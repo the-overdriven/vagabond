@@ -2097,8 +2097,6 @@
     }
   },
   "worldDecorations": {
-    "surfaceFissures": 4,
-    "minFissureSpacing": 12,
     "uniqueVillageClearance": 40,
     "surfaceSkeletons": 3,
     "surfaceStones": 6,

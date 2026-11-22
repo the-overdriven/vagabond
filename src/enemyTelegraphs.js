@@ -114,7 +114,7 @@ function enemyBurrowReturnTile(e,pending) {
 
 function enemyBurrowShoveTiles(e) {
   const from={x:player.x,y:player.y}
-  const open=(x,y)=> (isWalkable(x,y) || deepSwimmingWater(x,y)) &&
+  const open=(x,y)=> playerForcedTerrainOpen(x,y) &&
     !grasslandTrees.has(keyXY(x,y))
   return DIRS8.map(([dx,dy])=>({x:from.x+dx,y:from.y+dy,dx,dy}))
     .filter(tile=>open(tile.x,tile.y) &&

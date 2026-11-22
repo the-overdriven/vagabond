@@ -16,7 +16,7 @@ const document = {getElementById: id => {
   return elements.get(id)
 }, querySelector: () => element(), querySelectorAll: () => [], createElement: () => element(),
   documentElement:element(),body:element(),head:element(),addEventListener(){},hidden:false}
-const context = {document, console, URL, Blob, Response, DecompressionStream, structuredClone, TextEncoder, TextDecoder,
+const context = {document, console, URL, Blob, Response, AbortController, DecompressionStream, structuredClone, TextEncoder, TextDecoder,
   performance:{now:()=>0}, innerWidth:1280, innerHeight:800, devicePixelRatio:1,
   navigator:{userAgent:'node rules check',maxTouchPoints:0}, location:{protocol:'http:',hostname:'localhost',search:'',href:'http://localhost/'},
   localStorage:{getItem:()=>null,setItem(){},removeItem(){}},

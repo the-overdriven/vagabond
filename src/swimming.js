@@ -4,10 +4,15 @@ function deepSwimmingWater(x, y) {
   return map[y]?.[x] === 'water'
 }
 
+// Actual swimming excludes Water Walking, shallow rivers and ice.
+function isActuallySwimming(x = player.x, y = player.y) {
+  return deepSwimmingWater(x, y) && !ArtifactWayfaring.walkingOnWater(x,y)
+}
+
 function canUseItemsWhileSwimming() {
   // The same input gate covers item actions during ordered monster attacks.
   if (enemyAttackPresentationPending()) return false
-  if (!deepSwimmingWater(player.x, player.y) || raceHas('swims')) return true
+  if (!isActuallySwimming() || raceHas('swims')) return true
   log('You cannot use items while swimming.', 'info')
   return false
 }
@@ -20,11 +25,11 @@ function resetSwimming() {
 
 function isDrowning() {
   return player.hp > 0 && !player.godMode && !raceHas('swims') &&
-    deepSwimmingWater(player.x, player.y) && player.swimTurns > (player.swimming || 0)
+    isActuallySwimming() && player.swimTurns > (player.swimming || 0)
 }
 
 function reconcileSwimming() {
-  if (!deepSwimmingWater(player.x, player.y) || player.hp <= 0) resetSwimming()
+  if (!isActuallySwimming() || player.hp <= 0) resetSwimming()
   if (!isDrowning()) player.drowning = false
 }
 
@@ -38,8 +43,13 @@ function advanceSwimming(moved, from = null, fellThroughIce = false) {
     ? prior.x !== from.x || prior.y !== from.y
     : prior.x !== here.x || prior.y !== here.y))) resetSwimming()
   if (!deepSwimmingWater(here.x, here.y)) {
-    if (from && deepSwimmingWater(from.x,from.y)) AdaptivePlayerTrolling.onWaterExited(here)
+    ArtifactWayfaring.waterLand()
+    if (from && deepSwimmingWater(from.x,from.y) && (prior || player.swimTurns>0)) AdaptivePlayerTrolling.onWaterExited(here)
     if (player.swimPosition || player.swimTurns > 0) log('You reach the shore and catch your breath.', 'info')
+    resetSwimming()
+    return
+  }
+  if (ArtifactWayfaring.walkingOnWater(here.x,here.y)) {
     resetSwimming()
     return
   }
@@ -86,7 +96,7 @@ function advanceSwimming(moved, from = null, fellThroughIce = false) {
   }
 }
 
-function drowningShore() {
+function drowningShore(safe = false) {
   const queue = [{x: player.x, y: player.y}]
   const visited = new Set([keyXY(player.x, player.y)])
   for (let head = 0; head < queue.length; head++) {
@@ -95,8 +105,13 @@ function drowningShore() {
       const x = p.x + dx, y = p.y + dy, key = keyXY(x, y)
       if (visited.has(key)) continue
       visited.add(key)
-      if (deepSwimmingWater(x, y)) queue.push({x, y})
+      if (deepSwimmingWater(x, y)) {
+        if (!safe || !occupied.has(key)) queue.push({x, y})
+      }
       else if (isWalkable(x, y) && map[y][x] !== 'river' &&
+        (!safe || (!['lava','frozenriver'].includes(map[y][x]) && !isLakeIce(map[y][x]) &&
+          !grasslandTrees.has(keyXY(x,y)) && !DungeonTraps.isTrigger(map[y][x]) && !DungeonHazards.knownDanger(x,y) && !DungeonHazards.gasAt(x,y) &&
+          !occupied.has(keyXY(x,y)) && !Mimics.hiddenAt(x,y))) &&
         !enemies.some(e => e.alive && onCurrentLevel(e) && e.x === x && e.y === y) &&
         !(currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) return {x, y}
     }

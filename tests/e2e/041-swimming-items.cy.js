@@ -64,7 +64,8 @@ describe('Swimming restrictions and visibility', () => {
         const fractions = []
         try {
           drawSwimmingCreature = (...args) => {
-            if (args.length === 4) fractions.push(args[3])
+            // Player rendering now supplies a fifth argument for Water Walking.
+            if (args.length === 5 && !args[4]) fractions.push(args[3])
             return original(...args)
           }
           render()

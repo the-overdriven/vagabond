@@ -35,7 +35,11 @@ function forcePlayerPosition(x, y, presentation, fromPosition = null) {
   DungeonHazards.onActorEntered(player, from.x, from.y)
   if (player.hp <= 0 || deathTransition) return
   // Forced movement spends water endurance, but never earns swimming practice.
-  advanceSwimming(false, from)
+  ArtifactWayfaring.lavaEntry(from)
+  if (player.hp <= 0 || deathTransition) return
+  // Forced entry onto a cracking magical bridge collapses it before swimming.
+  if (!Frostwalker.forcedEntry(player)) advanceSwimming(false, from)
+  Frostwalker.reconcileCrossing()
   if (player.hp <= 0 || deathTransition) return
   currentUndergroundFov()
   animateCameraToPlayer(from, presentation)
@@ -43,17 +47,21 @@ function forcePlayerPosition(x, y, presentation, fromPosition = null) {
   updateTooltip()
 }
 
+function playerForcedTerrainOpen(x,y) {
+  return isWalkable(x,y) || deepSwimmingWater(x,y) || (map[y]?.[x]==='lava' && ArtifactWayfaring.lavaWalk())
+}
+
 function enemyKnockback(e, line, charge = false) {
   if (playerHasArtifactAbility('immovable')) return
   const x = player.x + line.sx, y = player.y + line.sy
   if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H ||
-      !(isWalkable(x, y) || deepSwimmingWater(x, y)) ||
+      !playerForcedTerrainOpen(x,y) ||
       grasslandTrees.has(keyXY(x, y)) ||
       enemies.some(other => other.alive && onCurrentLevel(other) && other.x === x && other.y === y) ||
       (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) return
   if (line.sx && line.sy &&
-      (!(isWalkable(player.x + line.sx, player.y) || deepSwimmingWater(player.x + line.sx, player.y)) ||
-       !(isWalkable(player.x, player.y + line.sy) || deepSwimmingWater(player.x, player.y + line.sy)))) return
+      (!playerForcedTerrainOpen(player.x + line.sx, player.y) ||
+       !playerForcedTerrainOpen(player.x, player.y + line.sy))) return
   log(`The ${e.name}'s ${charge ? 'charge' : 'critical strike'} knocks you back!`, 'bad')
   const impactAt = charge && e.chargeAnim
     ? e.chargeAnim.start + e.chargeAnim.duration : null
@@ -65,7 +73,7 @@ function enemyKnockback(e, line, charge = false) {
 
 function tryEnemyRush(e) {
   const charge = enemyHasAbility(e, 'charge')
-  if ((!charge && !enemyHasAbility(e, 'pull')) || playerHiddenFromEnemy(e) ||
+  if ((!charge && !enemyHasAbility(e, 'pull')) || playerHiddenFromEnemy(e) || ArtifactWayfaring.truce(e) ||
       enemyIsPassive(e) || playerInsideSanctuary() || e.summonedTurn === turnCount) return false
   if (!charge && playerHasArtifactAbility('immovable')) return false
   const line = enemyChargeLine(e, charge)
@@ -101,10 +109,17 @@ function tryEnemyRush(e) {
         spawnDamageNumber(from.x, from.y, 'Web!', RENDER_STYLE.damage.miss, throwMs + presentation.delay)
       }
     }
-    forcePlayerPosition(e.x + line.sx, e.y + line.sy,
+    const ordinaryDistance = line.distance - 1
+    const distance = flavorId === 'web' ? ArtifactWayfaring.webPullDistance(e,ordinaryDistance) : ordinaryDistance
+    if (distance > 0) forcePlayerPosition(from.x-line.sx*distance,from.y-line.sy*distance,
       animated ? {kind:'pull', delay:throwMs + presentation.delay, duration:pullMs} : undefined)
+    if (distance < ordinaryDistance) {
+      // Keep the resistance log immediate, but let the Web! impact text finish first.
+      const popupDelay = flavor.projectile ? presentation.delay + throwMs + DAMAGE_ANIM_MS : 0
+      artifactAbilityMessage('escape_artist', 'Escape Artist resists the pull!', 'You resist the pull!', 'good', popupDelay)
+    }
     if (player.hp > 0 && !deathTransition && flavor.overlay === 'web') markSpiderWeb(e, animated, presentation.delay)
-    if (player.hp > 0 && !deathTransition) {
+    if (player.hp > 0 && !deathTransition && Math.max(Math.abs(player.x-e.x),Math.abs(player.y-e.y)) <= ATTACK_RANGE) {
       enemyAttackPlayer(e, true)
       // The melee lunge is already sequenced after the web's flight and drag.
     }

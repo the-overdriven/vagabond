@@ -209,10 +209,10 @@ const Mimics = (() => {
     for (const chest of adjacent) if(player.hp>0 && !deathTransition)reveal(chest)
     return adjacent.length>0
   }
-  function revealBump(x,y) {
-    const chest=groundItems.find(g=>g.isMimic&&onCurrentLevel(g)&&g.x===x&&g.y===y)
-    return reveal(chest)
+  function hiddenAt(x,y) {
+    return groundItems.find(g=>g.isMimic&&onCurrentLevel(g)&&g.x===x&&g.y===y)
   }
+  function revealBump(x,y) { return reveal(hiddenAt(x,y)) }
   function deathLoot(e) {
     if(!e.mimicLoot)return false
     const loot=e.mimicLoot
@@ -221,13 +221,13 @@ const Mimics = (() => {
     for(const item of loot.items||[]) {
       // These are precisely the pre-rolled contents of the disguised chest.
       if(isStackableKind(item.kind))addInventoryItem(item.kind,{count:item.count||1})
-      else player.inventory.push(item)
+      else carryItem(item)
       const label = item.kind === 'artifact' ? artifactDisplayName(item) : item.name || itemDefinition(item.kind)?.name || item.kind
       lootLog(`The ${e.name} contained ${label}.`,item,label)
       if (item.kind === 'artifact' && enemyIsVisibleOnMainView(e)) spawnRareDropAnim(e)
     }
     return true
   }
-  return {initialize,update,onLoad,onLevelChange,revealAdjacent,revealBump,revealBySpell,deathLoot,
+  return {initialize,update,onLoad,onLevelChange,revealAdjacent,hiddenAt,revealBump,revealBySpell,deathLoot,
     UNSEEN_THRESHOLD,SHIFT_CHANCE,BONUS_GOLD,STATIONARY_AFTER_REVEAL,ATTACK_ON_REVEAL}
 })()

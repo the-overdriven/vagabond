@@ -22,7 +22,9 @@ function tickCombatPotions() {
 // Called at damage resolution, before death checks, poison, knockback or extra hits.
 // A shield protects one damage event, never the rest of the turn.
 function absorbPlayerFatalDamage() {
-  if (player.hp > 0 || !player.deathShieldReady) return false
+  if (player.hp > 0) return false
+  if (ArtifactWayfaring.rescueCastaway()) return true
+  if (!player.deathShieldReady) return false
   player.hp = 1
   player.deathShieldReady = false
   log('Your death shield shatters, leaving you barely alive!', 'good')

@@ -8,7 +8,7 @@ const WRESTLE_COOLDOWN = 5
 function playerWrestleTileOpen(x, y) {
   // Forced displacement never teaches Swimming or puts an untrained player
   // into deep water. God mode retains its ordinary movement exemption.
-  if (deepSwimmingWater(x, y) && !player.godMode && !raceHas('swims') && player.swimming <= 0) return false
+  if (deepSwimmingWater(x, y) && !ArtifactWayfaring.walkingOnWater(x,y) && !player.godMode && !raceHas('swims') && player.swimming <= 0) return false
   return isWalkableForPlayer(x, y) && !grasslandTrees.has(keyXY(x, y))
 }
 
@@ -57,7 +57,7 @@ function tryEnemyWrestle(e) {
   e.aware = true
   log(`The ${e.name} grabs you and swaps places with you!`, 'bad')
   spawnDamageNumber(fromPlayer.x, fromPlayer.y, 'Swapped!', RENDER_STYLE.damage.playerHit)
-  finishEnemyMove(e, fromEnemy.x, fromEnemy.y)
+  finishEnemyMove(e, fromEnemy.x, fromEnemy.y, true)
   // A trap may kill the monster; the player entry still resolves independently.
   forcePlayerPosition(fromEnemy.x, fromEnemy.y,
     {kind:'wrestle', duration: MOVE_ANIM_MS}, fromPlayer)

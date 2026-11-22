@@ -3,7 +3,7 @@
 // Each status starts on the monster's action and ticks at the start of the
 // following world turns. Absolute cooldown deadlines avoid animation races.
 function applyEnemyContactStatuses(e) {
-  if (enemyHasAbility(e, 'root') && turnCount >= e.rootReadyTurn && chance(ROOT_CONFIG.hitChance ?? 0.25)) {
+  if (!ArtifactWayfaring.rootImmune() && enemyHasAbility(e, 'root') && turnCount >= e.rootReadyTurn && chance(ROOT_CONFIG.hitChance ?? 0.25)) {
     player.rootTurns = ROOT_CONFIG.durationTurns ?? 3
     player.rootSourceId = e.id
     player.rootFlavor = ENEMY_TEMPLATE_BY_NAME[e.baseName || e.name]?.rootFlavor || 'generic'

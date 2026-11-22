@@ -128,9 +128,41 @@ describe('Low-HP enrage', () => {
     })()`))
   })
 
-  it('shows one red animated label per living threshold crossing and skips replay simulation', () => {
+  it('distinguishes enrage from pursuit and shows one red label per living threshold crossing', () => {
     cy.window().then(win => win.eval(`(() => {
       const e=rushEnemy('Orc'); e.maxHp=100; e.hp=29
+      const oldCtx=ctx,oldTilePx=TILE_PX,oldRng=rngState
+      let outlines=[],dash=[],stack=[]
+      const spy={strokeStyle:'initial',lineWidth:1,
+        save(){stack.push([this.strokeStyle,this.lineWidth,dash.slice()])},
+        restore(){[this.strokeStyle,this.lineWidth,dash]=stack.pop()},
+        setLineDash(value){dash=value.slice()},
+        strokeRect(x,y,w,h){outlines.push({color:this.strokeStyle,dash:dash.slice(),x,y,w,h})}}
+      try {
+        ctx=spy
+        for (const size of [12,48,62]) {
+          TILE_PX=size
+          e.aware=false;e.alarmed=false;e.hp=29;outlines=[]
+          drawEnemyStatusOutlines(e,0,0)
+          rushCheck(outlines.length===1 && outlines[0].color===RENDER_STYLE.overlays.enemyEnragedOutline &&
+            outlines[0].dash.length===2 && outlines[0].w>0,'unaware enraged enemy has only dashed amber marker')
+          e.aware=true;outlines=[]
+          drawEnemyStatusOutlines(e,0,0)
+          rushCheck(outlines.length===2 && outlines[0].color===RENDER_STYLE.overlays.enemyAwareOutline &&
+            outlines[0].dash.length===0 && outlines[1].color===RENDER_STYLE.overlays.enemyEnragedOutline &&
+            outlines[1].x>outlines[0].x,'pursuit and rage remain distinguishable when combined')
+          e.hp=30;outlines=[]
+          drawEnemyStatusOutlines(e,0,0)
+          rushCheck(outlines.length===1 && outlines[0].color===RENDER_STYLE.overlays.enemyAwareOutline,
+            'healing removes rage marker but not pursuit outline')
+          e.aware=false;e.alarmed=true;outlines=[]
+          drawEnemyStatusOutlines(e,0,0)
+          rushCheck(outlines.length===0,'Alarmed alone does not imply active pursuit')
+          rushCheck(stack.length===0 && dash.length===0 && spy.strokeStyle==='initial',
+            'outline rendering restores canvas settings')
+        }
+        rushCheck(rngState===oldRng,'status drawing does not consume gameplay RNG')
+      } finally {ctx=oldCtx;TILE_PX=oldTilePx;e.aware=false;e.alarmed=false;e.hp=29}
       damageAnims=[]; replayAnimationsDisabled=false; replaySimulationMode=false
       logEnemyEnrageTransition(e,false)
       const label=damageAnims.find(effect=>effect.amount==='Enraged!')

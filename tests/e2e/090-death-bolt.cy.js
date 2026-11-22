@@ -46,7 +46,8 @@ describe('Generic Death Bolt and skull projectile', () => {
         if(!tryEnemySpell(caster))throw Error('Death Bolt failed to cast')
         if(!projectileAnims.length||projectileAnims[0].duration!==650)throw Error('skull flight absent')
         render()
-        if(${tiles}&&!preloadedImages.has('img/projectiles/death-bolt.png'))throw Error('skull image not preloaded')
+        if(${tiles}&&!(preloadedImages.get('img/projectiles/death-bolt.png')?.naturalWidth > 0))
+          throw Error('skull image not decoded: img/projectiles/death-bolt.png')
       }finally{chance=prevChance;replayAnimationsDisabled=true}
     })()`))
     cy.get('#logpanel').should('contain.text','casts a death bolt')

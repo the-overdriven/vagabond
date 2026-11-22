@@ -16,10 +16,12 @@
 - dangerous enemies with speed and aggro differences
 - same enemy types can have different variants
 - caves and progressively deeper underground areas
-- procedural artifacts with unknown buffs and debuffs (curses) - unknown unless identified
+- procedural artifacts with unknown buffs and debuffs (curses) - unknown unless
+  identified
 - NPCs and environmental lore
 - deliberately unexplained landmarks and mysteries
-- normal-mode death returning the player to the Temple rather than ending the character
+- normal-mode death returning the player to the Temple rather than ending the
+  character
 
 Generic roguelike mechanics are not assumed unless implemented.
 
@@ -94,46 +96,52 @@ The world is generated **only after Begin confirms a valid name and race**.
 Startup loads content and essential images under a rotating skull with
 `Loading...`; after confirmation, the overlay says `Generating world...`.
 The overlay blocks input and allows a paint before synchronous generation.
+Content and image requests retry a transient transport failure once after a
+bounded request timeout. Missing or invalid content is still reported as an
+error. Essential sprites are decoded before the selection screen opens;
+background image warming uses bounded concurrency, shares in-flight requests,
+and stops queuing new work when the page is discarded. Animated terrain frames
+are also prepared at the current zoom when a late image load succeeds.
 If animation frames are suspended, startup and game operations continue after
 a short presentation-only fallback instead of waiting indefinitely for a paint.
 Character race and Permadeath are set before world generation. Invalid names
 and duplicate Begin clicks cannot start a second world.
 
-**World size** is independently selectable at character creation (XS, S, M, L, XL,
-XXL); **L** is the default 260×260 surface. See [§9. World](#9-world).
-The optional **Cursed world** setting is described in [§85. Cursed World](#85-cursed-world),
-including its [Adaptive Player Trolling](#adaptive-player-trolling) reactions.
-Loading a save bypasses character creation.
-While race selection is open, the HUD hides the not-yet-created player's
-stats entirely, without reserving their space. On desktop the remaining
-Save/Load and other HUD actions occupy a compact bar at the upper right;
-on touch layouts they keep the normal tap-sized header. The full centered
-HUD returns during play. Race cards still explain each race's gameplay bonuses.
-On desktop, the selection overlay cycles through eight static 1920×1080 WebP
-panoramas captured offline from Vagabond's surface world generation and tile
-renderer. The images show terrain blending, biomes, trees, and small creatures;
-some scenes use arranged creatures for composition, while others show only
-monsters in their naturally generated spawn positions. Neither the player nor
-the gameplay HUD, messages, or pointer are visible. The backdrops drift slowly
-through CSS and advance on successive race-selection openings, including after
-page reloads when browser storage is available. These visual-only assets never
-advance gameplay RNG, change world geometry, or affect replay or saving.
-No preview world is generated at runtime: world generation happens only after
-confirming **Begin your journey**. All eight WebPs are precached by the service
-worker and preloaded and decoded on desktop during `Loading...` before the
-selection appears, avoiding a black flash on first display; subsequent visits
-can use the cache. On mobile/touch layouts the original static dark background
-remains and the large-image preload is skipped.
+**World size** is independently selectable at character creation (XS, S, M, L,
+XL, XXL); **L** is the default 260×260 surface. See [§9. World](#9-world). The
+optional **Cursed world** setting is described in
+[§85. Cursed World](#85-cursed-world), including its
+[Adaptive Player Trolling](#adaptive-player-trolling) reactions. Loading a save
+bypasses character creation. While race selection is open, the HUD hides the
+not-yet-created player's stats entirely, without reserving their space. On
+desktop the remaining Save/Load and other HUD actions occupy a compact bar at
+the upper right; on touch layouts they keep the normal tap-sized header. The
+full centered HUD returns during play. Race cards still explain each race's
+gameplay bonuses. On desktop, the selection overlay cycles through eight static
+1920×1080 WebP panoramas captured offline from Vagabond's surface world
+generation and tile renderer. The images show terrain blending, biomes, trees,
+and small creatures; some scenes use arranged creatures for composition, while
+others show only monsters in their naturally generated spawn positions. Neither
+the player nor the gameplay HUD, messages, or pointer are visible. The backdrops
+drift slowly through CSS and advance on successive race-selection openings,
+including after page reloads when browser storage is available. These
+visual-only assets never advance gameplay RNG, change world geometry, or affect
+replay or saving. No preview world is generated at runtime: world generation
+happens only after confirming **Begin your journey**. All eight WebPs are
+precached by the service worker and preloaded and decoded on desktop during
+`Loading...` before the selection appears, avoiding a black flash on first
+display; subsequent visits can use the cache. On mobile/touch layouts the
+original static dark background remains and the large-image preload is skipped.
 The 🎲 button next to the name input chooses a random name from
 `content/random_names_human.json`; this is cosmetic and does not consume the
-game's seeded RNG or affect replay.
-On desktop the character-selection overlay stays above gameplay-only overlays
-(the side minimap, keyboard hints and message log) while the top HUD remains
-visible; the viewport-anchored form itself stays below the HUD even when a
-field is focused or scrolled into view. On narrow windows, only the character
-form scrolls within the space below the HUD so its fields remain accessible
-without covering the Load button. Desktop form height includes its padding and
-borders within that available space, including short windows with a wrapped HUD.
+game's seeded RNG or affect replay. On desktop the character-selection overlay
+stays above gameplay-only overlays (the side minimap, keyboard hints and message
+log) while the top HUD remains visible; the viewport-anchored form itself stays
+below the HUD even when a field is focused or scrolled into view. On narrow
+windows, only the character form scrolls within the space below the HUD so its
+fields remain accessible without covering the Load button. Desktop form height
+includes its padding and borders within that available space, including short
+windows with a wrapped HUD.
 
 There are currently **10 races**.
 
@@ -143,8 +151,9 @@ There are currently **10 races**.
 
 ## Halfling
 
-**-1 AGGRO range from all enemies; +20 percentage points to forest concealment (spotting checks),
-including against alarmed unaware enemies (alarmed but not chasing the player).**
+**-1 AGGRO range from all enemies; +20 percentage points to forest concealment
+(spotting checks), including against alarmed unaware enemies (alarmed but not
+chasing the player).**
 
 ## Catling
 
@@ -185,12 +194,12 @@ ordinary river/water SPD penalties, but not cold-river slowdown (§11).
 
 Regenerates:
 
-**1 HP every 5 turns at levels 1–4, every 4 turns at levels 5–9, and every
-3 turns from level 10 onward.** The rate stays at 3 turns at higher levels. Cooked-food regeneration and fireplace
-resting also benefit Trolls, alongside this natural regeneration.
-The interval uses the global turn count, and regeneration stops at full HP.
-The race parameters are `regenEvery: 5`, `regenLevelStep: 5`, and
-`regenMinEvery: 3` in `content/races.json`.
+**1 HP every 5 turns at levels 1–4, every 4 turns at levels 5–9, and every 3
+turns from level 10 onward.** The rate stays at 3 turns at higher levels.
+Cooked-food regeneration and fireplace resting also benefit Trolls, alongside
+this natural regeneration. The interval uses the global turn count, and
+regeneration stops at full HP. The race parameters are `regenEvery: 5`,
+`regenLevelStep: 5`, and `regenMinEvery: 3` in `content/races.json`.
 
 ---
 
@@ -199,22 +208,22 @@ The race parameters are `regenEvery: 5`, `regenLevelStep: 5`, and
 ## Bestiary
 
 The Bestiary is opened with **B**, from the map sidebar, or from the Character
-inventory panel. It lists each base species the current character has killed
-at least once and shows its total count. Its introduction reports how many
+inventory panel. It lists each base species the current character has killed at
+least once and shows its total count. Its introduction reports how many
 different species have been slain (zero for an empty list), rather than the
-total number of kills. Entries run from weakest to strongest
-by base `round(ATK + DEF + SPD + GRACE + MaxHP / 10)`, with alphabetical ties. Prefixes and
-random equipment do not affect the order; records without a species template
-follow the known species. On desktop, hovering or keyboard-
-focusing an entry shows its portrait above the Bestiary overlay; on touch
-screens, tapping a row expands a small portrait below the name and count. The
-touch layout keeps the title and header close control visible while entries scroll,
-and provides a separate Close button below the list.
-Desktop retains the compact modal and hover portrait. This character-specific
-record is separate from the online Graveyard. Prefix variants share their
-base-species entry; unencountered species are hidden. The list reads the saved
-per-species kill counters and refreshes when opened. It does not affect gameplay,
-RNG or replay actions. A new permadeath character begins with an empty Bestiary.
+total number of kills. Entries run from weakest to strongest by base
+`round(ATK + DEF + SPD + GRACE + MaxHP / 10)`, with alphabetical ties. Prefixes
+and random equipment do not affect the order; records without a species template
+follow the known species. On desktop, hovering or keyboard- focusing an entry
+shows its portrait above the Bestiary overlay; on touch screens, tapping a row
+expands a small portrait below the name and count. The touch layout keeps the
+title and header close control visible while entries scroll, and provides a
+separate Close button below the list. Desktop retains the compact modal and
+hover portrait. This character-specific record is separate from the online
+Graveyard. Prefix variants share their base-species entry; unencountered species
+are hidden. The list reads the saved per-species kill counters and refreshes
+when opened. It does not affect gameplay, RNG or replay actions. A new
+permadeath character begins with an empty Bestiary.
 
 On the **first entry to z:-5 in the Dwarven Ruins**, one extra ordinary
 monster of a species absent from that character's kill record appears in a
@@ -252,12 +261,12 @@ input blocking and consumes no turn or RNG. Desktop keeps its collapsible
 character stats. Mobile sheet navigation is presentation state, not save data.
 
 A level gain displays a brief animated **Level Up!** notice with the resulting
-level and total max-HP, ATK, DEF, SPD and GRACE gains. Multiple levels earned from one XP
-award share one notice. The notice requires no dismissal, does not intercept
-input, and never delays stat changes or turns. Reduced-motion preferences
-suppress the animation. Replay playback suppresses the notice; recording and
-live play use identical gameplay rules. Loading or starting another character
-clears any outstanding notice.
+level and total max-HP, ATK, DEF, SPD and GRACE gains. Multiple levels earned
+from one XP award share one notice. The notice requires no dismissal, does not
+intercept input, and never delays stat changes or turns. Reduced-motion
+preferences suppress the animation. Replay playback suppresses the notice;
+recording and live play use identical gameplay rules. Loading or starting
+another character clears any outstanding notice.
 
 ## Strongest kill achievement
 
@@ -267,15 +276,15 @@ strength is:
 
 `strength = round(ATK + DEF + SPD + GRACE + MaxHP / 10)`
 
-Round the final sum, not its components (44.4 → 44; 44.5 → 45). Bestiary
-sorting uses base species stats; individual kill records and enemy artifact
+Round the final sum, not its components (44.4 → 44; 44.5 → 45). Bestiary sorting
+uses base species stats; individual kill records and enemy artifact
 probabilities use a permanent enemy snapshot. It includes spawn variance,
 prefixes, equipment and permanent maximum-HP changes. Equipped weapon GRACE
 replaces natural GRACE; defensive gear GRACE penalties apply. Assigned shooters
 use their configured ranged ATK (melee ATK after permanent ranged disarm),
-regardless of current ammunition or combat mode. Remaining HP, terrain,
-Alarmed, Enrage, Charge, inspiration, temporary stat penalties and temporary
-flight bonuses do not contribute. Combat comparisons for AI and relative-strength
+regardless of current ammunition or combat mode. Remaining HP, terrain, Alarmed,
+Enrage, Charge, inspiration, temporary stat penalties and temporary flight
+bonuses do not contribute. Combat comparisons for AI and relative-strength
 abilities retain the original four-stat formula without HP or rounding.
 
 The highest rounded strength wins; equal rounded scores retain the first kill.
@@ -283,12 +292,12 @@ Only player-credited kills qualify. The snapshot is taken before death-time
 mutations. No kills displays “None”. The record grants no gameplay bonus.
 
 The achievement survives normal deaths, current saves and replay; a new
-character starts without it. Saves retain exact permanent ATK/DEF/SPD/GRACE/MaxHP
-and the authoritative rounded score. Graveyard and Highscores upload that score
-unchanged with independently rounded integer component stats; their sum need
-not reproduce the exact score. Invalid snapshots are omitted rather than
-blocking the online record. Historical online achievements are not recalculated.
-Player leaderboard ranking remains separate.
+character starts without it. Saves retain exact permanent
+ATK/DEF/SPD/GRACE/MaxHP and the authoritative rounded score. Graveyard and
+Highscores upload that score unchanged with independently rounded integer
+component stats; their sum need not reproduce the exact score. Invalid snapshots
+are omitted rather than blocking the online record. Historical online
+achievements are not recalculated. Player leaderboard ranking remains separate.
 
 ## ATK
 
@@ -381,14 +390,15 @@ continues to blink with reduced-motion enabled; its earlier static-red fallback
 prevented the requested blink for those players.
 
 Crossing strictly below 20% HP while alive logs `You're hurt badly.` in red
-once, immediately after the damage-source message. Recovering to 20% or above rearms it; exactly 20% is not low HP. Fatal
-hits do not emit this warning. Damage and healing resolve the warning state
-immediately, and its latch is saved/restored in current saves and replay
-snapshots. Death closes inventory for both ordinary and permadeath characters.
+once, immediately after the damage-source message. Recovering to 20% or above
+rearms it; exactly 20% is not low HP. Fatal hits do not emit this warning.
+Damage and healing resolve the warning state immediately, and its latch is
+saved/restored in current saves and replay snapshots. Death closes inventory for
+both ordinary and permadeath characters.
 
-On desktop, the HUD labels **ATK**, **DEF**, **SPD**, and **MF** expose short hover
-tooltips explaining their gameplay role. These are presentation-only and do not
-change stat calculations.
+On desktop, the HUD labels **ATK**, **DEF**, **SPD**, and **MF** expose short
+hover tooltips explaining their gameplay role. These are presentation-only and
+do not change stat calculations.
 
 ---
 
@@ -436,7 +446,8 @@ On level-up:
 - level increases by 1
 - XP is reduced by the threshold
 - maximum HP increases by 10
-- SPD increases by 1 on every second level, starting from lvl 2 (`floor(level / 2)`)
+- SPD increases by 1 on every second level, starting from lvl 2
+  (`floor(level / 2)`)
 - player GRACE bonus increases by 1 on every fifth level (`floor(level / 5)`)
 - Orcs gain +1 ATK, Dwarves +1 DEF, and Catlings +1 SPD on every fifth level
 - derived stats are recalculated as needed
@@ -448,9 +459,9 @@ Racial scaling is `3 + floor(level / 5)` in the race's specialty stat. It stacks
 with ordinary level gains. Death can create XP debt but does not lower level,
 so it does not remove racial milestones. New characters restart at +3.
 
-Monster kill XP uses permanent combat stats and an additive bonus for each distinct
-monster ability, configured in `content/monster_xp_weights.json`. Monster tiers do
-**not** affect the reward:
+Monster kill XP uses permanent combat stats and an additive bonus for each
+distinct monster ability, configured in `content/monster_xp_weights.json`.
+Monster tiers do **not** affect the reward:
 
 `stat XP = (max HP + 2 × ATK + 2 × DEF + 0.5 × SPD + 0.5 × GRACE) / 3`
 
@@ -516,25 +527,23 @@ SPD and GRACE penalties are unchanged; passive shield DEF still applies.
 Successful blocks have a visible **Block!** cue and an explanatory message.
 
 Each damaging melee or bow hit trains its respective skill. A landed melee
-attack trains Shielding when the player carries a shield. Misses, immune
-targets and zero-damage offensive hits give no skill XP. Each monster has a
-persistent **2–6 XP budget per skill** of
-`clamp(ceil(monster kill XP / 25), 2, 6)`. Eligible actions give 1 skill XP,
-or 2 against enemies at least two tiers above the minimum relevant tier.
-The minimum eligible monster tier is
+attack trains Shielding when the player carries a shield. Misses, immune targets
+and zero-damage offensive hits give no skill XP. Each monster has a persistent
+**2–6 XP budget per skill** of `clamp(ceil(monster kill XP / 25), 2, 6)`.
+Eligible actions give 1 skill XP, or 2 against enemies at least two tiers above
+the minimum relevant tier. The minimum eligible monster tier is
 `clamp(floor(player level / 5), 1, 5)`; weaker opponents and God Mode award no
 combat skill XP. Budgets persist across saves and replay to prevent indefinite
 training against regenerating or intentionally prolonged opponents.
 
 For skill value `s`, the next point costs `3 × (1 + floor(s / 25))` skill XP,
-for cumulative requirements **75 / 225 / 450 / 750** at levels
-**25 / 50 / 75 / 100**. The character sheet shows each skill simply as a
-**0–100 rating**; a desktop tooltip appears during hover or keyboard focus,
-while touch layouts let players expand one skill description at a time.
-Descriptions explain training, the current effect and the maximum benefit;
-intermediate XP stays internal.
-Reaching level 1 or a multiple of 25 is announced in the log;
-training and blocking resolve deterministically, independently of animations.
+for cumulative requirements **75 / 225 / 450 / 750** at levels **25 / 50 / 75 /
+100**. The character sheet shows each skill simply as a **0–100 rating**; a
+desktop tooltip appears during hover or keyboard focus, while touch layouts let
+players expand one skill description at a time. Descriptions explain training,
+the current effect and the maximum benefit; intermediate XP stays internal.
+Reaching level 1 or a multiple of 25 is announced in the log; training and
+blocking resolve deterministically, independently of animations.
 
 ---
 
@@ -576,47 +585,47 @@ diagonal neighbor) invokes the same `tryMove(dx, dy)` combat path as keyboard
 movement, so turn consumption, replay recording, combat rules, and animations
 remain shared rather than duplicated. Hovering any visible living enemy, whether
 adjacent or distant, changes the canvas cursor to a red diagonal sword whose
-hotspot is the sword tip. Outside an enemy, the inline cursor override is cleared so the canvas keeps its
-existing stylesheet/default cursor. Clicking a visible, non-adjacent enemy
-uses normal auto-pathing toward its clicked tile, including the path preview on
-hover. Once clicked, auto-travel follows that particular creature: before each
-next step it refreshes the route when the target changes position or the way
-ahead becomes blocked. Reaching melee range attacks through the ordinary
-movement/combat rules. The pursuit ends if the creature dies, becomes unseen,
-leaves the visible screen or level, or cannot be reached using known terrain.
-Clicking empty ground still targets a fixed tile. Unreachable targets do not
-start a route. Coarse-pointer/mobile input does not use this cursor or
-desktop monster-click behavior. Both sword and bow SVGs are decoded with the essential startup images,
-before character selection opens. The game rasterizes them into ready-to-use
-PNG data cursors, including a greyed-out bow variant for unavailable shots;
-no new SVG fetch or PNG conversion is performed on first hover. All three
-variants retain their sword/arrow-tip hotspots. Touch layouts do not prepare
-or show desktop cursors.
-The chase target and planned route are transient UI state, cleared by loading a
-save or replay; the executed movement and combat actions remain individually
-recorded for deterministic playback.
-Auto-path footsteps and the remaining-step counter render above underground
-fog/darkness, remaining legible on already-discovered tiles beyond current sight.
-When a planned melee route ends on an occupied enemy tile, its last footprint
-is omitted in both hover previews and active pursuit, keeping the creature's
-sprite unobscured. The counter and movement/attack behavior remain unchanged.
-Pathfinding still refuses unknown underground tiles, so this does not expose
-unexplored terrain.
+hotspot is the sword tip. Outside an enemy, the inline cursor override is
+cleared so the canvas keeps its existing stylesheet/default cursor. Clicking a
+visible, non-adjacent enemy uses normal auto-pathing toward its clicked tile,
+including the path preview on hover. Once clicked, auto-travel follows that
+particular creature: before each next step it refreshes the route when the
+target changes position or the way ahead becomes blocked. Reaching melee range
+attacks through the ordinary movement/combat rules. The pursuit ends if the
+creature dies, becomes unseen, leaves the visible screen or level, or cannot be
+reached using known terrain. Clicking empty ground still targets a fixed tile.
+Unreachable targets do not start a route. Coarse-pointer/mobile input does not
+use this cursor or desktop monster-click behavior. Both sword and bow SVGs are
+decoded with the essential startup images, before character selection opens. The
+game rasterizes them into ready-to-use PNG data cursors, including a greyed-out
+bow variant for unavailable shots; no new SVG fetch or PNG conversion is
+performed on first hover. All three variants retain their sword/arrow-tip
+hotspots. Touch layouts do not prepare or show desktop cursors. The chase target
+and planned route are transient UI state, cleared by loading a save or replay;
+the executed movement and combat actions remain individually recorded for
+deterministic playback. Auto-path footsteps and the remaining-step counter
+render above underground fog/darkness, remaining legible on already-discovered
+tiles beyond current sight. When a planned melee route ends on an occupied enemy
+tile, its last footprint is omitted in both hover previews and active pursuit,
+keeping the creature's sprite unobscured. The counter and movement/attack
+behavior remain unchanged. Pathfinding still refuses unknown underground tiles,
+so this does not expose unexplored terrain.
 
-On fine-pointer desktop layouts, attacking an enemy also keeps a temporary combat
-inspection target. While the keyboard-hint panel is collapsed, if that enemy is not
-already being inspected by hovering its glyph, the shared enemy tooltip is pinned
-exactly 12 px inside the visible bottom-right edge of the full-screen desktop game
-stage and refreshes as the attack changes HP or combat status. Expanded keyboard hints suppress the pinned
-tooltip without discarding the
-combat target; collapsing the hints can reveal it again until the player moves.
-Attacking another enemy replaces the target; killing the target clears it. A successful
-player movement clears the temporary inspection, matching the mobile combat-inspection
-lifetime. Hovering the attacked enemy continues to use the normal cursor-relative
-tooltip instead of creating a second copy. The desktop side map and keyboard-hint
-panels use a tighter upper-right stack so their collapse controls stay clear of the
-combat tooltip. This desktop-only presentation state is not saved or replayed;
-coarse-pointer/mobile inspection and layout remain unchanged.
+On fine-pointer desktop layouts, attacking an enemy also keeps a temporary
+combat inspection target. While the keyboard-hint panel is collapsed, if that
+enemy is not already being inspected by hovering its glyph, the shared enemy
+tooltip is pinned exactly 12 px inside the visible bottom-right edge of the
+full-screen desktop game stage and refreshes as the attack changes HP or combat
+status. Expanded keyboard hints suppress the pinned tooltip without discarding
+the combat target; collapsing the hints can reveal it again until the player
+moves. Attacking another enemy replaces the target; killing the target clears
+it. A successful player movement clears the temporary inspection, matching the
+mobile combat-inspection lifetime. Hovering the attacked enemy continues to use
+the normal cursor-relative tooltip instead of creating a second copy. The
+desktop side map and keyboard-hint panels use a tighter upper-right stack so
+their collapse controls stay clear of the combat tooltip. This desktop-only
+presentation state is not saved or replayed; coarse-pointer/mobile inspection
+and layout remain unchanged.
 
 Walking into an adjacent NPC opens the same conversation menu as clicking that
 NPC. Opening or dismissing the menu consumes no turn, generates no dialogue RNG,
@@ -641,36 +650,48 @@ state; later drowning turns use the normal 5% damage. Merlings take no plunge
 hit. Forced entry grants no practice and still allows escape through adjacent
 water until reaching shore. The tile remains freezing (§12).
 
-Learning Swimming 5 allows five safe consecutive deep-water movements/waits;
-the entry step counts as the first. Each subsequent movement/wait costs
+Learning Swimming 5 allows five safe consecutive deep-water movements/waits; the
+entry step counts as the first. Each subsequent movement/wait costs
 `max(1, round(playerMaxHp() * 0.05))` HP and can kill. Only genuine successful
 deep-water movement earns practice: every 100 points increases Swimming by one
 with rollover and an improvement message. Practice is applied **before** testing
 the drowning threshold, so an improvement can prevent that step's damage.
-Waiting, failed movement, teleports, level changes and rendering earn no practice.
-Disabling god mode while already in deep water keeps adjacent water traversable
-until reaching shore or dying, but blocks entering water from land again without
-Swimming. The consecutive-wait cap does not trap a non-Merling in deep water;
-they can wait until drowning even with god mode's boosted HP.
+Waiting, failed movement, teleports, level changes and rendering earn no
+practice. Disabling god mode while already in deep water keeps adjacent water
+traversable until reaching shore or dying, but blocks entering water from land
+again without Swimming. The consecutive-wait cap does not trap a non-Merling in
+deep water; they can wait until drowning even with god mode's boosted HP.
 
 Entry, first drowning and reaching shore have transition messages, not per-step
-spam. Leaving deep water says "You reach the shore and catch your breath." Landing, homecoming, death and level transitions clear the current swim
-session but preserve learned skill/practice. Non-Merlings cannot use inventory
-items in deep water, including consumables, equipment, and readable items;
-blocked actions spend neither items nor turns. Drowning obscures the lower two
-thirds of the player sprite (ordinary swimming obscures half), and a fatal step
-logs **You have drown.** Drowning records the death in water, then places any
-remains on the nearest available walkable shore **after** the Temple respawn;
-breadth-first search and fixed direction order settle ties deterministically.
-The condition-based Drowning badge has no countdown and disappears whenever
-the danger no longer applies.
+spam. Leaving deep water says "You reach the shore and catch your breath."
+Landing, homecoming, death and level transitions clear the current swim session
+but preserve learned skill/practice. Non-Merlings cannot use inventory items in
+deep water, including consumables, equipment, and readable items; blocked
+actions spend neither items nor turns. Drowning obscures the lower two thirds of
+the player sprite (ordinary swimming obscures half), and a fatal step logs **You
+have drown.** Drowning records the death in water, then places any remains on
+the nearest available walkable shore **after** the Temple respawn; breadth-first
+search and fixed direction order settle ties deterministically. The
+condition-based Drowning badge has no countdown and disappears whenever the
+danger no longer applies.
 
 God mode bypasses movement/swimming restrictions only while enabled. Pressing
-**G** again disables it, resets the
-current swim session, unlearns Swimming and clears practice and any pending lesson.
-Non-Merlings can ask the Hermit for another lesson on an already completed quest,
-without respawning its predator. Merling reward entitlement is preserved. As before,
-god-mode stat grants and revealed exploration are not rolled back.
+**G** again disables it, resets the current swim session, unlearns Swimming and
+clears practice and any pending lesson. Non-Merlings can ask the Hermit for
+another lesson on an already completed quest, without respawning its predator.
+Merling reward entitlement is preserved. As before, god-mode stat grants and
+revealed exploration are not rolled back.
+
+Water Walking and other Wayfaring powers extend these rules (see Wayfaring).
+Water Walking is not actual swimming and does not incur ordinary deep-water
+movement penalties, swimming practice, or item-use restrictions. Ashen Wanderer
+damage is calculated once per completed world turn spent swimming. Both new
+environmental damage sources remain enabled in God Mode, use ordinary damage
+mitigation and charge abilities based on actual HP loss. Autopath combines
+remaining Water Walking and Swimming endurance; it avoids damaging lava, but
+allows harmless lava with Ashen Wanderer. Castaway uses the same shore search
+with stricter safe-landing checks, and does not relocate characters between
+levels.
 
 The character sheet displays Swimming as **Unknown**, its numeric value, or
 **Natural** for Merlings, refreshing when skill or race state changes.
@@ -678,30 +699,30 @@ The character sheet displays Swimming as **Unknown**, its numeric value, or
 ## Mining
 
 Mining is a **0–100** numerical skill that improves through extracting minerals
-and opening mineable stone. A carried Pickaxe is required, but does not need to be
-equipped. Attempting to move manually into an adjacent cracked wall, a crystal formation,
-or an overworld boulder initiates mining; all eight directions work. Mining
-cannot be performed while standing in deep water or an unfrozen river, regardless
-of race or God Mode. A blocked attempt displays a message without consuming a
-turn, triggering noise, or changing skill or excavation progress; solid frozen
-water remains valid footing. The first
-mining attempt in a playthrough displays a one-time warning and costs no turn,
-even when the wall looks solid. Every subsequent attempt, including one aimed
-at a new target, immediately strikes once per turn. The tutorial state persists
+and opening mineable stone. A carried Pickaxe is required, but does not need to
+be equipped. Attempting to move manually into an adjacent cracked wall, a
+crystal formation, or an overworld boulder initiates mining; all eight
+directions work. Mining cannot be performed while standing in deep water or an
+unfrozen river, regardless of race or God Mode. A blocked attempt displays a
+message without consuming a turn, triggering noise, or changing skill or
+excavation progress; solid frozen water remains valid footing. The first mining
+attempt in a playthrough displays a one-time warning and costs no turn, even
+when the wall looks solid. Every subsequent attempt, including one aimed at a
+new target, immediately strikes once per turn. The tutorial state persists
 through saves and replay. In normal play, hitting genuinely solid rock costs a
-turn and creates noise, but earns no Mining progress or XP.
-In God Mode, ordinary solid mine walls are traversable without a mining strike,
-as with other impassable terrain; marked mineable walls and crystals retain
-their normal mining interactions.
-Most mine walls are unbreakable. Each generated weak seam or mineral deposit is
-finite and keeps its identity even while concealed from an inexperienced miner.
-Partial damage persists across interruptions. Opening a mine wall leaves gray
-excavated floor; extracting a crystal already exposed on a mine floor leaves
-its original brown floor. Completing an overworld boulder has a **2.5%** chance
-to yield one reusable Flint Stone; individual strikes and underground deposits
-do not roll for flint. Clearing an overworld boulder restores its underlying surface terrain (grass, forest, hill
-or sand), even after world rotation or save/load. Both minimaps immediately
-reflect the cleared tile, as does the full-world map when opened.
+turn and creates noise, but earns no Mining progress or XP. In God Mode,
+ordinary solid mine walls are traversable without a mining strike, as with other
+impassable terrain; marked mineable walls and crystals retain their normal
+mining interactions. Most mine walls are unbreakable. Each generated weak seam
+or mineral deposit is finite and keeps its identity even while concealed from an
+inexperienced miner. Partial damage persists across interruptions. Opening a
+mine wall leaves gray excavated floor; extracting a crystal already exposed on a
+mine floor leaves its original brown floor. Completing an overworld boulder has
+a **2.5%** chance to yield one reusable Flint Stone; individual strikes and
+underground deposits do not roll for flint. Clearing an overworld boulder
+restores its underlying surface terrain (grass, forest, hill or sand), even
+after world rotation or save/load. Both minimaps immediately reflect the cleared
+tile, as does the full-world map when opened.
 
 Mining level determines the number of strikes and the ability to **recognize**
 concealed geological features. A wall may be mineable even before its clue is
@@ -722,16 +743,15 @@ leave the character at zero HP. All strike counts, strain, awareness thresholds,
 mineral rewards, and XP are configurable in `content/mining_config.json`.
 
 For skill value `s`, the next level costs `3 × (1 + floor(s / 25))` Mining XP;
-cumulative requirements are **75 / 225 / 450 / 750 XP** at levels
-**25 / 50 / 75 / 100**. The experience multiplier is configurable.
-Normal underground walls and minerals grant XP only once when completed.
-Overworld boulder removal gives 1 XP for each of the first five stones, then
-`1 / n` XP for the *n*th stone. Fractional XP is accumulated in deterministic
-integer units, so endlessly mining surface stones barely advances the skill.
-Surface boulders do not display a hover tooltip; their appearance remains the
-visual cue that a pickaxe may clear them.
-Mining has no stamina meter, tool durability or item refining. Extracted gems
-stack in inventory and can be sold to the village merchant.
+cumulative requirements are **75 / 225 / 450 / 750 XP** at levels **25 / 50 / 75
+/ 100**. The experience multiplier is configurable. Normal underground walls and
+minerals grant XP only once when completed. Overworld boulder removal gives 1 XP
+for each of the first five stones, then `1 / n` XP for the *n*th stone.
+Fractional XP is accumulated in deterministic integer units, so endlessly mining
+surface stones barely advances the skill. Surface boulders do not display a
+hover tooltip; their appearance remains the visual cue that a pickaxe may clear
+them. Mining has no stamina meter, tool durability or item refining. Extracted
+gems stack in inventory and can be sold to the village merchant.
 
 ---
 
@@ -769,61 +789,62 @@ Ordering matters when adding future mechanics.
 
 Turn-consuming actions that leave the player on the same tile still use the same
 presentation pipeline as movement. After enemy and NPC rules resolve, the shared
-animation loop must run until their movement reaches its final tile. This includes
-item/equipment actions, foraging, digging, waiting, and other stationary interactions.
-Animation never controls rules or RNG: actor destinations are resolved first, and the
-animation loop only presents those already-determined start/end positions and guarantees
-a final repaint.
+animation loop must run until their movement reaches its final tile. This
+includes item/equipment actions, foraging, digging, waiting, and other
+stationary interactions. Animation never controls rules or RNG: actor
+destinations are resolved first, and the animation loop only presents those
+already-determined start/end positions and guarantees a final repaint.
 
-Combat and healing popups place the newest visible message at the bottom.
-Older overlapping messages move upward by one 24-pixel text line, independent
-of map zoom; labels from adjacent tiles also avoid overlap. Delayed projectile
-feedback joins the stack only when its impact is displayed. Each label remains
-fully opaque and stationary for **280 ms** before drifting and fading over the
-rest of its existing lifetime (850 ms for ordinary combat text, 1,000 ms for
-summoning). New messages still push older ones up immediately. Popups never
-delay input or affect combat resolution, saves, or replay RNG.
-The foraging **found!** label starts closer to its tile, remains fully visible
-for 320 ms and then rises/fades across the rest of a 1,150 ms lifetime.
-Confirmed forest and cave-exit ambushes show a **red Ambush!** banner over the
-player's tile with the same hold, rise and fade. No warning appears for an
-ambush that fails its roll or cannot spawn, and concealed wall ambushers keep
-their original reveal timing. The banner is purely visual, consumes no seeded
-randomness, and is skipped during fast replay simulation.
-Successful monster drops with an absolute chance below 10%, all artifacts, and
-unusually strong rare equipment modifiers emit one gold sparkle at the death
-tile. Equipment qualifies by the less-than-10% upper tail of the modifier
-strength roll at its monster's source tier, not by the base item's tier.
-The rarer 6.25% shooter Hunting Bow outcome also qualifies.
-Each kill emits at most one sparkle even when several rare rewards roll;
-projectile kills synchronize it with impact. These visuals do not reveal item
-identity in messages, consume RNG, or change saves and replay rules. Ordinary
-combat popup labels begin 5 screen pixels above their tile anchor, stay there
-during the hold, and are drawn over creatures, lighting, attack telegraphs, and
-rectangular range overlays in both tile and ASCII modes. Screen-fade transitions still cover
+Combat and healing popups place the newest visible message at the bottom. Older
+overlapping messages move upward by one 24-pixel text line, independent of map
+zoom; labels from adjacent tiles also avoid overlap. Delayed projectile feedback
+joins the stack only when its impact is displayed. Each label remains fully
+opaque and stationary for **280 ms** before drifting and fading over the rest of
+its existing lifetime (850 ms for ordinary combat text, 1,000 ms for summoning).
+New messages still push older ones up immediately. Popups never delay input or
+affect combat resolution, saves, or replay RNG. The foraging **found!** label
+starts closer to its tile, remains fully visible for 320 ms and then rises/fades
+across the rest of a 1,150 ms lifetime. Confirmed forest and cave-exit ambushes
+show a **red Ambush!** banner over the player's tile with the same hold, rise
+and fade. No warning appears for an ambush that fails its roll or cannot spawn,
+and concealed wall ambushers keep their original reveal timing. The banner is
+purely visual, consumes no seeded randomness, and is skipped during fast replay
+simulation. Successful monster drops with an absolute chance below 10%, all
+artifacts, and unusually strong rare equipment modifiers emit one gold sparkle
+at the death tile. Equipment qualifies by the less-than-10% upper tail of the
+modifier strength roll at its monster's source tier, not by the base item's
+tier. The rarer 6.25% shooter Hunting Bow outcome also qualifies. Each kill
+emits at most one sparkle even when several rare rewards roll; projectile kills
+synchronize it with impact. These visuals do not reveal item identity in
+messages, consume RNG, or change saves and replay rules. Ordinary combat popup
+labels begin 5 screen pixels above their tile anchor, stay there during the
+hold, and are drawn over creatures, lighting, attack telegraphs, and rectangular
+range overlays in both tile and ASCII modes. Screen-fade transitions still cover
 the whole scene.
 
 Animation-only frames reuse the current status display. Actions and HUD changes
 refresh it, and the animation loop refreshes it again on completion so visible
 concealment information follows the settled camera. Status placement follows
 canvas/stage resizing. Lighting passes share one source list within each render;
-the next frame rebuilds it, preserving immediate pickup, fire and floor changes. Current-floor object lists and enemy-cell lookups are also
-shared only within one render. Each new frame reflects moves, deaths, pickups
-and level changes; tower views retain their separate surface-actor pass.
+the next frame rebuilds it, preserving immediate pickup, fire and floor changes.
+Current-floor object lists and enemy-cell lookups are also shared only within
+one render. Each new frame reflects moves, deaths, pickups and level changes;
+tower views retain their separate surface-actor pass.
 
 
 ---
 
 # 8. Auto-Pathing
 
-The player can path toward a destination by tapping or clicking on a walkable target tile.
-On the full map, clicking or tapping a **discovered, reachable tile on the current
-floor** closes the overlay and begins the same turn-by-turn auto-travel. The
-selected destination and every tile on its route must be explored; a route
-cannot use hidden terrain as a shortcut. The player cannot issue travel orders
-while browsing a different floor. Fog, unreachable or impassable destinations,
-and the player's own tile are ignored without consuming a turn. Dragging pans
-the map, while pinching zooms; neither starts travel, even on mobile.
+The player can path toward a destination by tapping or clicking on a walkable
+target tile. On the full map, clicking or tapping a **discovered, reachable tile
+on the current floor** closes the overlay and begins the same turn-by-turn
+auto-travel. The selected destination and every tile on its route must be
+explored; a route cannot use hidden terrain as a shortcut. The player cannot
+issue travel orders while browsing a different floor. Fog, unreachable or
+impassable destinations, and the player's own tile are ignored without consuming
+a turn. Dragging pans the map, while pinching zooms; neither starts travel, even
+on mobile.
 
 Map travel follows the existing rules for hazards, enemies, interactions,
 manual movement, and interruptions. It uses deterministic breadth-first
@@ -836,7 +857,8 @@ Surface boulders are never eligible destinations or intermediate steps for
 automatic travel, whether the player has a Pickaxe or is using God Mode.
 On-screen clicks and taps also do not mine an adjacent boulder; only explicit
 manual directional movement initiates mining (§6). If a boulder appears on an
-already planned route, auto-travel stops before striking it without using a turn.
+already planned route, auto-travel stops before striking it without using a
+turn.
 
 Auto-pathing accounts for normal walkable terrain and Swimming. For ordinary
 characters, a path can contain no more than the current Swimming skill's number
@@ -853,13 +875,13 @@ changes to the water or current endurance make it unsafe before the next step.
 Manual swimming and unexpected ice collapse still follow the normal drowning
 rules (§6).
 
-Occupied enemy/NPC tiles are generally avoided except when they are the intended destination.
+Occupied enemy/NPC tiles are generally avoided except when they are the intended
+destination.
 
-Direct interaction cancels pathing.
-Keyboard movement also cancels both the active path and its preview; the
-desktop preview returns when the pointer enters a new destination tile.
-On touch screens, tapping another destination while a movement animation is
-finishing replaces the route.
+Direct interaction cancels pathing. Keyboard movement also cancels both the
+active path and its preview; the desktop preview returns when the pointer enters
+a new destination tile. On touch screens, tapping another destination while a
+movement animation is finishing replaces the route.
 
 In tile mode, the full player sprite rises about one pixel at normal zoom
 and settles during each land step, including automatic travel. Steps into,
@@ -876,9 +898,9 @@ its depth and active-map identity before generation; otherwise underground FOV
 and decorations can incorrectly appear on the surface. Surface and underground
 objects retain their own level identity and are rendered only on that level.
 
-The surface size is selected independently of Cursed world at character creation.
-**L** (260×260 tiles) is the default. The six square presets are configured in
-`content/map_config.json`:
+The surface size is selected independently of Cursed world at character
+creation. **L** (260×260 tiles) is the default. The six square presets are
+configured in `content/map_config.json`:
 
 | XS | S | M | L (default) | XL | XXL |
 | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -890,9 +912,9 @@ only a newly generated world can select a different size. The surface
 population and ordinary chests scale with eligible walkable terrain, while
 specific landmarks and guaranteed spawns do not multiply with map area.
 
-The world is procedurally generated.
-New worlds have a land boundary to the north; inland lakes remain possible.
-Loaded saves retain their stored map dimensions.
+The world is procedurally generated. New worlds have a land boundary to the
+north; inland lakes remain possible. Loaded saves retain their stored map
+dimensions.
 
 Generation uses multiple layers of interpolated random noise for things such as:
 
@@ -951,14 +973,6 @@ Current terrain includes:
 - boulders
 - special landmarks
 
-The surface contains **four open fissures** on ordinary grass or hills, with
-at least twelve tiles between them. They are permanent, impassable terrain in
-both tile-image and ASCII modes (shown as `◉` in ASCII), but do not block
-vision or projectiles. They are placed on broadly connected terrain after
-world rotation, away from stair/entrance approaches, inhabited areas, water
-crossings and the Temple start. Their terrain IDs are saved in the world map,
-so loading or replaying cannot restore walkability accidentally.
-
 The following are tile-image-only, non-interactive surface scenery. Neither
 movement nor NPC/enemy pathfinding, combat, terrain bonuses, loot or ASCII
 presentation changes because of them:
@@ -1013,94 +1027,95 @@ Grassland tree decoration:
   game immediately restores every previously dug tile's appearance on the
   main view, side minimap and full-world map without requiring another dig.
 
-Underground terrain includes cave floors, walls, entrances, stairs/passages, marble, dwarven walls, rubble, and dwarven structures.
+Underground terrain includes cave floors, walls, entrances, stairs/passages,
+marble, dwarven walls, rubble, and dwarven structures.
 
 Water and river tiles clip grounded creatures to their upper half on every
 level, including underground. Flying creatures retain their flight rendering.
 
 In tile-image mode, `content/rendering.json` maps ordinary cave floors
-(`cavefloor`, `cavefloor2`) to `img/tiles/cave-floor.png`; one generic
-z:-2 burrow uses `cavefloorBrown` and `img/tiles/cave-floor-brown-dark.png`. Cave walls
-(`cavewall`) to `img/tiles/cave-wall.png`. Crypt floors and niches reuse
-these textures; `marble` has a lighter stone-floor image, and
-`cryptrubble` uses cave rubble, while `dwarvenrubble` alternates between
-cave rubble and `img/tiles/dwarven-rubble.png` with an even-weight,
-coordinate-based visual selection (no gameplay RNG). Crypt rubble in tile mode
-overlays the original `crypt2floor` tile without a painted square, just as
-dwarven rubble overlays its recorded floor underlay; ASCII backgrounds stay
-unchanged. Both rubble types block movement, enemy and player sight, and
-projectiles. A carried Pickaxe clears one adjacent rubble tile with one movement
-attempt, without moving into that tile. Clearing consumes one turn and produces
-the same nearby/distant noise response as striking a dwarven crate. Attempting
-without a Pickaxe costs no turn. Dwarven rubble exposes its saved floor
-underlay; crypt rubble exposes `crypt2floor`. The authoritative map and its matching cave
-masks update together wherever those masks exist. Other locations on the same
-shared Z-level stay untouched. Crypt 2's legacy standalone map remains the
-exception and must not modify the ordinary grotto at the same depth. Removed underlay records are discarded. Saves and
-replays preserve cleared passages as ordinary terrain, without a new persistent
-status or random excavation roll. Dungeon generation treats uncleared rubble as
-solid when verifying paths to mandatory locations; optional rubble cannot
-replace stairs or required progression tiles. Crypt stairs, mausoleum stairs, trap coffins, and the sarcophagus
-use existing transition or coffin images over the appropriate floor. The regular coffin already uses
-`specialTiles.coffin`. Underground Dwarven columns use
+(`cavefloor`, `cavefloor2`) to `img/tiles/cave-floor.png`; one generic z:-2
+burrow uses `cavefloorBrown` and `img/tiles/cave-floor-brown-dark.png`. Cave
+walls (`cavewall`) to `img/tiles/cave-wall.png`. Crypt floors and niches reuse
+these textures; `marble` has a lighter stone-floor image, and `cryptrubble` uses
+cave rubble, while `dwarvenrubble` alternates between cave rubble and
+`img/tiles/dwarven-rubble.png` with an even-weight, coordinate-based visual
+selection (no gameplay RNG). Crypt rubble in tile mode overlays the original
+`crypt2floor` tile without a painted square, just as dwarven rubble overlays its
+recorded floor underlay; ASCII backgrounds stay unchanged. Both rubble types
+block movement, enemy and player sight, and projectiles. A carried Pickaxe
+clears one adjacent rubble tile with one movement attempt, without moving into
+that tile. Clearing consumes one turn and produces the same nearby/distant noise
+response as striking a dwarven crate. Attempting without a Pickaxe costs no
+turn. Dwarven rubble exposes its saved floor underlay; crypt rubble exposes
+`crypt2floor`. The authoritative map and its matching cave masks update together
+wherever those masks exist. Other locations on the same shared Z-level stay
+untouched. Crypt 2's legacy standalone map remains the exception and must not
+modify the ordinary grotto at the same depth. Removed underlay records are
+discarded. Saves and replays preserve cleared passages as ordinary terrain,
+without a new persistent status or random excavation roll. Dungeon generation
+treats uncleared rubble as solid when verifying paths to mandatory locations;
+optional rubble cannot replace stairs or required progression tiles. Crypt
+stairs, mausoleum stairs, trap coffins, and the sarcophagus use existing
+transition or coffin images over the appropriate floor. The regular coffin
+already uses `specialTiles.coffin`. Underground Dwarven columns use
 `img/tiles/dwarven-column-indoor.png`; the two surface Fort entrance columns
 keep `img/tiles/ancient-stone-column.png`. Dwarven rubble and all columns are
 transparent props composited over **the underlying floor at their exact map
-coordinate**. Both surface and indoor Dwarven columns **block walking**, while preserving
-their existing projectile-blocking behavior and transparent visual underlays.
-The surface entrance columns also clear mountains
-and tree cover beneath them, exposing grass, sand or snow as appropriate for
-the surrounding terrain. No tree may occupy a column tile. The underlay is
-recorded during generation, rotates with the world and persists in saves;
-underground underlays are keyed by depth to keep floors independent.
-Where no underlay is recorded, tile-image mode draws only the transparent prop
-without inserting a fabricated floor. Underground floor textures never inherit
-the surface grass/snow fallback. ASCII mode retains its normal terrain glyph
-and background.
+coordinate**. Both surface and indoor Dwarven columns **block walking**, while
+preserving their existing projectile-blocking behavior and transparent visual
+underlays. The surface entrance columns also clear mountains and tree cover
+beneath them, exposing grass, sand or snow as appropriate for the surrounding
+terrain. No tree may occupy a column tile. The underlay is recorded during
+generation, rotates with the world and persists in saves; underground underlays
+are keyed by depth to keep floors independent. Where no underlay is recorded,
+tile-image mode draws only the transparent prop without inserting a fabricated
+floor. Underground floor textures never inherit the surface grass/snow fallback.
+ASCII mode retains its normal terrain glyph and background.
 
 The Dwarven Fort has its own `dwarvenfortexit` terrain ID at its underground
 gate on z:-3; `dwarvengate` is the surface entrance. `caveup` remains the
-generic ascent tile inside caves and retains its cave-floor background.
-Ordinary z:-1 cave exits admit a restrained patch of steady, warm surface light
-limited to the exit and its immediately adjacent tile (one-tile radius).
-It uses the same smooth, wall-aware illumination as crystals, brightens
-the exit and the floor directly in front in tile and ASCII modes, and can reveal lit tiles
-within the player's line of sight. Opaque rock blocks the glow. Exit locations
-are already part of the cave map, so the effect adds no saved state or RNG.
-The surface Fort gate, its underground exit and the Dwarven Ruins up/down
-staircases have bright red minimap markers, distinct from their original gold ASCII/tile presentation.
-The fort exit reuses the existing cave-up image with `baseTileKey: marble` and
-the marble ASCII background; no `marblefloor` terrain key or new image is
-needed. `content/tiles.json` defines its walkable `^` glyph, gold color,
-marble background, description, and unique save character `U`. Generation
-stamps the fort tile in both its local template and shared map. The loader
-restamps this tile at the fort gate on z:-3, including a current-schema map
-encoded with `caveup`; it leaves all other deep-cave `caveup` entrances unchanged.
-`marble` is a terminal image base, so neighboring surface tiles cannot replace
-it while composing overlays. Ancient Forest trees use the same grass ground
-as ordinary forest; no separate dark-ground image tile is used.
+generic ascent tile inside caves and retains its cave-floor background. Ordinary
+z:-1 cave exits admit a restrained patch of steady, warm surface light limited
+to the exit and its immediately adjacent tile (one-tile radius). It uses the
+same smooth, wall-aware illumination as crystals, brightens the exit and the
+floor directly in front in tile and ASCII modes, and can reveal lit tiles within
+the player's line of sight. Opaque rock blocks the glow. Exit locations are
+already part of the cave map, so the effect adds no saved state or RNG. The
+surface Fort gate, its underground exit and the Dwarven Ruins up/down staircases
+have bright red minimap markers, distinct from their original gold ASCII/tile
+presentation. The fort exit reuses the existing cave-up image with
+`baseTileKey: marble` and the marble ASCII background; no `marblefloor` terrain
+key or new image is needed. `content/tiles.json` defines its walkable `^` glyph,
+gold color, marble background, description, and unique save character `U`.
+Generation stamps the fort tile in both its local template and shared map. The
+loader restamps this tile at the fort gate on z:-3, including a current-schema
+map encoded with `caveup`; it leaves all other deep-cave `caveup` entrances
+unchanged. `marble` is a terminal image base, so neighboring surface tiles
+cannot replace it while composing overlays. Ancient Forest trees use the same
+grass ground as ordinary forest; no separate dark-ground image tile is used.
 
 Dwarven masonry walls on z:-3 and deeper use `img/tiles/dwarven-stone-wall.png`
 when any of their eight neighbors is walkable terrain or a dwarven doorway.
 Including closed doorways keeps wall materials stable when doors open. Buried
-masonry uses the existing dark cave-wall texture; natural cave walls retain
-that texture throughout. The simple overhead stone blocks distinguish room
-and corridor boundaries from solid rock. Dark charcoal masonry has four visual
-variants, selected by a stable coordinate hash: **30% plain, 50% cracked,
-10% moss-covered and 10% ivy-covered**. These are approximate
-frequencies across many tiles, not quotas for each room. Cracks do not weaken
-walls; moss and ivy are decorative, with no interaction. Unlit torches are no
-longer used. All four masonry assets are 100×100 pixels, designed for readability at a
-40×40 display size. Moss follows mortar joints and chipped edges in muted olive bands; ivy follows
-stone gaps with restrained dark-green leaves. Cracks retain the original
+masonry uses the existing dark cave-wall texture; natural cave walls retain that
+texture throughout. The simple overhead stone blocks distinguish room and
+corridor boundaries from solid rock. Dark charcoal masonry has four visual
+variants, selected by a stable coordinate hash: **30% plain, 50% cracked, 10%
+moss-covered and 10% ivy-covered**. These are approximate frequencies across
+many tiles, not quotas for each room. Cracks do not weaken walls; moss and ivy
+are decorative, with no interaction. Unlit torches are no longer used. All four
+masonry assets are 100×100 pixels, designed for readability at a 40×40 display
+size. Moss follows mortar joints and chipped edges in muted olive bands; ivy
+follows stone gaps with restrained dark-green leaves. Cracks retain the original
 stone fracture patterns with slightly wider, darker main splits. Shading and
-color stay close to the masonry so weathering blends into the wall.
-The renderer preserves an outer 10% border (rounded up to whole pixels) from the plain stone
+color stay close to the masonry so weathering blends into the wall. The renderer
+preserves an outer 10% border (rounded up to whole pixels) from the plain stone
 image on all four sides, keeping vegetation away from neighboring tiles.
-Repeated entries in the rendering variant list supply these weights.
-Selection uses terrain and coordinates only, never
-creature occupancy, visibility, animation timing or RNG. Collision, sight,
-ASCII glyphs and save/replay data are unchanged.
+Repeated entries in the rendering variant list supply these weights. Selection
+uses terrain and coordinates only, never creature occupancy, visibility,
+animation timing or RNG. Collision, sight, ASCII glyphs and save/replay data are
+unchanged.
 
 The cave floor/wall images are rendering replacements for existing terrain
 IDs. Cave scenarios add no terrain IDs; the Dwarven Fort exit is a separate
@@ -1148,26 +1163,26 @@ terrain may apply an additional SPD penalty (see Snow / Cold).
 The HUD highlights effective player DEF/SPD in green with an upward arrow for
 terrain gains and red with a downward arrow for terrain losses. The status strip
 identifies the terrain and the effective changes while the modifier is active.
-Enemy inspection tooltips show effective stats without directional arrows;
-the existing **Terrain** line lists effective terrain modifiers, including on
+Enemy inspection tooltips show effective stats without directional arrows; the
+existing **Terrain** line lists effective terrain modifiers, including on
 mobile. Numeric monster-prefix differences remain readable without arrow
-symbols. Effective monster stats, displayed bonuses and status-related 
-stat values are rounded to whole numbers for inspection only; 
-combat uses their unrounded values. The character sheet reflects 
-the same changes on mobile stat rows.
-Directional HUD colors and arrows reflect actual effective changes after
-stat limits, not hypothetical raw bonuses. Terrain modifiers are
-derived from the current tile, not separate timed statuses; inspecting them
-never changes combat calculations, RNG, or replay state.
+symbols. Effective monster stats, displayed bonuses and status-related stat
+values are rounded to whole numbers for inspection only; combat uses their
+unrounded values. The character sheet reflects the same changes on mobile stat
+rows. Directional HUD colors and arrows reflect actual effective changes after
+stat limits, not hypothetical raw bonuses. Terrain modifiers are derived from
+the current tile, not separate timed statuses; inspecting them never changes
+combat calculations, RNG, or replay state.
 
 ---
 
 # 12. Snow / Cold
 
-Freezing is a surface mechanic. Snow, taiga, frozen rivers, both lake-ice
-stages and water exposed by broken lake ice are cold terrain. A snow underlay
-also marks cold river water. Each elapsed turn on cold terrain advances the
-existing Freezing counter; the configured defaults are **1 HP every 5 cold
+Natural freezing is a surface mechanic. Magical ice formed by Frostwalker is
+also cold, including underground. Snow, taiga, frozen rivers, both natural
+lake-ice stages and water exposed by broken lake ice are cold terrain. A snow
+underlay also marks cold river water. Each elapsed turn on cold terrain advances
+the existing Freezing counter; the configured defaults are **1 HP every 5 cold
 turns**. Moving between cold tiles preserves that counter. Leaving cold terrain
 clears it. There is no general cold-resistance equipment system.
 
@@ -1202,17 +1217,17 @@ Thus ordinary intact ice has a 1% instant-break outcome and a 1.98% cracking
 outcome per turn (99% × 2%). Already-cracking ice uses only its 10% break roll.
 
 Stepping onto intact ice beside cracking ice checks all eight neighbors,
-including diagonals and the tile just vacated. If the instant-break check
-fails, the entered tile has an 85% chance to become cracking ice. A failed
-spread roll leaves it intact: there is no fallback 2% roll or extra break check.
-When the step started on cracking ice and the 85% roll succeeds, the newly
-cracked destination immediately gets an additional 10% break check. Its total
-chance to become water on that step is **9.415%**:
-`1% + 99% × 85% × 10%` (previously 10.9%). A failed break recheck leaves it
-cracking. Moving from any other terrain does not get that extra break check,
-even if a neighboring crack makes the 85% spread rule apply. Waiting beside
-cracking ice keeps the ordinary 2% cracking chance after the instant-break
-check. Randomly starting to crack still grants a warning stage.
+including diagonals and the tile just vacated. If the instant-break check fails,
+the entered tile has an 85% chance to become cracking ice. A failed spread roll
+leaves it intact: there is no fallback 2% roll or extra break check. When the
+step started on cracking ice and the 85% roll succeeds, the newly cracked
+destination immediately gets an additional 10% break check. Its total chance to
+become water on that step is **9.415%**: `1% + 99% × 85% × 10%` (previously
+10.9%). A failed break recheck leaves it cracking. Moving from any other terrain
+does not get that extra break check, even if a neighboring crack makes the 85%
+spread rule apply. Waiting beside cracking ice keeps the ordinary 2% cracking
+chance after the instant-break check. Randomly starting to crack still grants a
+warning stage.
 
 Whenever the player's tile breaks into water, its eight neighbors that were
 already cracking also become freezing water. This is one ring only: those
@@ -1225,36 +1240,80 @@ cracking ice uses these ordinary-break rules, so it can also collapse the
 tile just vacated. It does not crack intact neighbors. Other newly cracked
 tiles, including neighbors cracked by an instant break, survive that turn.
 
-Monsters never initiate cracking or collapse. Underground terrain, god mode
-and flight do not roll or spread cracks. Disabling god mode restores normal
-rules on the next spent turn. Merlings are immune to the collapse damage;
-learned swimmers still take the one-time 8% max-HP plunge hit, but can swim
-without immediate drowning. Rendering and animation timing never roll or
-advance these rules.
+Natural lake ice: monsters never initiate cracking or collapse. Underground
+terrain, god mode and flight do not roll or spread cracks. Disabling god mode
+restores normal rules on the next spent turn. Merlings are immune to the
+collapse damage; learned swimmers still take the one-time 8% max-HP plunge hit,
+but can swim without immediate drowning. Rendering and animation timing never
+roll or advance these rules.
 
 Each transition logs a warning, shows an animated popup and stops auto-travel.
 Ordinary ice inspection shows only `lake ice`, without displaying the random
 break/cracking probabilities; the rules remain unchanged.
 
-Cracking ice retains its state when vacated, uses a bright white fracture overlay in
-tile mode, and changes the ASCII glyph from `=` to `≠` and the minimap color.
-The hero hover portrait on both lake-ice stages reuses the frozen-river
-background variants, selected deterministically from the tile coordinates.
-Broken ice uses normal water rendering and swimming/drowning visuals. Falling
-through inflicts the single 8% max-HP plunge hit (except Merlings) without
-granting swimming practice; normal drowning starts for non-swimmers but cannot
-deal a second hit that turn. Freezing continues on the same turn. Reaching
-intact ice or land ends swimming, but only warm terrain ends freezing. Broken
-tiles never refreeze, and water washes away any tracks on the tile.
+Cracking ice retains its state when vacated, uses a bright white fracture
+overlay in tile mode, and changes the ASCII glyph from `=` to `≠` and the
+minimap color. The hero hover portrait on both lake-ice stages reuses the
+frozen-river background variants, selected deterministically from the tile
+coordinates. Broken ice uses normal water rendering and swimming/drowning
+visuals. Falling through inflicts the single 8% max-HP plunge hit (except
+Merlings) without granting swimming practice; normal drowning starts for
+non-swimmers but cannot deal a second hit that turn. Freezing continues on the
+same turn. Reaching intact ice or land ends swimming, but only warm terrain ends
+freezing. Broken tiles never refreeze, and water washes away any tracks on the
+tile.
 
-Ice stages live in the saved surface grid; the existing snow underlay preserves
-the cold-water property after breaking. Both rotate with the world and restore
-through current saves and replay snapshots. No new player status or parallel
-ice registry is needed. Every collapsed tile keeps its snow underlay, loses
-any tracks and refreshes its map display. The player receives only one forced
-water-entry check and one plunge hit regardless of how many neighboring tiles
-collapse. Chances are configured in `environment.iceInstantBreakChance`, `environment.iceCrackChance`,
-`environment.iceSpreadChance` and `environment.crackingIceBreakChance`.
+Natural ice stages live in the saved surface grid; the existing snow underlay
+preserves the cold-water property after breaking. Both rotate with the world and
+restore through current saves and replay snapshots. No new player status or
+parallel ice registry is needed. Every collapsed tile keeps its snow underlay,
+loses any tracks and refreshes its map display. The player receives only one
+forced water-entry check and one plunge hit regardless of how many neighboring
+tiles collapse. Chances are configured in `environment.iceInstantBreakChance`,
+`environment.iceCrackChance`, `environment.iceSpreadChance` and
+`environment.crackingIceBreakChance`.
+
+### Magical ice (Frostwalker)
+
+A successful walking step onto water or a shallow river freezes the entered tile
+before swimming is resolved, even without Swimming. All tiles created during one
+continuous crossing share the first step's absolute world-turn deadline: crack
+after 10 turns and melt after 15. Stepping onto additional water, backtracking,
+waiting, or removing the trinket does not extend the deadline. Once a crossing
+is exhausted it cannot be renewed while still in water; reaching solid ground
+starts a new crossing. Rush and free steps can create several tiles without
+advancing the clock between them; forced movement and teleportation do not
+create ice.
+
+Magical ice is real walkable terrain on the existing global Z-level (the legacy
+Crypt map retains its separate identity). It uses the natural ice visuals but
+does not participate in natural random cracking, chain collapse or isolated-tile
+cleanup. Forced displacement onto cracked magical ice breaks that tile
+immediately. Melting or collapse restores the exact underlying water or river
+tile, preserving the original climate metadata. A fall into deep water uses the
+ordinary one-time 8% max HP plunge and swimming rules, including the normal
+Merling and God Mode exemptions; falling into a shallow river does not require
+swimming. Frostwalker takes priority over Water Walking, and a deep-water plunge
+exhausts the latter's reserve until reaching non-deep terrain. Permafrost
+protects against freezing while on magical ice. Auto-travel checks the crossing
+lifetime and rejects routes that would still be on a bridge when it melts.
+
+Non-swimming ground monsters caught in deep water by magical ice collapse
+suspend attacks and ordinary AI. They seek a free reachable shore using the same
+floor's collision rules, advancing one step per enemy phase. If no route exists,
+they lose 10% maximum HP per completed world turn (rounded to nearest integer,
+minimum 1), regardless of the number of enemy phases. Swimming, flying and
+ethereal monsters are exempt. Drowning is an environmental death, without direct
+kill XP; ordinary drops remain on the ground. Off-floor terrain still melts on
+schedule, while stranded monsters' swimming and damage resume when their floor
+becomes active, like ordinary enemy combat and poison. They do not use
+inactive-floor wandering to evade this state.
+
+Bridge ownership, original tiles, deadlines and stranded enemy identities
+persist across saves and replay and across permadeath when the world is
+retained. They are reapplied to reconstructed shared dungeon maps without
+creating new floors or altering transitions. Map and path caches are refreshed
+when terrain changes. No magical ice roll or timer is driven by rendering.
 
 ---
 
@@ -1267,67 +1326,68 @@ five playable levels: the ground floor (`z:0`) and four upper floors (`z:+1`
 through `z:+4`). The tower is placed on a Temple-reachable patch of dry natural
 terrain, away from the starting sanctuary. Its footprint and surrounding
 walkable ring cannot overlap existing creatures, loot, NPCs or special terrain.
-The closest distance from any village hut to the tower's outer footprint is
-**at least 50 tiles** by Chebyshev distance, measured after the tower's full
-10×10 bounding footprint is accounted for. The four outer corner tiles are cut
-away, exposing the original terrain below, with masonry at the new diagonal
-edges and inner corners. This rule applies equally on small worlds.
-The ring preserves routes around the structure. Generation must reject a world
-rather than silently omit its tower when no valid site exists. A new-world request first
-allocates an empty mutable surface grid rather than reusing the active map or
-assuming a previous surface exists; this also applies to the first character
-of a fresh session. World generation can retry rejected layouts without
-appending discarded terrain to the accepted world.
-Several withered grassland trees grow near the tower's outer walls, beyond the
-clear walking ring. Existing dead-tree artwork is selected deterministically
-from the tower's position, while the trees use ordinary grassland-tree collision
-and save/replay rules. Their placement does not block the immediate perimeter.
+The closest distance from any village hut to the tower's outer footprint is **at
+least 50 tiles** by Chebyshev distance, measured after the tower's full 10×10
+bounding footprint is accounted for. The four outer corner tiles are cut away,
+exposing the original terrain below, with masonry at the new diagonal edges and
+inner corners. This rule applies equally on small worlds. The ring preserves
+routes around the structure. Generation must reject a world rather than silently
+omit its tower when no valid site exists. A new-world request first allocates an
+empty mutable surface grid rather than reusing the active map or assuming a
+previous surface exists; this also applies to the first character of a fresh
+session. World generation can retry rejected layouts without appending discarded
+terrain to the accepted world. Several withered grassland trees grow near the
+tower's outer walls, beyond the clear walking ring. Existing dead-tree artwork
+is selected deterministically from the tower's position, while the trees use
+ordinary grassland-tree collision and save/replay rules. Their placement does
+not block the immediate perimeter.
 
-The ground entrance uses matching closed and open sprites; the open doorway
-has transparency over the underlying floor. Both states are registered in the terrain
-image catalog so startup loads them into the renderer, and cached for offline use.
-The ground entrance and window artwork retain their upright orientation
-regardless of world rotation, although their positions and the tower layout still
-rotate as a unit. The ground entrance is an ordinary unlocked door, like the two internal doors
-on each of the first four floors. Each of these **nine doors** independently
-starts **open with 10% probability** (otherwise closed). Initial states are
-seeded once and persist through travel, save and replay. From **six or more tiles**
-away from the footprint (Chebyshev distance to the closest tower tile), the
-surface view presents the **darkened, terrain-only summit** (`z:+4`). At five
-tiles or less, the view switches to the **ground-floor stone exterior**. The
-summit preview never includes summit monsters, items or interaction targets and
-does not change active collision, map depth or discovery state. The near exterior
-conceals the ground-floor rooms. Opening the entrance allows the player's normal
-sight lines to reveal the interior; closed doors and solid walls prevent seeing
-through them. From inside, the ground floor uses **eight-tile dungeon FOV**:
-unexplored rooms are black and explored rooms outside current sight are dimmed.
-From outside, currently invisible interiors are fully concealed even if explored
-on a previous visit. Windows do not grant sight through their masonry. Visibility
-updates immediately when a door opens or closes. These presentation and FOV
-rules use no randomness or additional persisted state.
+The ground entrance uses matching closed and open sprites; the open doorway has
+transparency over the underlying floor. Both states are registered in the
+terrain image catalog so startup loads them into the renderer, and cached for
+offline use. The ground entrance and window artwork retain their upright
+orientation regardless of world rotation, although their positions and the tower
+layout still rotate as a unit. The ground entrance is an ordinary unlocked door,
+like the two internal doors on each of the first four floors. Each of these
+**nine doors** independently starts **open with 10% probability** (otherwise
+closed). Initial states are seeded once and persist through travel, save and
+replay. From **six or more tiles** away from the footprint (Chebyshev distance
+to the closest tower tile), the surface view presents the **darkened,
+terrain-only summit** (`z:+4`). At five tiles or less, the view switches to the
+**ground-floor stone exterior**. The summit preview never includes summit
+monsters, items or interaction targets and does not change active collision, map
+depth or discovery state. The near exterior conceals the ground-floor rooms.
+Opening the entrance allows the player's normal sight lines to reveal the
+interior; closed doors and solid walls prevent seeing through them. From inside,
+the ground floor uses **eight-tile dungeon FOV**: unexplored rooms are black and
+explored rooms outside current sight are dimmed. From outside, currently
+invisible interiors are fully concealed even if explored on a previous visit.
+Windows do not grant sight through their masonry. Visibility updates immediately
+when a door opens or closes. These presentation and FOV rules use no randomness
+or additional persisted state.
 
 Upper floors align with the surface footprint, including its clipped corners.
 The northern rooms are shorter and the eastern room is narrower; the southern
-stair passage and its walkable landing clearance are preserved. Lower floors have partitioned
-chambers with two unlocked internal doors: one connects the chambers directly,
-while the other connects the eastern chamber to the southern hallway. The
-partition and southern chamber wall meet at a solid masonry corner, so neither
-a straight nor a diagonal path can bypass closed doors. The summit is an open
-battlement floor, with plain stone rather than raised corner battlements.
-In the tower's local layout, stair landings alternate between the south-west
-and north-west chambers, then rotate together with the rest of the world. Each
-stair has a clear 3×3 patch of ordinary floor (all eight adjacent tiles are
-walkable marble), and initial defenders and loot spawn at least three tiles
-away from either landing. Inspecting stairs uses the existing transition
+stair passage and its walkable landing clearance are preserved. Lower floors
+have partitioned chambers with two unlocked internal doors: one connects the
+chambers directly, while the other connects the eastern chamber to the southern
+hallway. The partition and southern chamber wall meet at a solid masonry corner,
+so neither a straight nor a diagonal path can bypass closed doors. The summit is
+an open battlement floor, with plain stone rather than raised corner
+battlements. In the tower's local layout, stair landings alternate between the
+south-west and north-west chambers, then rotate together with the rest of the
+world. Each stair has a clear 3×3 patch of ordinary floor (all eight adjacent
+tiles are walkable marble), and initial defenders and loot spawn at least three
+tiles away from either landing. Inspecting stairs uses the existing transition
 action and does not advance a combat turn. Ascending announces that the player
-climbs; descending announces that the player descends. An occupied stair
-landing does not block travel: its occupant is moved to a free adjacent tile
-traversable for that creature, or the nearest available tile if the immediate
-neighbors are occupied. The player retains the matching stair coordinate. Initial
-encounters remain at least three tiles from the stairs. No creatures, loot or
-door states reset when revisiting a floor.
-Downward tower stairs have their own `stairs-down.png` artwork in tile mode;
-the movement, ASCII glyphs and transitions remain the same.
+climbs; descending announces that the player descends. An occupied stair landing
+does not block travel: its occupant is moved to a free adjacent tile traversable
+for that creature, or the nearest available tile if the immediate neighbors are
+occupied. The player retains the matching stair coordinate. Initial encounters
+remain at least three tiles from the stairs. No creatures, loot or door states
+reset when revisiting a floor. Downward tower stairs have their own
+`stairs-down.png` artwork in tile mode; the movement, ASCII glyphs and
+transitions remain the same.
 
 | Elevation | Number | Weighted encounter pool | Chest tier |
 |-----------|--------|-------------------------|------------|
@@ -1345,11 +1405,10 @@ equipment rules; there are no tower-specific stat multipliers, new species or
 new abilities. The summit always keeps its Lich with two Gargoyles. Each upper
 floor has one ordinary, persistent chest. The summit is an optional high-risk
 encounter, not a safe early-game loot route. Retreat is allowed, but collected
-treasure and damage persist.
-There is also a **25% chance of one Dwarven Stove per tower**, appearing on
-one of the intermediate floors (+1 to +3), never the entrance or roof. It
-blocks movement, is kept clear of stair landings, and uses normal cooking and
-resting rules.
+treasure and damage persist. There is also a **25% chance of one Dwarven Stove
+per tower**, appearing on one of the intermediate floors (+1 to +3), never the
+entrance or roof. It blocks movement, is kept clear of stair landings, and uses
+normal cooking and resting rules.
 
 
 ## Labyrinth beneath the Stone Tower
@@ -1369,19 +1428,18 @@ seeded order. Rejected plans carve nothing; both layers must pass before any
 underground tiles are stamped. If every footprint fails, the world attempt is
 rejected without weakening isolation or moving stair endpoints.
 
-The basement is a dry, initially empty 5×5 walkable chamber inside a 7×7
-stone envelope, joined to the upper maze by a short corridor. The stair starts
-in the eastern Tower chamber beyond an interior door. On each underground level,
-a seeded Growing Tree maze occupies a **31–37-tile square** including walls,
-with predominantly one-tile corridors and **zero or one extra independent
-corridor loop**. The farthest dead end is chosen by the shortest path under
-actual eight-direction movement, which also accounts for diagonal shortcuts.
-The bottom level's far end holds its unique, high-value reward chest. The first
-maze level also reserves a dry, otherwise unoccupied side dead end for one
-guaranteed disguised Mimic chest, independent of all Dwarven Fort/Ruins limits.
-Optional water
-appears only at nonessential dead ends, never along the required dry route.
-The basement, the maze envelopes, their corridor and isolation ring are
+The basement is a dry, initially empty 5×5 walkable chamber inside a 7×7 stone
+envelope, joined to the upper maze by a short corridor. The stair starts in the
+eastern Tower chamber beyond an interior door. On each underground level, a
+seeded Growing Tree maze occupies a **31–37-tile square** including walls, with
+predominantly one-tile corridors and **zero or one extra independent corridor
+loop**. The farthest dead end is chosen by the shortest path under actual
+eight-direction movement, which also accounts for diagonal shortcuts. The bottom
+level's far end holds its unique, high-value reward chest. The first maze level
+also reserves a dry, otherwise unoccupied side dead end for one guaranteed
+disguised Mimic chest, independent of all Dwarven Fort/Ruins limits. Optional
+water appears only at nonessential dead ends, never along the required dry
+route. The basement, the maze envelopes, their corridor and isolation ring are
 protected from mining, even when approached from an adjacent cave. Ethereal
 creatures cannot pass through this reinforced masonry.
 
@@ -1392,21 +1450,21 @@ A lever on Tower floor **+3** switches the paired entrances:
 | Initially inactive | Ordinary openable door | Sealed |
 | Activated | Sealed; cannot be opened or breached | Open |
 
-Using the lever from an adjacent tile costs **one turn on success** and no
-turn when blocked. Both entrances are validated first, then changed as one
-rule action. Monsters occupying an entrance are displaced to a legal nearby
-walkable square, with no cross-level relocation; if that cannot be done,
-neither gate changes. When switched back, the normal Tower door is left open.
-Homecoming and death do not reset the lever, enemies or treasure. Save/load and
-replay preserve each monster's labyrinth membership alongside its identity;
-ordinary cave population checks exclude these separate residents and treasure. The lever,
+Using the lever from an adjacent tile costs **one turn on success** and no turn
+when blocked. Both entrances are validated first, then changed as one rule
+action. Monsters occupying an entrance are displaced to a legal nearby walkable
+square, with no cross-level relocation; if that cannot be done, neither gate
+changes. When switched back, the normal Tower door is left open. Homecoming and
+death do not reset the lever, enemies or treasure. Save/load and replay preserve
+each monster's labyrinth membership alongside its identity; ordinary cave
+population checks exclude these separate residents and treasure. The lever,
 gates and strengthened stone have visible/inspectable distinctions without
 identifying connections or solutions in tooltips or messages. Lever use only
 reports the distant sound of closing doors, regardless of the resulting state.
-Attempting to open either lever-sealed gate by bumping or tapping it gives
-only **"The door won't budge."** without using a turn or revealing its
-cause. Tile descriptions and inspection text reveal no puzzle solution;
-no native browser alert is used.
+Attempting to open either lever-sealed gate by bumping or tapping it gives only
+**"The door won't budge."** without using a turn or revealing its cause. Tile
+descriptions and inspection text reveal no puzzle solution; no native browser
+alert is used.
 
 | Maze level | Initial monsters | Tier distribution per monster |
 |---|---:|---|
@@ -1415,19 +1473,19 @@ no native browser alert is used.
 
 Each creature is individually sampled by weighted rarity from existing normal
 species in its rolled tier, excluding **mine-specific, event-only, flying and
-ethereal monsters (including Ghost)**. Each sampled creature that is weaker
-than the Minotaur has a separate **30% chance to become a Minotaur** before
-prefix and equipment rolls. Weaker requires a tier no higher than the
-Minotaur's, HP no higher than its base HP (84), and a strictly lower sum of
-base ATK + DEF + SPD + GRACE (Minotaur: 30). Stronger or equal candidates,
-including higher-tier creatures, keep their original species. This does not
-change the number or positions of monsters. Ordinary prefixes and world traits
-apply; adaptive player trolling does not create, modify or trigger reactions
-inside the protected basement and mazes. Each starting creature has its own
-meaningful side dead end, outside every shortest route to the goal. The number
-of such branches `B` satisfies `M < B < 2M` for `M` starting monsters, leaving
-some branches empty. No new bosses, respawns or randomly placed labyrinth chests are added.
-Creatures retain their normal behavior once encountered.
+ethereal monsters (including Ghost)**. Each sampled creature that is weaker than
+the Minotaur has a separate **30% chance to become a Minotaur** before prefix
+and equipment rolls. Weaker requires a tier no higher than the Minotaur's, HP no
+higher than its base HP (84), and a strictly lower sum of base ATK + DEF + SPD +
+GRACE (Minotaur: 30). Stronger or equal candidates, including higher-tier
+creatures, keep their original species. This does not change the number or
+positions of monsters. Ordinary prefixes and world traits apply; adaptive player
+trolling does not create, modify or trigger reactions inside the protected
+basement and mazes. Each starting creature has its own meaningful side dead end,
+outside every shortest route to the goal. The number of such branches `B`
+satisfies `M < B < 2M` for `M` starting monsters, leaving some branches empty.
+No new bosses, respawns or randomly placed labyrinth chests are added. Creatures
+retain their normal behavior once encountered.
 
 The single bottom chest guarantees **one unidentified tier-4-source gear
 artifact** (a weapon, shield, or armor), plus **60–150 base gold** adjusted by
@@ -1469,11 +1527,11 @@ cumulatively, so level-up and XP loss do not erase proof of progress. A
 successful blessing restores current HP only up to `min(70, current maximum HP)`
 and records the earned-XP total. If a level 2+ player needs healing but has
 gained no XP since the last blessing, the log says:
-`The temple remains silent. Its blessing awaits proof of your growth.`
-The bell tower counts as Temple ground. A Scroll of Homecoming attempts the
-conditional blessing. Normal death returns the character at full current
-maximum HP and records the earned-XP total; the next Temple heal requires XP
-earned after that death recovery once the player is above level 1.
+`The temple remains silent. Its blessing awaits proof of your growth.` The bell
+tower counts as Temple ground. A Scroll of Homecoming attempts the conditional
+blessing. Normal death returns the character at full current maximum HP and
+records the earned-XP total; the next Temple heal requires XP earned after that
+death recovery once the player is above level 1.
 
 Visiting Temple ground (including the bell tower) cures poison before the
 turn's poison tick, even at full HP or without new XP. Homecoming also cures
@@ -1533,9 +1591,9 @@ that hut is marked mausoleum=true
 The remaining huts receive unique random names drawn without replacement from
 `HUMAN_NAMES` (duplicate entries in the source list count only once). The odd
 tombstone name is reserved and cannot be assigned to an ordinary hut. The
-odd-name hut is not selected by a later random roll and must not be replaced by a guessed
-central/nearest hut. This relationship is established during world creation
-and remains fixed for the lifetime of the world.
+odd-name hut is not selected by a later random roll and must not be replaced by
+a guessed central/nearest hut. This relationship is established during world
+creation and remains fixed for the lifetime of the world.
 
 Because village placement must remain spatially constrained relative to the
 Temple/Ancient Forest, the village **geometry** is generated before the
@@ -1556,9 +1614,9 @@ does not consume the seeded gameplay RNG.
 
 Random cave entrances are not allowed to spawn immediately beside the village.
 After z:-1 caves are generated, every non-crypt cave entrance is checked against
-every village hut using Chebyshev distance. If any entrance is within **4 tiles**
-of any hut, cave placement is considered invalid and the **entire world is
-discarded and regenerated**. This is a world-validation rule, not a cosmetic
+every village hut using Chebyshev distance. If any entrance is within **4
+tiles** of any hut, cave placement is considered invalid and the **entire world
+is discarded and regenerated**. This is a world-validation rule, not a cosmetic
 relocation of the offending entrance.
 
 </details>
@@ -1577,7 +1635,8 @@ It is intentionally unexplained and primarily serves as a mystery/lore element.
 <details>
   <summary>Details</summary>
 
-A large brass bell placed near mountains and guarded by two brutes (randomly picked: either cyclops, or ogres).
+A large brass bell placed near mountains and guarded by two brutes (randomly
+picked: either cyclops, or ogres).
 
 Its mountain-edge position must be reachable on foot from the Temple, not just
 border any walkable snow or grass in an isolated mountain pocket. World
@@ -1684,9 +1743,9 @@ rectangles are positioned, the generator builds a **room graph before carving
 corridors**. The graph chooses the entrance, main route, exit, **4–6 optional
 branch rooms**, and up to two seeded loop edges (`loopProbability: 0.18`). Only
 then are corridor edges carved into terrain. The exit must be at least **4
-room-graph edges** from the entrance and at least **28 walkable tiles** away after
-carving; these are separate configuration knobs. Loops are rejected if they
-would shorten the room-graph route below the configured minimum. Localized
+room-graph edges** from the entrance and at least **28 walkable tiles** away
+after carving; these are separate configuration knobs. Loops are rejected if
+they would shorten the room-graph route below the configured minimum. Localized
 collapses then damage the layout, and progression-gate selection runs against
 the finished topology so a loop can never turn the mandatory gate into a
 decorative bypass. Shared room-spacing and corridor-carving helpers are used by
@@ -1694,42 +1753,43 @@ the existing Fort and the deeper Ruins rather than maintaining separate copies
 of those primitives. A failed floor layout is retried deterministically up to
 **12 times** before the world-generation attempt is rejected.
 
-The reusable dungeon-package layer owns the rules that later strata should share:
-room graphs, stable feature/lock IDs, vault selection and entrance constraints,
-encounter-family/depth filtering, tactical role ordering, depth loot budgets and
-tier bias, trap configuration, shortcut registration, and base stratum
-validation. Package configuration supplies the content-specific choices (for
-example native enemy biomes, valid encounter floor tiles, key item kind, lock
-namespace, vault definitions and room tactical-role preferences). Dwarven Ruins
-therefore remains the first content package, while dwarven tile art and story
-props stay content-specific instead of being baked into the reusable rules.
+The reusable dungeon-package layer owns the rules that later strata should
+share: room graphs, stable feature/lock IDs, vault selection and entrance
+constraints, encounter-family/depth filtering, tactical role ordering, depth
+loot budgets and tier bias, trap configuration, shortcut registration, and base
+stratum validation. Package configuration supplies the content-specific choices
+(for example native enemy biomes, valid encounter floor tiles, key item kind,
+lock namespace, vault definitions and room tactical-role preferences). Dwarven
+Ruins therefore remains the first content package, while dwarven tile art and
+story props stay content-specific instead of being baked into the reusable
+rules.
 
 Ordinary room entrances can receive dwarven doors. The generator now finds
-actual two-tile corridor crossings through each room perimeter and only places
-a door if closing both leaves makes the room interior unreachable from the
-floor entrance. A collapsed wall or alternate corridor cannot leave a decorative,
+actual two-tile corridor crossings through each room perimeter and only places a
+door if closing both leaves makes the room interior unreachable from the floor
+entrance. A collapsed wall or alternate corridor cannot leave a decorative,
 pointless door. The default chance remains **45% per eligible entrance**; both
-leaves start closed. A closed
-door blocks movement, sight, and projectiles. Bumping an unlocked closed door
-opens that one leaf and consumes one player turn without moving the player; the
-next movement action can pass through it. Clicking/tapping an **adjacent** intact
-open wooden or barred prison door closes **that leaf** for **one turn** without
-moving the player. Diagonal adjacency counts, but the player cannot close a
-leaf while standing on it or while a monster occupies it. Invalid attempts
-cost no turn. Closing changes the tile back to its ordinary **unlocked** closed
-state; it never restores a spent lock/key, repairs a breached leaf, or closes
-an open progression gate. Closed doors again use their existing collision,
-sight and projectile rules; FOV refreshes immediately. Closing a door stops
-auto-travel. Opening and closing replay as distinct deterministic actions.
-Humanoid enemies treat unlocked closed doors as traversable routes but spend an
-action opening the encountered leaf before moving through it. Non-humanoids do
-not open them, while ethereal traversal retains its existing ability to pass
-through otherwise blocked terrain. Auto-travel may route through a known closed
-door and accounts for the extra opening action. Clicking or tapping a closed door
-as the destination opens it but stops before entering its tile, even when the
-player approaches from farther away. A route to a destination beyond the door
-continues through the doorway after the opening turn. Door state lives directly in the
-Ruins terrain map, so save/load and replay restore the exact open/closed state.
+leaves start closed. A closed door blocks movement, sight, and projectiles.
+Bumping an unlocked closed door opens that one leaf and consumes one player turn
+without moving the player; the next movement action can pass through it.
+Clicking/tapping an **adjacent** intact open wooden or barred prison door closes
+**that leaf** for **one turn** without moving the player. Diagonal adjacency
+counts, but the player cannot close a leaf while standing on it or while a
+monster occupies it. Invalid attempts cost no turn. Closing changes the tile
+back to its ordinary **unlocked** closed state; it never restores a spent
+lock/key, repairs a breached leaf, or closes an open progression gate. Closed
+doors again use their existing collision, sight and projectile rules; FOV
+refreshes immediately. Closing a door stops auto-travel. Opening and closing
+replay as distinct deterministic actions. Humanoid enemies treat unlocked closed
+doors as traversable routes but spend an action opening the encountered leaf
+before moving through it. Non-humanoids do not open them, while ethereal
+traversal retains its existing ability to pass through otherwise blocked
+terrain. Auto-travel may route through a known closed door and accounts for the
+extra opening action. Clicking or tapping a closed door as the destination opens
+it but stops before entering its tile, even when the player approaches from
+farther away. A route to a destination beyond the door continues through the
+doorway after the opening turn. Door state lives directly in the Ruins terrain
+map, so save/load and replay restore the exact open/closed state.
 
 Every Ruins floor now also contains one **two-leaf mandatory progression gate**
 on the route from its entrance to its deeper exit. The gate is selected only
@@ -1738,14 +1798,14 @@ bypassed through another corridor. Finished room perimeters have **only
 registered two-leaf entrances**: optional loop passages join the exterior of
 existing entrances instead of cutting through masonry. Post-collapse repairs
 preserve every room wall and authored opening, rerouting through safe rock or
-rejecting the floor attempt. Both generation and final stratum validation
-reject unregistered walkable gaps and verify intact progression gates against
+rejecting the floor attempt. Both generation and final stratum validation reject
+unregistered walkable gaps and verify intact progression gates against
 **eight-direction movement**, preventing diagonal bypasses beside doors. This
 layout correction is deterministic and applies only to newly generated worlds.
-Each gate has an independent **30% chance**
-to generate already breached/open. A pre-breached gate needs no key. Otherwise,
-exactly one matching **Dwarven Key source** is generated on the reachable side of
-the gate using one of four seeded scenarios:
+Each gate has an independent **30% chance** to generate already breached/open. A
+pre-breached gate needs no key. Otherwise, exactly one matching **Dwarven Key
+source** is generated on the reachable side of the gate using one of four seeded
+scenarios:
 
 ```text
 champion carrier       -> the guaranteed floor Champion carries the key
@@ -1756,15 +1816,15 @@ locked side room       -> a reachable local key opens the side room containing t
 
 The dependency validator proves that local keys can be collected in order and
 that the progression key can be obtained without crossing its own gate. No
-arbitrary nested key chains are generated. Key-carrying Champions must be non-ethereal so they cannot phase into an
-impassable tile with the key; other Champions (including Ghosts) remain eligible
-for normal generation. Killing a key-carrying Champion drops
-the ordinary key item through the normal corpse/drop path; searchable remains use
-the existing remains interaction. Bumping an intact gate while carrying its
-matching key consumes the key, opens both leaves, and costs **1 turn** without
-also moving the player. Key-opened gates use a distinct persistent **intact open**
-terrain state; only gates generated pre-breached use the ruined/breached state.
-Mandatory gates cannot be breached with a weapon.
+arbitrary nested key chains are generated. Key-carrying Champions must be
+non-ethereal so they cannot phase into an impassable tile with the key; other
+Champions (including Ghosts) remain eligible for normal generation. Killing a
+key-carrying Champion drops the ordinary key item through the normal corpse/drop
+path; searchable remains use the existing remains interaction. Bumping an intact
+gate while carrying its matching key consumes the key, opens both leaves, and
+costs **1 turn** without also moving the player. Key-opened gates use a distinct
+persistent **intact open** terrain state; only gates generated pre-breached use
+the ruined/breached state. Mandatory gates cannot be breached with a weapon.
 
 ### Closing the Dwarven progression gate
 
@@ -1778,21 +1838,21 @@ Breached gates are never closable. The new terrain tile is included in
 
 
 Closed wooden doors (including ordinary locks and mandatory progression gates)
-block movement, sight and projectiles. Barred prison doors instead block only movement
-while allowing sight and projectiles through the bars, even when locked. Their
-adjacent prison-bar partitions follow the same sight and projectile rules. Keys are tied
-to a specific physical lock rather than acting as universal Dwarven keys.
-Inspecting a Dwarven Key also states its originating underground floor
-(e.g. `Found on floor -5.`), determined from its existing lock identity;
-keys retain that label through save, load and replay. Auto-travel may plan through a locked door/gate only when the
-matching key is already carried; it never chooses weapon breaching on the
-player's behalf. Humanoids can still open ordinary *unlocked* doors, but do not
-unlock or breach locked doors. Ethereal movement keeps its existing terrain-
-passing exception. Any door/gate transition from sight-blocking to open or breached
-terrain invalidates the cached underground FOV immediately, so sight through the
-new opening updates in the same action rather than waiting for player movement.
-Opening a barred cell door removes its movement barrier; sight and projectile
-lanes were already open.
+block movement, sight and projectiles. Barred prison doors instead block only
+movement while allowing sight and projectiles through the bars, even when
+locked. Their adjacent prison-bar partitions follow the same sight and
+projectile rules. Keys are tied to a specific physical lock rather than acting
+as universal Dwarven keys. Inspecting a Dwarven Key also states its originating
+underground floor (e.g. `Found on floor -5.`), determined from its existing lock
+identity; keys retain that label through save, load and replay. Auto-travel may
+plan through a locked door/gate only when the matching key is already carried;
+it never chooses weapon breaching on the player's behalf. Humanoids can still
+open ordinary *unlocked* doors, but do not unlock or breach locked doors.
+Ethereal movement keeps its existing terrain- passing exception. Any door/gate
+transition from sight-blocking to open or breached terrain invalidates the
+cached underground FOV immediately, so sight through the new opening updates in
+the same action rather than waiting for player movement. Opening a barred cell
+door removes its movement barrier; sight and projectile lanes were already open.
 
 Each ordinary doorway that receives a door then has an independent **10% chance
 to be locked**. The roll is made once for the two-leaf doorway, never per leaf:
@@ -1800,42 +1860,41 @@ when a doorway locks, **both adjacent leaves share one lock and one matching
 key**. This prevents a locked leaf from being bypassed simply by opening its
 sibling. Generated ordinary-door keys are placed only on marble reachable from
 the floor entrance while all generated locks are still closed, so a key cannot
-spawn behind its own lock or form a circular dependency with another lock.
-Each generated ordinary key, progression-key source (including a Champion
-carrier or searchable remains), and internal prison-door key is assigned a
-**different room**. Ground keys appear inside actual non-stair rooms, not in
-corridors or entrance/exit halls; internal cell keys cannot appear in the
-prison room they unlock. Ground keys also remain at least **four tiles apart**
-by Chebyshev distance. Independently generated locked
-doors may never touch orthogonally unless they use the **same key**; otherwise
-the floor is regenerated. This avoids ambiguous three- or four-leaf door
-clusters and accidental key piles without changing deliberate two-leaf gates.
+spawn behind its own lock or form a circular dependency with another lock. Each
+generated ordinary key, progression-key source (including a Champion carrier or
+searchable remains), and internal prison-door key is assigned a **different
+room**. Ground keys appear inside actual non-stair rooms, not in corridors or
+entrance/exit halls; internal cell keys cannot appear in the prison room they
+unlock. Ground keys also remain at least **four tiles apart** by Chebyshev
+distance. Independently generated locked doors may never touch orthogonally
+unless they use the **same key**; otherwise the floor is regenerated. This
+avoids ambiguous three- or four-leaf door clusters and accidental key piles
+without changing deliberate two-leaf gates.
 
 A matching key opens both leaves in **1 turn** and is consumed. Without the key,
 the first bump on a particular locked doorway identifies the lock without
 spending a turn. A subsequent bump attempts a breach with an equipped weapon,
 using the same **132 ms cosmetic attack lunge** as ordinary melee and crate
 strikes. Inspection is remembered per physical lock (including double-door
-leaves), survives save/replay, and resets with a new character. Bare fists
-and ranged weapons cannot attempt a breach and do not consume a turn. Each
-actual melee-weapon attempt costs **1 turn**, does not consume or damage the
-weapon, and uses
-the player's **final ATK** (the same ATK shown in the HUD, including the equipped
-weapon and other current ATK bonuses/penalties):
+leaves), survives save/replay, and resets with a new character. Bare fists and
+ranged weapons cannot attempt a breach and do not consume a turn. Each actual
+melee-weapon attempt costs **1 turn**, does not consume or damage the weapon,
+and uses the player's **final ATK** (the same ATK shown in the HUD, including
+the equipped weapon and other current ATK bonuses/penalties):
 
 ```text
 P(breach) = min(1, max(0, final ATK) / 100)
 ```
 
 For example, a character at 18 final ATK has an 18% success chance per attempt,
-regardless of how much of that ATK comes from the equipped weapon itself. Each actual
-weapon-breach attempt, successful or not, also has an independent **25% chance**
-to Alarm one enemy: the nearest eligible non-Alarmed monster on the current
-level, with no distance limit. Distance ties resolve deterministically. Already
-Alarmed or otherwise ineligible monsters are skipped, so repeated noisy attempts
-can progressively wake multiple enemies. A breached ordinary door leaf remains
-permanently passable; breaching one leaf does not automatically destroy the
-other.
+regardless of how much of that ATK comes from the equipped weapon itself. Each
+actual weapon-breach attempt, successful or not, also has an independent **25%
+chance** to Alarm one enemy: the nearest eligible non-Alarmed monster on the
+current level, with no distance limit. Distance ties resolve deterministically.
+Already Alarmed or otherwise ineligible monsters are skipped, so repeated noisy
+attempts can progressively wake multiple enemies. A breached ordinary door leaf
+remains permanently passable; breaching one leaf does not automatically destroy
+the other.
 
 Gate/door terrain state and ground keys use the existing persistent level/item
 data, so saves and replay restore opened/breached locks, remaining keys, and
@@ -1843,109 +1902,110 @@ consumed keys exactly. No additional save-schema field is required for locks.
 
 The Ruins stratum also contains one permanent **shortcut lift**. Its upper
 platform is on D1, is guaranteed reachable from the D1 entrance with all locks
-still closed, and begins unpowered. The deeper endpoint is selected with
-seeded RNG from the configured normalized depth range **50–100%** of the
-stratum, which means D2–D3 for a three-floor stratum and D3–D5 for a five-floor
-stratum. Both platforms occupy the same global X/Y coordinates. The generator
-tries eligible depths in seeded order, accepting only a shared, accessible
-platform location with solid rock throughout the intervening levels. Each
-intermediate level stores an enclosed, impassable lift shaft at that X/Y, with
-no access from the surrounding floor. No room, corridor, stair or special
-encounter is carved through to make room for the shaft. If no valid column
-exists, the layout is rejected and regenerated. The upper platform remains
-reachable with locks closed; the lower platform is reachable through normal
-progression. Both retain a safe approach and adjacent landing space; timed
-hazard rooms cannot overlap the lift approaches. A wall-mounted control lever
-is generated beside the deeper platform.
-Its inactive and pulled sprites visually use marble as their underlay, even
-though the underlying lever terrain remains blocking like a wall. Bumping that lever costs **1 turn**, permanently powers both endpoints, changes
-the lever itself to a persistent pulled/locked-down terrain state, and enables
-two-way inspect-to-travel between the two fixed platforms. The D1 side
-cannot activate the lift remotely. Lift travel itself follows the existing
+still closed, and begins unpowered. The deeper endpoint is selected with seeded
+RNG from the configured normalized depth range **50–100%** of the stratum, which
+means D2–D3 for a three-floor stratum and D3–D5 for a five-floor stratum. Both
+platforms occupy the same global X/Y coordinates. The generator tries eligible
+depths in seeded order, accepting only a shared, accessible platform location
+with solid rock throughout the intervening levels. Each intermediate level
+stores an enclosed, impassable lift shaft at that X/Y, with no access from the
+surrounding floor. No room, corridor, stair or special encounter is carved
+through to make room for the shaft. If no valid column exists, the layout is
+rejected and regenerated. The upper platform remains reachable with locks
+closed; the lower platform is reachable through normal progression. Both retain
+a safe approach and adjacent landing space; timed hazard rooms cannot overlap
+the lift approaches. A wall-mounted control lever is generated beside the deeper
+platform. Its inactive and pulled sprites visually use marble as their underlay,
+even though the underlying lever terrain remains blocking like a wall. Bumping
+that lever costs **1 turn**, permanently powers both endpoints, changes the
+lever itself to a persistent pulled/locked-down terrain state, and enables
+two-way inspect-to-travel between the two fixed platforms. The D1 side cannot
+activate the lift remotely. Lift travel itself follows the existing
 level-transition convention and does not add a separate combat turn. Travel
-changes Z only; a creature occupying the destination yields to the nearest
-safe available tile deterministically, without consuming RNG or moving the
-player sideways. If no safe displacement exists, the transition is not
-performed. The shaft and both platforms rotate with and are saved in the
-ordinary global level grids.
+changes Z only; a creature occupying the destination yields to the nearest safe
+available tile deterministically, without consuming RNG or moving the player
+sideways. If no safe displacement exists, the transition is not performed. The
+shaft and both platforms rotate with and are saved in the ordinary global level
+grids.
 
 Lift endpoint/lever coordinates and powered state are persisted explicitly in
-the generic dungeon-shortcut registry; runtime lever activation and inspect-to-travel
-always resolve the lift from that registry rather than a Ruins-only mirror variable.
-The platform and pulled-lever terrain states are also stored in the ordinary
-Ruins map grids. Terrain save codes are one-to-one with terrain IDs: lava and the
-pulled lever must never share an internal code, and these save codes are separate
-from the visible ASCII glyphs. On load, an already-powered shortcut reasserts the
-pulled terrain only at its registered lever coordinate, so saves written during a
-code collision restore lava normally without losing the powered lever. Lift
-metadata was introduced in save schema **34**. Distinct open-gate/pulled-lever
-terrain states use save schema **36**. Room descriptors,
-vault descriptors, selected encounter families and tactical enemy role metadata
-use schema **37**. Schema **38** adds the persistent room graph, progression-key
-scenario metadata and enemy-carried dungeon-key state. Schema **39** replaces the
-Ruins-specific lift save field with a package-tagged dungeon shortcut registry and
-persists each deep level's dungeon-package identity, so later dungeon strata can
-reuse shortcuts without another dedicated save field. The current save/replay
-format is listed in §66; older saves are rejected.
+the generic dungeon-shortcut registry; runtime lever activation and
+inspect-to-travel always resolve the lift from that registry rather than a
+Ruins-only mirror variable. The platform and pulled-lever terrain states are
+also stored in the ordinary Ruins map grids. Terrain save codes are one-to-one
+with terrain IDs: lava and the pulled lever must never share an internal code,
+and these save codes are separate from the visible ASCII glyphs. On load, an
+already-powered shortcut reasserts the pulled terrain only at its registered
+lever coordinate, so saves written during a code collision restore lava normally
+without losing the powered lever. Lift metadata was introduced in save schema
+**34**. Distinct open-gate/pulled-lever terrain states use save schema **36**.
+Room descriptors, vault descriptors, selected encounter families and tactical
+enemy role metadata use schema **37**. Schema **38** adds the persistent room
+graph, progression-key scenario metadata and enemy-carried dungeon-key state.
+Schema **39** replaces the Ruins-specific lift save field with a package-tagged
+dungeon shortcut registry and persists each deep level's dungeon-package
+identity, so later dungeon strata can reuse shortcuts without another dedicated
+save field. The current save/replay format is listed in §66; older saves are
+rejected.
 
 ### Dwarven Ruins traps (batch 5)
 
 `src/dungeonTraps.js` places reusable spikes and wall-arrow mechanisms in
-**corridors outside room footprints**, after stairs, locks, keys and the shortcut
-lift are generated. Each floor targets
-4–10 traps in total across spikes and wall arrows, stopping early if no
-safe placement remains. High target counts are not guaranteed: reachable
-stairways, progression keys and lifts take priority. Placement uses seeded
-RNG once; entering or loading a floor never regenerates mechanisms. Both spike
-and pressure-plate triggers reject dead ends and skippable inside corners. A
-trigger needs at least two cardinal exits (closed/locked doors count as exits).
-With exactly two perpendicular exits, their shared diagonal must be blocked:
-this preserves narrow corridor bends but excludes the corner of an open area.
-The check applies to the final pressure-plate position, not just its emitter
-candidate. **Arrow emitters also require solid stone or cave rock directly
-behind the emitting wall**, in the opposite direction from the shot. A thin
-wall separating a corridor from walkable room flooring is never eligible:
-otherwise the `!` mechanism can appear to cap a pointless dead-end corridor
-while the hidden plate passes the separate route check. The check applies
-before the emitter replaces the wall and to every candidate direction; a
-rejected candidate consumes no placement slot. Triggers stay at least four Chebyshev tiles from entrances,
-generated keys and lift platforms.
-Every staircase, Dwarven key source (including key-bearing searchable remains)
-and lift endpoint retains a route avoiding all triggers; keys reachable
+**corridors outside room footprints**, after stairs, locks, keys and the
+shortcut lift are generated. Each floor targets 4–10 traps in total across
+spikes and wall arrows, stopping early if no safe placement remains. High target
+counts are not guaranteed: reachable stairways, progression keys and lifts take
+priority. Placement uses seeded RNG once; entering or loading a floor never
+regenerates mechanisms. Both spike and pressure-plate triggers reject dead ends
+and skippable inside corners. A trigger needs at least two cardinal exits
+(closed/locked doors count as exits). With exactly two perpendicular exits,
+their shared diagonal must be blocked: this preserves narrow corridor bends but
+excludes the corner of an open area. The check applies to the final
+pressure-plate position, not just its emitter candidate. **Arrow emitters also
+require solid stone or cave rock directly behind the emitting wall**, in the
+opposite direction from the shot. A thin wall separating a corridor from
+walkable room flooring is never eligible: otherwise the `!` mechanism can appear
+to cap a pointless dead-end corridor while the hidden plate passes the separate
+route check. The check applies before the emitter replaces the wall and to every
+candidate direction; a rejected candidate consumes no placement slot. Triggers
+stay at least four Chebyshev tiles from entrances, generated keys and lift
+platforms. Every staircase, Dwarven key source (including key-bearing searchable
+remains) and lift endpoint retains a route avoiding all triggers; keys reachable
 before unlocking also retain their original accessibility. Optional loot and
-non-key searchable/decorative remains are not mandatory safe-route targets and may
-sit beyond a trap. Trap triggers are separated by more than three tiles. Existing monsters cannot
-start within two tiles of either a trigger or emitter. Summoning uses the same
-`DungeonTraps.safeSpawn` predicate, as does Ruins encounter placement. Triggers
-and emitters also keep that clearance from authored room tactical slots, so
-traps cannot displace their intended encounters. Floor and wall-arrow triggers must also have meaningful
-walkable continuation at least three steps on each apparent exit: a two-wide
-cul-de-sac is not a valid through-route just because its end-cap has three
-walkable neighbours. This check applies before placing either trap type;
-wall-arrow emitters must also be backed by solid stone.
+non-key searchable/decorative remains are not mandatory safe-route targets and
+may sit beyond a trap. Trap triggers are separated by more than three tiles.
+Existing monsters cannot start within two tiles of either a trigger or emitter.
+Summoning uses the same `DungeonTraps.safeSpawn` predicate, as does Ruins
+encounter placement. Triggers and emitters also keep that clearance from
+authored room tactical slots, so traps cannot displace their intended
+encounters. Floor and wall-arrow triggers must also have meaningful walkable
+continuation at least three steps on each apparent exit: a two-wide cul-de-sac
+is not a valid through-route just because its end-cap has three walkable
+neighbours. This check applies before placing either trap type; wall-arrow
+emitters must also be backed by solid stone.
 
 Spikes and arrow pressure plates trigger on entry by players and grounded,
 corporeal enemies. **Flying and ethereal enemies do not activate either floor
 mechanism**, including when moved by force. Forced movement of other creatures
-still triggers them. Remaining on a trigger or
-restoring a save does not. A pressure plate, placed a seeded random **1–5 floor squares** from its
-backed wall emitter where corridor geometry permits, fires a cardinal arrow
-toward the first non-ethereal creature in its lane, regardless of who stepped
-on it. Ethereal creatures do not intercept arrows. Closed doors,
-projectile-blocking terrain and ground items stop the arrow; an item on a
-creature's tile intercepts before that creature. The emitter remains a wall.
-Automatic player travel excludes all trigger tiles; manual movement is allowed.
+still triggers them. Remaining on a trigger or restoring a save does not. A
+pressure plate, placed a seeded random **1–5 floor squares** from its backed
+wall emitter where corridor geometry permits, fires a cardinal arrow toward the
+first non-ethereal creature in its lane, regardless of who stepped on it.
+Ethereal creatures do not intercept arrows. Closed doors, projectile-blocking
+terrain and ground items stop the arrow; an item on a creature's tile intercepts
+before that creature. The emitter remains a wall. Automatic player travel
+excludes all trigger tiles; manual movement is allowed.
 
-Balance lives in `dungeons.dwarvenRuins.traps` in `world_generation.json`:
-spike ATK 8, arrow ATK 10, mechanism speed 5, arrow range 12. Both
-mechanisms **ignore numerical DEF**, including temporary DEF bonuses and monster
-DEF. Separate armor glancing and critical rolls still apply; arrows retain
-their ranged dodge multiplier. Ordinary weapon attacks still use DEF. Traps grant no player XP, kill count, bestiary entry,
-strongest-kill record or immediate quest-kill credit. Normal loot and stolen
-items still drop, and enemy fatal-hit protection still applies. A trap's damage
-message appears before its fatality message; deaths and drops still resolve in
-the same game action. Resolution and RNG finish before presentation; projectile
-animation never determines a hit.
+Balance lives in `dungeons.dwarvenRuins.traps` in `world_generation.json`: spike
+ATK 8, arrow ATK 10, mechanism speed 5, arrow range 12. Both mechanisms **ignore
+numerical DEF**, including temporary DEF bonuses and monster DEF. Separate armor
+glancing and critical rolls still apply; arrows retain their ranged dodge
+multiplier. Ordinary weapon attacks still use DEF. Traps grant no player XP,
+kill count, bestiary entry, strongest-kill record or immediate quest-kill
+credit. Normal loot and stolen items still drop, and enemy fatal-hit protection
+still applies. A trap's damage message appears before its fatality message;
+deaths and drops still resolve in the same game action. Resolution and RNG
+finish before presentation; projectile animation never determines a hit.
 
 Each deep level saves its `traps` array, including stable ID, trigger, type and
 optional emitter, direction and range. Save and replay restoration use the
@@ -1956,15 +2016,14 @@ ASCII glyphs are `^` for spikes and `!` for wall-arrow emitters. Wall-arrow
 pressure plates are disguised as ordinary `marble` flooring in both tile and
 ASCII modes (including inspection text); their hidden gameplay tile and entry
 trigger remain intact, and auto-travel still avoids them. In image mode, spike
-traps use `dwarven-floor-trap-0.png` when empty
-and `dwarven-floor-trap-1.png` while the player or a living monster occupies
-the tile. Occupancy changes the displayed image only; spikes still deal damage
-on entry, not each turn spent standing on them. The arrow emitter still uses
-the trap atlas. Rendering supports
-`sourceRect: [x, y, width, height]` for atlas regions without changing the
-gameplay tile. Shared underground FOV now honors
-`TILE.blocksSight`, so closed doors, levers and arrow walls block sight.
-The supplied service worker now precaches the trap module and images for offline play.
+traps use `dwarven-floor-trap-0.png` when empty and `dwarven-floor-trap-1.png`
+while the player or a living monster occupies the tile. Occupancy changes the
+displayed image only; spikes still deal damage on entry, not each turn spent
+standing on them. The arrow emitter still uses the trap atlas. Rendering
+supports `sourceRect: [x, y, width, height]` for atlas regions without changing
+the gameplay tile. Shared underground FOV now honors `TILE.blocksSight`, so
+closed doors, levers and arrow walls block sight. The supplied service worker
+now precaches the trap module and images for offline play.
 
 ### Dwarven Ruins encounters (batch 6)
 
@@ -1986,15 +2045,17 @@ The minimum budget still supports the required family mix and Champion escort.
 More enemies increase the *total* obtainable combat XP and monster drops, even
 though individual rewards and placed chest/loot budgets are unchanged.
 
-The organized room budget targets **70%** (formerly **82%**), though
-required Champion and tactical encounters can exceed this slice. A separate corridor budget targets **20%** of threat on D1, rising
-**1.5 percentage points per deeper floor**. These corridor spawns use the
-floor's existing dominant families and normal species wandering; they appear
-only on walkable passage tiles outside any room rectangle and at least two
-tiles away from authored door leaves. The remainder can appear as ordinary
-ambient roamers. Both corridor and room spawns preserve entrance clearance,
-trap safety, terrain eligibility, spawn spacing and obstacle rules. Corridor
-placements reuse the existing wandering and persistence rules with the tactical role label `corridor`; they do not create new tile or status types.
+The organized room budget targets **70%** (formerly **82%**), though required
+Champion and tactical encounters can exceed this slice. A separate corridor
+budget targets **20%** of threat on D1, rising **1.5 percentage points per
+deeper floor**. These corridor spawns use the floor's existing dominant families
+and normal species wandering; they appear only on walkable passage tiles outside
+any room rectangle and at least two tiles away from authored door leaves. The
+remainder can appear as ordinary ambient roamers. Both corridor and room spawns
+preserve entrance clearance, trap safety, terrain eligibility, spawn spacing and
+obstacle rules. Corridor placements reuse the existing wandering and persistence
+rules with the tactical role label `corridor`; they do not create new tile or
+status types.
 
 A floor selects **2–4 dominant encounter families** (goblinoids, undead,
 marauders, or cave predators when their members are depth-eligible). Organized
@@ -2006,29 +2067,30 @@ wanderers. Both roaming selections use the **full depth-eligible species pool**,
 not just the selected dominant families or their leftovers, and use each
 species' configured rarity as a direct relative weight. Thus a `0.02` species
 has one fiftieth of the selection weight of an otherwise eligible `1.0` species
-in these global draws. This is a relative weight, not a 2% spawn chance.
-**All Dwarven Ruins populations, including corridor wanderers, require an
-explicit `z-n` biome in the monster template.** The `z-n` tag is a minimum
-depth: for example, `z-5` allows spawning on z:-5 and deeper, but not z:-4.
-An ordinary `cave` biome alone never grants Ruins eligibility. Tier minimums,
-rarity and the existing encounter-role rules still apply. The Ruins package
-uses an empty `nativeBiomes` list to enforce that distinction; ordinary cave
-spawning is unaffected. Family member lists are only thematic candidates;
-listing a species there cannot override its depth-biome requirement.
-Only species explicitly marked `"ultraRare": true` in `enemy_templates.json`
-are limited to **one individual per species per world**, across surface,
-underground and forest ambush generation. A low `rarity` weight by itself does
-not imply uniqueness. After an ultra-rare species spawns, subsequent weighted
-selections exclude it and other eligible monsters fill those slots. Unflagged
-species, including Myrka (`0.02`) and Vampire (`0.01`), can repeat. Themed room populations remain
-predictable while wandering encounters can occasionally be exceptional.
-**All** Ruins enemies use their species' normal idle wandering mode and home radius,
-including Champions, escorts, ranged backliners and other tactical room/vault guards.
-Roles determine initial positions and shooter selection, not stationary behavior;
-`far` still becomes `roam` underground and normal active-range/terrain limits apply.
-The configured default is exactly **one Champion per floor**, usually spawning
-with an escort in a remote or tactical room. Other prefixes begin at **11%**,
-rise by **2.5 percentage points per floor**, and cap at **28%**; random prefix rolls exclude Champion.
+in these global draws. This is a relative weight, not a 2% spawn chance. **All
+Dwarven Ruins populations, including corridor wanderers, require an explicit
+`z-n` biome in the monster template.** The `z-n` tag is a minimum depth: for
+example, `z-5` allows spawning on z:-5 and deeper, but not z:-4. An ordinary
+`cave` biome alone never grants Ruins eligibility. Tier minimums, rarity and the
+existing encounter-role rules still apply. The Ruins package uses an empty
+`nativeBiomes` list to enforce that distinction; ordinary cave spawning is
+unaffected. Family member lists are only thematic candidates; listing a species
+there cannot override its depth-biome requirement. Only species explicitly
+marked `"ultraRare": true` in `enemy_templates.json` are limited to **one
+individual per species per world**, across surface, underground and forest
+ambush generation. A low `rarity` weight by itself does not imply uniqueness.
+After an ultra-rare species spawns, subsequent weighted selections exclude it
+and other eligible monsters fill those slots. Unflagged species, including Myrka
+(`0.02`) and Vampire (`0.01`), can repeat. Themed room populations remain
+predictable while wandering encounters can occasionally be exceptional. **All**
+Ruins enemies use their species' normal idle wandering mode and home radius,
+including Champions, escorts, ranged backliners and other tactical room/vault
+guards. Roles determine initial positions and shooter selection, not stationary
+behavior; `far` still becomes `roam` underground and normal active-range/terrain
+limits apply. The configured default is exactly **one Champion per floor**,
+usually spawning with an escort in a remote or tactical room. Other prefixes
+begin at **11%**, rise by **2.5 percentage points per floor**, and cap at
+**28%**; random prefix rolls exclude Champion.
 
 Cave species may appear when their tier's depth permits it. Surface species
 must opt in using a `z-N` biome tag, meaning depth N or deeper. Current tier
@@ -2046,21 +2108,23 @@ alarmed, the target is not rolled again. This can make luring a wounded enemy
 past a guard room risky; preventing its escape or choosing another route are
 useful responses.
 
-Enemies, prefixes, positions, tactical role, encounter-family identity, room/vault
-identity and wander state are persisted. Loading restores the exact population;
-it never regenerates tactical encounters from room metadata.
+Enemies, prefixes, positions, tactical role, encounter-family identity,
+room/vault identity and wander state are persisted. Loading restores the exact
+population; it never regenerates tactical encounters from room metadata.
 
 ### Guaranteed Throne Hall (v146, side-branch layout and last-stand defense)
 
 The deepest generated **Dwarven Ruins** floor contains exactly one reserved
 **Throne Hall** as a single-entrance optional side branch, never on the
-mandatory route to the separate sealed Deep Mines chamber. It is a landmark room, not one of the
-randomly selected major vault types, and occupies one of the floor's ordinary
-room slots. Earlier Ruins floors and the entrance Fort contain no throne hall.
-The artifact chest is still in a separate optional vault. The throne hall
-**replaces** the formerly guaranteed separate defensive vault: exactly one
-artifact vault remains compulsory, while a second fitted vault is an ordinary
-1–2-vault roll. The ordinary room and Champion budgets are unchanged; the royal treasury and its extra guards are the only explicit additional rewards and foes.
+mandatory route to the separate sealed Deep Mines chamber. It is a landmark
+room, not one of the randomly selected major vault types, and occupies one of
+the floor's ordinary room slots. Earlier Ruins floors and the entrance Fort
+contain no throne hall. The artifact chest is still in a separate optional
+vault. The throne hall **replaces** the formerly guaranteed separate defensive
+vault: exactly one artifact vault remains compulsory, while a second fitted
+vault is an ordinary 1–2-vault roll. The ordinary room and Champion budgets are
+unchanged; the royal treasury and its extra guards are the only explicit
+additional rewards and foes.
 
 The floor reserves the hall's footprint **before** placing other rooms. Three
 possible interior dimensions are **9×19, 9×21, 9×23** cells, with four
@@ -2078,70 +2142,72 @@ expanded floors dangerous, particularly deeper underground.
 
 The hall has **exactly one specified two-leaf entrance**, at the short end
 opposite the throne. It is a **leaf branch** attached to a nearby main-route
-room, and the back wall is solid. There is no back passage or route to the
-mines through the throne hall. Corridors, loops, collapses and reachability
-repair may not tunnel through its perimeter. Closing both leaves must isolate
-only the throne hall, while the ordinary mandatory route still reaches the
-sealed mine continuation. Generation retries rather than accepting extra
-connections, an unreachable throne hall or a compromised progression gate. The hall has a three-cell clear central aisle and
-**three paired indoor stone columns**. Near the far end, exactly one
-**blocking dwarven stone throne** occupies the center of a **3×3 ceremonial
-dais**. Its eight exposed dais cells are walkable and have no gameplay bonus.
-The throne cannot be entered or interacted with, but deliberately **does not
-block sight or projectiles**; columns retain their existing projectile
-blocking behavior. Ordinary ambient chests are kept out of the hall. The throne
-has one dedicated royal treasure chest two cells behind it against the back
-wall, reachable from both flanking lanes without passing through the throne.
-The chest does not create another entrance or affect mine progression.
+room, and the back wall is solid. There is no back passage or route to the mines
+through the throne hall. Corridors, loops, collapses and reachability repair may
+not tunnel through its perimeter. Closing both leaves must isolate only the
+throne hall, while the ordinary mandatory route still reaches the sealed mine
+continuation. Generation retries rather than accepting extra connections, an
+unreachable throne hall or a compromised progression gate. The hall has a
+three-cell clear central aisle and **three paired indoor stone columns**. Near
+the far end, exactly one **blocking dwarven stone throne** occupies the center
+of a **3×3 ceremonial dais**. Its eight exposed dais cells are walkable and have
+no gameplay bonus. The throne cannot be entered or interacted with, but
+deliberately **does not block sight or projectiles**; columns retain their
+existing projectile blocking behavior. Ordinary ambient chests are kept out of
+the hall. The throne has one dedicated royal treasure chest two cells behind it
+against the back wall, reachable from both flanking lanes without passing
+through the throne. The chest does not create another entrance or affect mine
+progression.
 
 Room metadata identifies the hall's special archetype and facing. A separate
 stable landmark record stores recipe revision 3, associated room, sole front
 entrance and the throne anchor. It is serialized alongside room/vault
 descriptors and restored without rerolling any world-generation decisions.
-Whole-world rotation transforms its rectangle, points and facing together.
-The landmark direction runs from its single entrance toward the throne; the
-**throne sprite faces the opposite direction, back toward the entrance**. Sprite
-filenames indicate the direction the monarch faces (north, east, south, west); east/west art matches the ruler's actual facing, not the hall's approach vector. The camera, animation timing and random numbers do not affect
-which sprite appears. The throne and dais are new encoded terrain types,
-using the unique current-save codes `╙` and `╜`. Both graphics are transparent
-over the recorded stone floor: dais engravings overlay marble; the throne uses
-the dais as its underlay, saved and rotated alongside other per-level overlays.
-The hall has two to three small patches of obstructing rubble along its side
-edges and up to two decorative dwarven remains taken from the existing floor
-budget. Its central aisle, columns, dais, doorway landings and tactical slots
-remain clear of ambient dressing. Searchable corpses, regular chests and the
-artifact are placed in other rooms.
+Whole-world rotation transforms its rectangle, points and facing together. The
+landmark direction runs from its single entrance toward the throne; the **throne
+sprite faces the opposite direction, back toward the entrance**. Sprite
+filenames indicate the direction the monarch faces (north, east, south, west);
+east/west art matches the ruler's actual facing, not the hall's approach vector.
+The camera, animation timing and random numbers do not affect which sprite
+appears. The throne and dais are new encoded terrain types, using the unique
+current-save codes `╙` and `╜`. Both graphics are transparent over the recorded
+stone floor: dais engravings overlay marble; the throne uses the dais as its
+underlay, saved and rotated alongside other per-level overlays. The hall has two
+to three small patches of obstructing rubble along its side edges and up to two
+decorative dwarven remains taken from the existing floor budget. Its central
+aisle, columns, dais, doorway landings and tactical slots remain clear of
+ambient dressing. Searchable corpses, regular chests and the artifact are placed
+in other rooms.
 
 The hall's own tactical slots are measured relative to its entrance: two
-frontline flankers near column gaps, two supporting defenders farther back,
-a far-side ranged slot when the chosen encounter family includes a shooter,
-and a position for the existing guaranteed Champion. Guards use one of the
-floor's already-selected encounter families and spend the **current depth
-threat budget**; when no shooter is available, the backline is omitted rather
-than inventing a ranged species. The Champion and its existing escort may
-defend the throne instead of a fitted vault, unless the Champion must carry
-a progression key elsewhere. The floor still has exactly one guaranteed
-Champion and retains the same encounter-family count, wander/Alarmed rules,
-ordinary chest budget. In addition, the royal treasury is protected by
-**2–3 extra Tier-4 enemies** taken from the current depth-eligible, common
-monster pool (`rarity > 0.1`). They spawn around the rear portion of the hall,
-without taking ordinary floor threat points or introducing an extra Champion.
-Their ordinary XP and loot drops still apply. Guards remain free to pursue the player; the hall
-does not lock during combat.
+frontline flankers near column gaps, two supporting defenders farther back, a
+far-side ranged slot when the chosen encounter family includes a shooter, and a
+position for the existing guaranteed Champion. Guards use one of the floor's
+already-selected encounter families and spend the **current depth threat
+budget**; when no shooter is available, the backline is omitted rather than
+inventing a ranged species. The Champion and its existing escort may defend the
+throne instead of a fitted vault, unless the Champion must carry a progression
+key elsewhere. The floor still has exactly one guaranteed Champion and retains
+the same encounter-family count, wander/Alarmed rules, ordinary chest budget. In
+addition, the royal treasury is protected by **2–3 extra Tier-4 enemies** taken
+from the current depth-eligible, common monster pool (`rarity > 0.1`). They
+spawn around the rear portion of the hall, without taking ordinary floor threat
+points or introducing an extra Champion. Their ordinary XP and loot drops still
+apply. Guards remain free to pursue the player; the hall does not lock during
+combat.
 
 The throne recipe is revision 3. The progression gate **cannot** occupy the
-throne entrance: it belongs on the mandatory route to the sealed mine.
-The throne hall can still have an ordinary closed or locked door under the
-normal doorway rules. The royal chest guarantees **one item plus 300–600 gold** (before the
-world-gold multiplier): **70%** chance of equipment with a Tier-4 or Tier-5
+throne entrance: it belongs on the mandatory route to the sealed mine. The
+throne hall can still have an ordinary closed or locked door under the normal
+doorway rules. The royal chest guarantees **one item plus 300–600 gold** (before
+the world-gold multiplier): **70%** chance of equipment with a Tier-4 or Tier-5
 base, or **30%** chance of a tier-5-source artifact. It is separate from the
 existing guaranteed artifact chest and therefore sometimes gives a second
 artifact. The outcome is rolled by the seeded gameplay RNG when opened, just
-like ordinary chests; no respawning or reward reroll on save/load. This
-remains a landmark rather than a new boss or interactive throne.
-Landmark role positions, family assignments and enemy affiliations are
-persisted with existing room and monster records; loading never repopulates
-or rerolls the hall.
+like ordinary chests; no respawning or reward reroll on save/load. This remains
+a landmark rather than a new boss or interactive throne. Landmark role
+positions, family assignments and enemy affiliations are persisted with existing
+room and monster records; loading never repopulates or rerolls the hall.
 
 ### Rooms, vaults, tactical encounters and loot (v61)
 
@@ -2171,18 +2237,18 @@ one Kitchen and stove, but never more than one per floor. Kitchens convert an
 ordinary non-Prison, non-vault room after the mandatory Prison quota is secured;
 an available Dining Hall is preferred. Each stove has preparation tables and a
 free approach from the room interior. Neither stair halls nor special chambers
-are converted. There are **no stoves in the Dwarven Mines**. Kitchen furnishings and stove placement cannot
-replace stairs, progression keys, required rewards, trap mechanisms or tactical
-enemy positions. See Cooking and fireplace resting for stove rules.
-Stoves block ordinary player and monster movement (ethereal traversal retains
-its existing exception) and are operated from an adjacent
+are converted. There are **no stoves in the Dwarven Mines**. Kitchen furnishings
+and stove placement cannot replace stairs, progression keys, required rewards,
+trap mechanisms or tactical enemy positions. See Cooking and fireplace resting
+for stove rules. Stoves block ordinary player and monster movement (ethereal
+traversal retains its existing exception) and are operated from an adjacent
 accessible tile rather than by standing on them.
 
 Each floor then selects **1–2 major vaults** from ten procedural concepts:
 fortified barracks, trapped armory, treasury, library archive, prison block,
 flooded cistern, collapsed hall, sealed tomb, forge killzone and barricaded
-dormitory. Vault definitions constrain normalized progress, minimum/maximum
-room dimensions, allowed entrance count, internal zones, door/lock requirement,
+dormitory. Vault definitions constrain normalized progress, minimum/maximum room
+dimensions, allowed entrance count, internal zones, door/lock requirement,
 allowed trap mechanisms, tactical roles and loot modifiers. Dimensions and
 orientation still come from the containing procedural room, so a repeated
 concept does not produce a copied fixed rectangle. These constraints affect the
@@ -2191,15 +2257,15 @@ vaults restrict mechanism types, and internal patterns create shelves, water,
 rubble, defensive furniture or bars. A prison-block vault creates a real barred
 cell partition with its own locked cell door and separately reachable local key,
 rather than decorative bars only. Barred partitions use dedicated prison-door
-terrain and artwork, independent of regular entrances and mandatory gates. Ordinary
-**Prison** archetype rooms use the same
-cell subdivision and always place a reachable key for their locked side cell.
-The bar divider must span the entire room interior, without gaps at its ends;
-generation rejects any alternate route into the cell, including diagonal moves
-and routes that could open other doors. World rotation also rotates the cell
-partition's orientation and bounds, preserving the complete divider and its
-single doorway after generation and save/restore. Closed bars and prison doors block
-movement but do **not** block sight or projectiles.
+terrain and artwork, independent of regular entrances and mandatory gates.
+Ordinary **Prison** archetype rooms use the same cell subdivision and always
+place a reachable key for their locked side cell. The bar divider must span the
+entire room interior, without gaps at its ends; generation rejects any alternate
+route into the cell, including diagonal moves and routes that could open other
+doors. World rotation also rotates the cell partition's orientation and bounds,
+preserving the complete divider and its single doorway after generation and
+save/restore. Closed bars and prison doors block movement but do **not** block
+sight or projectiles.
 
 Every Ruins floor now guarantees a **functional barred Prison in at least 20%
 of ordinary room slots on D1**, rising linearly to **30% on the deepest floor**
@@ -2213,28 +2279,27 @@ floors are retried within the existing 12-attempt cap, rather than silently
 lowering the prison target. Throne and guaranteed artifact rooms remain
 protected from Prison assignment.
 
-Each prison cell contains a seeded reward prop: a **75% chance** of a
-searchable prisoner's skeleton (with its independent **10%** loot chance),
-or a **25% chance** of a chest, subject to the existing non-guaranteed
-floor chest allowance (an excess chest becomes another prisoner skeleton).
-A prisoner's skeleton substitutes for a
-searchable skeleton that would otherwise be scattered elsewhere on that
-floor; prison chests likewise substitute for ordinary floor-budget chests.
-The guaranteed royal and artifact rewards are unaffected. This makes the
-higher Prison frequency a change in *where loot is found*, not a chest farm.
-Every ordinary barred Prison instead guarantees **one actual ranged guard per six
-walkable cell-floor tiles**, rounded up per cell. These are armed, ammunition-
-limited monsters that shoot through bars, not decorative prisoners or a 65%
-chance of one guard. The same staffing ratio applies to ordinary prison cells
-and gallery bays; galleries round their two sides independently. Guards are
-either **all Goblins (75%) or all Kobolds (25%) in a given barred room**,
+Each prison cell contains a seeded reward prop: a **75% chance** of a searchable
+prisoner's skeleton (with its independent **10%** loot chance), or a **25%
+chance** of a chest, subject to the existing non-guaranteed floor chest
+allowance (an excess chest becomes another prisoner skeleton). A prisoner's
+skeleton substitutes for a searchable skeleton that would otherwise be scattered
+elsewhere on that floor; prison chests likewise substitute for ordinary
+floor-budget chests. The guaranteed royal and artifact rewards are unaffected.
+This makes the higher Prison frequency a change in *where loot is found*, not a
+chest farm. Every ordinary barred Prison instead guarantees **one actual ranged
+guard per six walkable cell-floor tiles**, rounded up per cell. These are armed,
+ammunition- limited monsters that shoot through bars, not decorative prisoners
+or a 65% chance of one guard. The same staffing ratio applies to ordinary prison
+cells and gallery bays; galleries round their two sides independently. Guards
+are either **all Goblins (75%) or all Kobolds (25%) in a given barred room**,
 never mixed. Other enemies cannot spawn inside these cells. Gallery Giant
-Spiders appear in the unbarred central aisle only. Guards are
-placed before ambient encounters and use a special placement exception for
-enclosed cells: they may be closer to stairs than roaming monsters, but cannot
-occupy the protected 3×3 landing. Spike/arrow trap placement avoids occupying
-the cells' potential guard positions. All guard state, ammunition and roles
-survive rotation and save/replay without an extra generation roll.
+Spiders appear in the unbarred central aisle only. Guards are placed before
+ambient encounters and use a special placement exception for enclosed cells:
+they may be closer to stairs than roaming monsters, but cannot occupy the
+protected 3×3 landing. Spike/arrow trap placement avoids occupying the cells'
+potential guard positions. All guard state, ammunition and roles survive
+rotation and save/replay without an extra generation roll.
 
 The fixed cell-density rule has a substantial **combat and balance cost**:
 more guaranteed archers means more arrows, danger and potential XP in prison-
@@ -2267,47 +2332,46 @@ entire connected cell. The one guaranteed treasure chest sits immediately
 wooden/stone reward door across the aisle. Eight-way movement cannot bypass
 the closed gate into the cells.
 
-The first row of the three-tile-wide exposed aisle is a **visible gallery
-alarm threshold**. Every square in that row carries a small, 70%-scale, 50%-transparent
-`dwarven-dais.png` floor engraving (ASCII: `◇`) on the ordinary stone floor.
-Stepping onto **any** of these three squares immediately applies the existing
-**Alarmed** status to all living ranged guards *currently inside that
-gallery*, including its connected rear aisle. It happens before the next enemy turn, needs no
-LOS or RNG check, and works when the hero is invisible (without revealing
-an invisible hero or bypassing normal targeting rules). The ordinary AGGRO
-+2, expiry, movement, and ranged firing rules stay unchanged. Guards outside
-the barred bays and unrelated prisoners are not affected; already Alarmed
-guards are not re-alarmed and do not create repeated log messages. The event
-has one concise log message when at least one new guard is alerted. The
-threshold itself remains passable, blocks neither projectiles nor vision,
-and does not consume an extra action beyond walking onto it. Its positions
-are saved within gallery geometry and rotate with the dungeon; individual
-enemy Alarmed states already persist via the regular save/replay mechanism.
+The first row of the three-tile-wide exposed aisle is a **visible gallery alarm
+threshold**. Every square in that row carries a small, 70%-scale,
+50%-transparent `dwarven-dais.png` floor engraving (ASCII: `◇`) on the ordinary
+stone floor. Stepping onto **any** of these three squares immediately applies
+the existing **Alarmed** status to all living ranged guards *currently inside
+that gallery*, including its connected rear aisle. It happens before the next
+enemy turn, needs no LOS or RNG check, and works when the hero is invisible
+(without revealing an invisible hero or bypassing normal targeting rules). The
+ordinary AGGRO +2, expiry, movement, and ranged firing rules stay unchanged.
+Guards outside the barred bays and unrelated prisoners are not affected; already
+Alarmed guards are not re-alarmed and do not create repeated log messages. The
+event has one concise log message when at least one new guard is alerted. The
+threshold itself remains passable, blocks neither projectiles nor vision, and
+does not consume an extra action beyond walking onto it. Its positions are saved
+within gallery geometry and rotate with the dungeon; individual enemy Alarmed
+states already persist via the regular save/replay mechanism.
 
 Every side cell contains **at least one genuine ranged monster for each six
-walkable cell squares (rounded up per side)**. With the current 15×2-tile
-bays this means **five shooters per side, ten total** rather than the former
-one per side. Shooters are distributed along the length, have real ammunition,
-use existing LOS and ranged-combat AI through the bars, and count fully
-against the normal floor encounter budget before roaming enemies. This is
-an intentionally dangerous optional branch, not a progression requirement.
-Gallery shooters receive ordinary humanoid equipment/HP scaling and the same
-depth-based prefix chances as other Ruins encounters. Their gear and prefixes
-affect normal monster stats, defenses, melee behavior and loot, but cannot raise
-the fixed ATK of arrows or stones. This makes some guards harder to eliminate
-without multiplying the gallery's fixed ranged damage.
-Gallery cells also contain visible scraps of fish, food and other refuse;
-this dressing does not obstruct movement, sight or projectiles.
-Each gallery also has two independent **20%** optional rolls. One places a
-Giant Spider in the unobstructed central aisle, never inside a barred shooter
-cell. The other places one additional chest on a free, trap-safe aisle tile;
-the guaranteed chest behind the prison door is never replaced. These optional
-encounters and rewards are rolled during seeded generation and survive saves.
-If the floor cannot fund the promised archers, generation must not substitute
-fake archers or quietly accept a less-populated gallery. The far-end chest
-remains a one-tier-higher reward, capped at the ordinary loot ceiling and
-substituted for discretionary floor loot. Gallery geometry, door state,
-enemy roles and reward persist through rotations and save/replay.
+walkable cell squares (rounded up per side)**. With the current 15×2-tile bays
+this means **five shooters per side, ten total** rather than the former one per
+side. Shooters are distributed along the length, have real ammunition, use
+existing LOS and ranged-combat AI through the bars, and count fully against the
+normal floor encounter budget before roaming enemies. This is an intentionally
+dangerous optional branch, not a progression requirement. Gallery shooters
+receive ordinary humanoid equipment/HP scaling and the same depth-based prefix
+chances as other Ruins encounters. Their gear and prefixes affect normal monster
+stats, defenses, melee behavior and loot, but cannot raise the fixed ATK of
+arrows or stones. This makes some guards harder to eliminate without multiplying
+the gallery's fixed ranged damage. Gallery cells also contain visible scraps of
+fish, food and other refuse; this dressing does not obstruct movement, sight or
+projectiles. Each gallery also has two independent **20%** optional rolls. One
+places a Giant Spider in the unobstructed central aisle, never inside a barred
+shooter cell. The other places one additional chest on a free, trap-safe aisle
+tile; the guaranteed chest behind the prison door is never replaced. These
+optional encounters and rewards are rolled during seeded generation and survive
+saves. If the floor cannot fund the promised archers, generation must not
+substitute fake archers or quietly accept a less-populated gallery. The far-end
+chest remains a one-tier-higher reward, capped at the ordinary loot ceiling and
+substituted for discretionary floor loot. Gallery geometry, door state, enemy
+roles and reward persist through rotations and save/replay.
 
 ### Dwarven Ruins Crusher and corridor consistency (v168 / schema 89)
 
@@ -2331,15 +2395,14 @@ Crusher jaws deal 80% max HP to the hero and ordinary monsters, but
 only 20% to Champions/bosses. The once-per-monster anti-farming cap and
 warning/cooldown remain in place.
 
-After rubble collapses and access repairs, a deterministic corridor
-finishing pass widens **straight one-cell passages outside rooms** wherever
-adjacent solid rock can safely be converted to marble. No room border,
-protected door, staircase or surrounding one-tile room buffer may be
-carved through. A one-cell bottleneck is still possible immediately against an authored
-door jamb; it is better to retain an isolated narrow part than create an
-accidental bypass around a gate or prison lock. This
-polishing is applied only to newly generated worlds, preserving save/replay
-coordinates without load-time rerolls.
+After rubble collapses and access repairs, a deterministic corridor finishing
+pass widens **straight one-cell passages outside rooms** wherever adjacent solid
+rock can safely be converted to marble. No room border, protected door,
+staircase or surrounding one-tile room buffer may be carved through. A one-cell
+bottleneck is still possible immediately against an authored door jamb; it is
+better to retain an isolated narrow part than create an accidental bypass around
+a gate or prison lock. This polishing is applied only to newly generated worlds,
+preserving save/replay coordinates without load-time rerolls.
 
 **Gameplay decisions and feedback:** The player can choose to investigate,
 avoid or deliberately use a visibly grooved side chamber. The advancing
@@ -2367,64 +2430,61 @@ small active-status countdown warn the player; the former large
 
 The triggering action is safe. On each **subsequent consumed player action**,
 the masonry emerges one tile from **each opposing wall**, becomes temporarily
-impassable and blocks projectiles and sight. For a five-tile passage, both
-walls meet on the **third action after triggering**; wider passages take a
+impassable and blocks projectiles and sight. For a five-tile passage, both walls
+meet on the **third action after triggering**; wider passages take a
 proportionate number of actions. Before the last step, a physical hero or
-monster touched by the advancing masonry is **pushed inward by one tile in
-the wall's direction of travel**, without losing HP. The player can still
-escape by moving lengthwise out of the five-tile strip during their turns;
-a stone push does not consume an extra action. Forced motion updates enemy
-occupancy, player camera/FOV, and auto-travel consistently. Pushing never
-moves through stone or stacks corporeal actors: a blocking actor is first
-pushed inward if possible. Actors who cannot be pushed (e.g. a crowded
-center) remain trapped and are hurt at the final squeeze, never earlier.
-At the last step, a terminal strike state holds for one consumed player action
-so the center pressure plates visibly become two opposed wall faces with a
-narrow seam (the real stone-wall artwork is cropped horizontally or vertically
-based on jaw direction). This final held frame does **not** hit again. Then
-the jaws retract and the three-turn cooldown begins. All temporary walls are
-restored to their recorded pre-compression
-tiles; opening the inventory, animations, enemy bonus actions, reloading,
-and time spent on other z-levels never advance the mechanism.
+monster touched by the advancing masonry is **pushed inward by one tile in the
+wall's direction of travel**, without losing HP. The player can still escape by
+moving lengthwise out of the five-tile strip during their turns; a stone push
+does not consume an extra action. Forced motion updates enemy occupancy, player
+camera/FOV, and auto-travel consistently. Pushing never moves through stone or
+stacks corporeal actors: a blocking actor is first pushed inward if possible.
+Actors who cannot be pushed (e.g. a crowded center) remain trapped and are hurt
+at the final squeeze, never earlier. At the last step, a terminal strike state
+holds for one consumed player action so the center pressure plates visibly
+become two opposed wall faces with a narrow seam (the real stone-wall artwork is
+cropped horizontally or vertically based on jaw direction). This final held
+frame does **not** hit again. Then the jaws retract and the three-turn cooldown
+begins. All temporary walls are restored to their recorded pre-compression
+tiles; opening the inventory, animations, enemy bonus actions, reloading, and
+time spent on other z-levels never advance the mechanism.
 
 Only the **terminal collision**, when the opposing jaws seal the central
 squishing zone, causes damage. A caught player takes `ceil(0.80 × maximum HP)`,
-ignoring numerical DEF, dodge and glancing, but retaining God Mode and
-fatal-hit shields. Ordinary monsters take **80% max HP**, and Champions/bosses
-**20% max HP**, once per final collision. The same monster may be injured on
-future activations of that Crusher (no permanent one-hit immunity), including
-lethal repeated activations. The 80% figure is **80% of maximum HP as a flat subtraction**
-(not 80% of current HP and not a floor at 20% HP), so a previously wounded
-monster can die from the hit. Temporary fatal-hit protection remains effective.
-Ethereal monsters completely ignore Crusher displacement and damage.
-They also ignore spike traps, wall arrows, and room gas.
-Monster environmental deaths grant no XP.
-Combat logs say the Crusher **squeezes** its victim, distinguishing
-compression damage from an ordinary weapon hit.
-Triggers and damage are deterministic turn events; wall progress, original
-tile records and geometry persist in deep-floor save state and rotate with the
-map. There is no persistent per-monster hit list. Auto-travel considers the *entire*
-danger strip known and refuses to traverse it automatically.
+ignoring numerical DEF, dodge and glancing, but retaining God Mode and fatal-hit
+shields. Ordinary monsters take **80% max HP**, and Champions/bosses **20% max
+HP**, once per final collision. The same monster may be injured on future
+activations of that Crusher (no permanent one-hit immunity), including lethal
+repeated activations. The 80% figure is **80% of maximum HP as a flat
+subtraction** (not 80% of current HP and not a floor at 20% HP), so a previously
+wounded monster can die from the hit. Temporary fatal-hit protection remains
+effective. Ethereal monsters completely ignore Crusher displacement and damage.
+They also ignore spike traps, wall arrows, and room gas. Monster environmental
+deaths grant no XP. Combat logs say the Crusher **squeezes** its victim,
+distinguishing compression damage from an ordinary weapon hit. Triggers and
+damage are deterministic turn events; wall progress, original tile records and
+geometry persist in deep-floor save state and rotate with the map. There is no
+persistent per-monster hit list. Auto-travel considers the *entire* danger strip
+known and refuses to traverse it automatically.
 
-**Crusher push/squeeze redesign (v175 / save schema 96):**
-This supersedes v174's early-step collision damage: intermediate advancing
-jaws only shove physical actors inward one square, and only terminal contact
-inflicts damage. No RNG draws are consumed by shoving. Occupied destinations
-are resolved deterministically by pushing blockers inward first; if the
-remaining center has no vacancy, actors are held in place until final
-compression. A single closing event never damages the same monster twice,
-but a subsequent Crusher activation can injure or kill the same monster.
-Ethereal monsters phase through both movement and damage, unchanged.
-Unaware monsters avoid Crusher trigger
-plates while roaming randomly, walking far routes, and returning home; far
-route searches treat the triggers as blocked and reject stale cached routes.
-If no safe idle step exists, the monster waits. Monsters actively chasing the
-player, pushed by other abilities, or otherwise deliberately moved onto
-plates may still activate them. Players can therefore bait or push opponents
-onto a trigger; flying and ethereal monsters do not depress the Crusher plates.
-Ethereal monsters remain immune to Crusher damage and displacement. A flying
-monster can still be struck by jaws activated by another actor, since the
-walls close across the passage rather than rising from the floor.
+**Crusher push/squeeze redesign (v175 / save schema 96):** This supersedes
+v174's early-step collision damage: intermediate advancing jaws only shove
+physical actors inward one square, and only terminal contact inflicts damage. No
+RNG draws are consumed by shoving. Occupied destinations are resolved
+deterministically by pushing blockers inward first; if the remaining center has
+no vacancy, actors are held in place until final compression. A single closing
+event never damages the same monster twice, but a subsequent Crusher activation
+can injure or kill the same monster. Ethereal monsters phase through both
+movement and damage, unchanged. Unaware monsters avoid Crusher trigger plates
+while roaming randomly, walking far routes, and returning home; far route
+searches treat the triggers as blocked and reject stale cached routes. If no
+safe idle step exists, the monster waits. Monsters actively chasing the player,
+pushed by other abilities, or otherwise deliberately moved onto plates may still
+activate them. Players can therefore bait or push opponents onto a trigger;
+flying and ethereal monsters do not depress the Crusher plates. Ethereal
+monsters remain immune to Crusher damage and displacement. A flying monster can
+still be struck by jaws activated by another actor, since the walls close across
+the passage rather than rising from the floor.
 
 **Crusher reward (v171):** Every functional Crusher room holds exactly one
 unopened chest beyond the far end of its five-tile crushing strip, farther
@@ -2460,14 +2520,14 @@ requirement is not one chamber *per floor*: the chamber takes the single major
 hazard slot on its own floor, leaving other eligible floors with an independent
 **30% Crusher chance**. Gas placement is no longer a 25% selection roll.
 
-A chamber must occupy an optional non-Prison **single-doorway side room** without
-mandatory progression, vaults, keys, stairs or royal/artifact loot. It must fit
-two linked entrance leaves, a reachable chest and a separate walkable approach
-to a visible valve. Prisons retain the required 20–30% quota. The chest is
-funded by removing an optional Prison or ordinary reward chest when the floor
-budget is already spent; guaranteed gallery, vault, throne and artifact loot
-is not sacrificed. Inability to preserve these rules rejects the world rather
-than producing a softlock or missing signature room.
+A chamber must occupy an optional non-Prison **single-doorway side room**
+without mandatory progression, vaults, keys, stairs or royal/artifact loot. It
+must fit two linked entrance leaves, a reachable chest and a separate walkable
+approach to a visible valve. Prisons retain the required 20–30% quota. The chest
+is funded by removing an optional Prison or ordinary reward chest when the floor
+budget is already spent; guaranteed gallery, vault, throne and artifact loot is
+not sacrificed. Inability to preserve these rules rejects the world rather than
+producing a softlock or missing signature room.
 
 Even before opening the chest, distinctive **vent grates and a pressure-release
 valve** signal danger; the chest itself is the trigger. Bumping or tapping an
@@ -2503,18 +2563,20 @@ no new actor may move onto a sealed leaf. Items on door tiles remain present
 for recovery; they do not jam the mechanism.
 
 Gas chambers use two **100×100 object-only transparent PNGs** placed over the
-normal marble background (`dwarven-gas-valve.png` and
-`dwarven-gas-vent.png`). Gas inside the chamber has a readable green floor
-overlay in tiles and a supplementary `≈` mark in ASCII. The green haze draws above all floor props, including decorative dwarven remains and searchable corpses, but below living actors; it does not obscure combatants. While exposed the
-player's status strip displays the active timer. The chamber's authoritative
-`hazards[]` entry contains immutable post-rotation world-space geometry,
-valve progress, door successful-hit progress, remaining turns, and the
-`dormant → active → vented` state. All values persist across save/load and
-replay; no render frame or inventory redraw advances the gas clock, and other
-z-level turns do not advance it. A fatal hit records **`poison gas`**
-separately from `dwarven crusher` or `dungeon trap` in death payloads.
-**Save/replay schema 83, game v161** introduces the gas tiles and chamber
-state; old save compatibility is intentionally not provided.
+normal marble background (`dwarven-gas-valve.png` and `dwarven-gas-vent.png`).
+Gas inside the chamber has a readable green floor overlay in tiles and a
+supplementary `≈` mark in ASCII. The green haze draws above all floor props,
+including decorative dwarven remains and searchable corpses, but below living
+actors; it does not obscure combatants. While exposed the player's status strip
+displays the active timer. The chamber's authoritative `hazards[]` entry
+contains immutable post-rotation world-space geometry, valve progress, door
+successful-hit progress, remaining turns, and the `dormant → active → vented`
+state. All values persist across save/load and replay; no render frame or
+inventory redraw advances the gas clock, and other z-level turns do not advance
+it. A fatal hit records **`poison gas`** separately from `dwarven crusher` or
+`dungeon trap` in death payloads. **Save/replay schema 83, game v161**
+introduces the gas tiles and chamber state; old save compatibility is
+intentionally not provided.
 
 The browser client supports these death cause strings, but a deployed Graveyard
 or Highscores database may separately constrain `cause_of_death`. Confirm that
@@ -2545,15 +2607,16 @@ animation time, and state restores without additional random rolls.
 
 The deterministic Ruins survey (`node tests/dwarven-ruins-hazard-survey.cjs`)
 uses the actual generator and validates floor-count range, prison quotas,
-registered door geometry, optional galleries and their shooters, hazard placement,
-progression topology and selected save/restoration states. Its short fixed-seed
-sample found **42/42 valid floors in 12 worlds** (7 three-floor, 4 four-floor,
-1 five-floor), with **116 functional prison rooms against 113 required**, 12
-galleries, 9 Crushers and 4 gas chambers. These are *sample outcomes*, not the
-intended global spawn rates. For release statistics, run `node tests/dwarven-ruins-hazard-survey.cjs --full` (500 seeds), then inspect actual
-spawn frequencies, key/loot density and recovery cost for different player
-builds. The short survey does **not** establish stable long-run frequencies,
-unmodified loot economics or expected crossing damage.
+registered door geometry, optional galleries and their shooters, hazard
+placement, progression topology and selected save/restoration states. Its short
+fixed-seed sample found **42/42 valid floors in 12 worlds** (7 three-floor, 4
+four-floor, 1 five-floor), with **116 functional prison rooms against 113
+required**, 12 galleries, 9 Crushers and 4 gas chambers. These are *sample
+outcomes*, not the intended global spawn rates. For release statistics, run
+`node tests/dwarven-ruins-hazard-survey.cjs --full` (500 seeds), then inspect
+actual spawn frequencies, key/loot density and recovery cost for different
+player builds. The short survey does **not** establish stable long-run
+frequencies, unmodified loot economics or expected crossing damage.
 
 Rule-level checks additionally cover real bump/open/close actions, prison cell
 quotas, crossfire shooter geometry, trapped doors, hazard damage, valve/breach,
@@ -2570,8 +2633,8 @@ the normal image pipeline before its 650 ms purely visual flight.
 Vault entrance limits are measured from the actual room graph, including loop
 connections, so a one-entrance archive/tomb cannot silently gain a second route.
 Vault internal zones are oriented from the room entrance and actively drive
-furniture, water/rubble patterns and tactical slot preference instead of existing
-only as labels.
+furniture, water/rubble patterns and tactical slot preference instead of
+existing only as labels.
 
 Vault and ordinary-room tactical slots are geometric roles, not monster names:
 
@@ -2584,55 +2647,53 @@ any       -> remaining valid interior positions
 ```
 
 A vault backline slot is strict: when a shooter-capable family is available the
-floor ensures such a family participates, and the backline spawn is forced to
-be an actual ranged variant with normal starting ammunition. Frontline/group
-slots suppress the ranged role even when the underlying species can normally
-roll as a shooter. Champion placement cannot consume a backline slot, and room
-props are kept out of the clear firing lane from backline to entrance. This lets
-the same fortified architecture produce different species compositions without
-hard-coding a Goblin or Skeleton to a coordinate.
-The later lift placement also leaves every authored tactical slot as ordinary
-floor, so its platform cannot replace a defender's planned position.
+floor ensures such a family participates, and the backline spawn is forced to be
+an actual ranged variant with normal starting ammunition. Frontline/group slots
+suppress the ranged role even when the underlying species can normally roll as a
+shooter. Champion placement cannot consume a backline slot, and room props are
+kept out of the clear firing lane from backline to entrance. This lets the same
+fortified architecture produce different species compositions without
+hard-coding a Goblin or Skeleton to a coordinate. The later lift placement also
+leaves every authored tactical slot as ordinary floor, so its platform cannot
+replace a defender's planned position.
 
 Room furniture is mechanical terrain. Barracks/dormitories use beds, libraries
 use sight-blocking shelves, dining halls use tables, storage/forge/workshops use
-crates, and prisons use bars. Beds (including bed barricades) and all other room-specific furniture are
-forbidden **anywhere inside a Ruins stair room**. The additional mechanically
-clear 3×3 stair landing rule remains unchanged. Other rooms may contain their
-normal furniture, even when they happen to be close to a staircase. Dwarven crates remain solid to movement and
-projectiles until destroyed by equipped-weapon strikes. Intact crates have **8 HP**
-and each strike removes `max(1, final ATK)` HP, without hit/miss/critical rolls.
-**10% of placed crates start as broken, walkable debris**, without an intact
-container to smash or loot.
-Bare fists cannot damage crates; weapon strikes cost **1 turn** and reuse the
-player's cosmetic melee lunge. Every successful weapon strike against a crate,
-including the final blow, immediately Alarms all eligible nonpassive monsters
-within **5 tiles of the crate** (Chebyshev distance, no sight requirement).
-Each strike independently has a **25% chance** to Alarm the nearest eligible,
-not-yet-Alarmed monster **beyond that radius**, without a maximum distance;
-repeated strikes can alert different monsters. Ties resolve by stable enemy ID.
-These sound effects also apply when the player is invisible: Alarmed does not
-reveal the player or bypass normal visibility and pursuit rules. Newly Alarmed
-monsters visible in the main view log `<name> is alarmed by the noise.`; offscreen
-monsters are alerted silently. Both the guaranteed radius and the distant
-chance are independently editable as `alarmNearbyRadius` and
-`alarmDistantChance` in `content/world_generation.json` under
-`dungeons.dwarvenRuins.crates`. Crate noise is resolved before enemies take
-their turn, regardless of the player's attack animation.
-A destroyed crate immediately becomes **walkable crate debris**
-(`dwarvencratepieces`) for game rules and save/replay. Broken boards, iron bands
-and any pre-rolled loot appear immediately, including during the player's
-**132 ms attack lunge**. Crates have no sinking, shrinking or fading death effect;
-monster death effects are unchanged. Debris remains
-over the marble floor; ASCII uses `;`. Debris does not block movement, sight,
-projectiles or auto-travel, cannot be smashed again, and remains beneath dropped
-loot and actors. Its unique terrain code persists in the existing floor map,
-including replay snapshots; no separate timer or destruction flag is needed.
-Destruction logs
-`You smash dwarven crate into pieces.` Each generated crate
-rolls its contents **once during accepted world generation** and persists its
-remaining HP and pre-rolled contents per dungeon floor. Empty crates yield
-nothing. The small crate loot table is editable in
+crates, and prisons use bars. Beds (including bed barricades) and all other
+room-specific furniture are forbidden **anywhere inside a Ruins stair room**.
+The additional mechanically clear 3×3 stair landing rule remains unchanged.
+Other rooms may contain their normal furniture, even when they happen to be
+close to a staircase. Dwarven crates remain solid to movement and projectiles
+until destroyed by equipped-weapon strikes. Intact crates have **8 HP** and each
+strike removes `max(1, final ATK)` HP, without hit/miss/critical rolls. **10% of
+placed crates start as broken, walkable debris**, without an intact container to
+smash or loot. Bare fists cannot damage crates; weapon strikes cost **1 turn**
+and reuse the player's cosmetic melee lunge. Every successful weapon strike
+against a crate, including the final blow, immediately Alarms all eligible
+nonpassive monsters within **5 tiles of the crate** (Chebyshev distance, no
+sight requirement). Each strike independently has a **25% chance** to Alarm the
+nearest eligible, not-yet-Alarmed monster **beyond that radius**, without a
+maximum distance; repeated strikes can alert different monsters. Ties resolve by
+stable enemy ID. These sound effects also apply when the player is invisible:
+Alarmed does not reveal the player or bypass normal visibility and pursuit
+rules. Newly Alarmed monsters visible in the main view log
+`<name> is alarmed by the noise.`; offscreen monsters are alerted silently. Both
+the guaranteed radius and the distant chance are independently editable as
+`alarmNearbyRadius` and `alarmDistantChance` in `content/world_generation.json`
+under `dungeons.dwarvenRuins.crates`. Crate noise is resolved before enemies
+take their turn, regardless of the player's attack animation. A destroyed crate
+immediately becomes **walkable crate debris** (`dwarvencratepieces`) for game
+rules and save/replay. Broken boards, iron bands and any pre-rolled loot appear
+immediately, including during the player's **132 ms attack lunge**. Crates have
+no sinking, shrinking or fading death effect; monster death effects are
+unchanged. Debris remains over the marble floor; ASCII uses `;`. Debris does not
+block movement, sight, projectiles or auto-travel, cannot be smashed again, and
+remains beneath dropped loot and actors. Its unique terrain code persists in the
+existing floor map, including replay snapshots; no separate timer or destruction
+flag is needed. Destruction logs `You smash dwarven crate into pieces.` Each
+generated crate rolls its contents **once during accepted world generation** and
+persists its remaining HP and pre-rolled contents per dungeon floor. Empty
+crates yield nothing. The small crate loot table is editable in
 `content/world_generation.json` → `dungeons.dwarvenRuins.crates`: the defaults
 provide a **16.9% total drop chance**, with one result per crate:
 
@@ -2648,50 +2709,53 @@ provide a **16.9% total drop chance**, with one result per crate:
 | Scroll of Fireball | 0.9% |
 | Scroll of Death Shield | 0.3% |
 
-The six tactical consumables together account for 6.9% of crates.
-Life Potion and Invisibility account for 6% and 4%; the empty share is 83.1%. Death Shield remains the rarest. Drops appear on the broken crate tile, are picked up
+The six tactical consumables together account for 6.9% of crates. Life Potion
+and Invisibility account for 6% and 4%; the empty share is 83.1%. Death Shield
+remains the rarest. Drops appear on the broken crate tile, are picked up
 normally, and cannot be rerolled through save/load or replay. The JSON loot
-entries use **relative weights**: `P(result) = weight / sum(all weights)`. Supported
-kinds are `null` (nothing), `potion`, `speedpotion`, `scrollOfInvisibility`, and all
-five tactical consumable IDs; changing weights changes the odds without code
-edits. Contents still use exactly one seeded roll per crate during generation.
-Existing generated crates retain their saved contents; the expanded table is
-used for new worlds. Destroyed terrain and remaining ground
-loot persist as part of the existing dungeon map/ground item records. Vaults
-add their own patterns, including water in cisterns and rubble in collapsed halls. Fortified barracks and barricaded
-dormitories drag bed frames into chokepoints. Final-floor dormitories have a
-strong additional barricade chance, except the final room containing the sealed
-Deep Mines work stair: that room never contains beds, bed barricades, or
-bookshelves, regardless of its other room/vault roles. Furniture never replaces
-stairs, keys, doors, or the protected room center/door approach used by traversal
-validation.
+entries use **relative weights**: `P(result) = weight / sum(all weights)`.
+Supported kinds are `null` (nothing), `potion`, `speedpotion`,
+`scrollOfInvisibility`, and all five tactical consumable IDs; changing weights
+changes the odds without code edits. Contents still use exactly one seeded roll
+per crate during generation. Existing generated crates retain their saved
+contents; the expanded table is used for new worlds. Destroyed terrain and
+remaining ground loot persist as part of the existing dungeon map/ground item
+records. Vaults add their own patterns, including water in cisterns and rubble
+in collapsed halls. Fortified barracks and barricaded dormitories drag bed
+frames into chokepoints. Final-floor dormitories have a strong additional
+barricade chance, except the final room containing the sealed Deep Mines work
+stair: that room never contains beds, bed barricades, or bookshelves, regardless
+of its other room/vault roles. Furniture never replaces stairs, keys, doors, or
+the protected room center/door approach used by traversal validation.
 
-Environmental damage now rises continuously with normalized floor progress: rubble
-pressure scales **0.9x → 1.3x**, decorative-remains pressure **0.8x → 1.5x**, breached-door pressure
-**0.75x → 2.0x**, dormitory barricade chance **5% → 22%**, and optional defensive
-debris **3% → 16%** before the final-floor override. **Ambient `dwarvenremains` and
-searchable skeletal remains are separate populations and have different loot tables.** Each
-Ruins floor keeps the original seeded **2–4 ambient `dwarvenremains`** roll, scaled
-by depth. In addition, it rolls **3–5 searchable skeletal remains** as real `skeleton`
-ground objects using the normal one-time search rules and an independent **10% loot
-chance**. The two populations use separate placement rolls and cannot occupy the same
-tile. These ambient remains are distributed outside prison-cell interiors;
+Environmental damage now rises continuously with normalized floor progress:
+rubble pressure scales **0.9x → 1.3x**, decorative-remains pressure **0.8x →
+1.5x**, breached-door pressure **0.75x → 2.0x**, dormitory barricade chance **5%
+→ 22%**, and optional defensive debris **3% → 16%** before the final-floor
+override. **Ambient `dwarvenremains` and searchable skeletal remains are
+separate populations and have different loot tables.** Each Ruins floor keeps
+the original seeded **2–4 ambient `dwarvenremains`** roll, scaled by depth. In
+addition, it rolls **3–5 searchable skeletal remains** as real `skeleton` ground
+objects using the normal one-time search rules and an independent **10% loot
+chance**. The two populations use separate placement rolls and cannot occupy the
+same tile. These ambient remains are distributed outside prison-cell interiors;
 cell-specific skeletons are generated independently so the scattered remains
 population is not reduced by adding prison occupants.
 
 On the final floor, both populations become denser to sell the failed-last-stand
 scene. Ambient remains use at least a **2.5x** multiplier, yielding **5–10**
-`dwarvenremains` before room-specific decorations; searchable skeletons independently
-use at least a **2.5x** multiplier, yielding **8–13** ambient searchable corpses before
-any progression-key corpse. The final floor also raises rubble to at least **1.65x**,
-ordinary breached-door pressure to at least **5x**, and multiplies barricade pressure
-by **2.2x**. It always guarantees two major **scenarios**: the mandatory throne hall
-last stand and a separate optional artifact vault. The former guaranteed
+`dwarvenremains` before room-specific decorations; searchable skeletons
+independently use at least a **2.5x** multiplier, yielding **8–13** ambient
+searchable corpses before any progression-key corpse. The final floor also
+raises rubble to at least **1.65x**, ordinary breached-door pressure to at least
+**5x**, and multiplies barricade pressure by **2.2x**. It always guarantees two
+major **scenarios**: the mandatory throne hall last stand and a separate
+optional artifact vault. The former guaranteed
 fortified-barracks/barricaded-dormitory/forge-killzone/collapsed-hall selection
-has been removed; any additional fitted vault uses the normal weighted roll. The result should visibly read as
-a failed holdout: more broken defenses, bodies, rubble and improvised chokepoints,
-while the sealed lower transition still points only toward continued excavation
-in the future Deep Mines.
+has been removed; any additional fitted vault uses the normal weighted roll. The
+result should visibly read as a failed holdout: more broken defenses, bodies,
+rubble and improvised chokepoints, while the sealed lower transition still
+points only toward continued excavation in the future Deep Mines.
 
 Ordinary Ruins loot uses a depth budget rather than one fixed chest:
 
@@ -2707,50 +2771,49 @@ armories and treasuries attract more of the floor's reward budget than dining
 halls or dormitories. Existing chest generation, Magic Find and identification
 rules still resolve the contents.
 
-Exactly **one additional guaranteed artifact chest** exists in the Dwarven
-Ruins stratum, on the final floor, separate from the existing Fort artifact. The
+Exactly **one additional guaranteed artifact chest** exists in the Dwarven Ruins
+stratum, on the final floor, separate from the existing Fort artifact. The
 final-floor generator first reserves a reachable optional treasury/sealed-tomb/
 trapped-armory vault **and a specific free tile inside it** before props, traps,
 or enemies are placed. If none of those normal artifact vaults fits, the
-farthest suitable optional branch is promoted into a dedicated **Guarded Artifact
-Chamber** with its own locked entrance, trap options, guard/frontline/backline
-roles and reliquary zone. The chest is reserved before population, so later
-props, traps or enemies cannot consume its location. The artifact chest is not
-required for descent.
+farthest suitable optional branch is promoted into a dedicated **Guarded
+Artifact Chamber** with its own locked entrance, trap options,
+guard/frontline/backline roles and reliquary zone. The chest is reserved before
+population, so later props, traps or enemies cannot consume its location. The
+artifact chest is not required for descent.
 
 After traps, encounters and Ruins loot are populated, a final deterministic
-validator is invoked by real new-world generation before the world is accepted. Vaults that
-require a closed or locked entrance are only assigned where that entrance is structurally
-meaningful; ordinary Prison rooms must successfully build their barred side cell during
-floor generation rather than relying on a later whole-world rejection. It verifies
-floor count, room-graph and physical entrance/exit separation, room/vault
-connectivity, trap-safe mandatory traversal, solvable key dependencies, the
-Champion guarantee, valid enemy terrain/clearance, ground-object conflicts,
-nonempty sealed prison cells with no eight-direction bypass routes,
-exactly one final-floor artifact, occupied throne-hall frontline/support slots,
-the one-Champion-per-floor budget, the lift endpoints and the sealed Deep Mines
-continuation. Structural floor failures are retried by the floor generator; a
-late population failure discards the world attempt and regenerates it, up to
-**3 configured attempts**. Enemy IDs restart for every discarded attempt so the
-number of retries cannot alter stable IDs or replay ordering in the accepted
-world.
+validator is invoked by real new-world generation before the world is accepted.
+Vaults that require a closed or locked entrance are only assigned where that
+entrance is structurally meaningful; ordinary Prison rooms must successfully
+build their barred side cell during floor generation rather than relying on a
+later whole-world rejection. It verifies floor count, room-graph and physical
+entrance/exit separation, room/vault connectivity, trap-safe mandatory
+traversal, solvable key dependencies, the Champion guarantee, valid enemy
+terrain/clearance, ground-object conflicts, nonempty sealed prison cells with no
+eight-direction bypass routes, exactly one final-floor artifact, occupied
+throne-hall frontline/support slots, the one-Champion-per-floor budget, the lift
+endpoints and the sealed Deep Mines continuation. Structural floor failures are
+retried by the floor generator; a late population failure discards the world
+attempt and regenerates it, up to **3 configured attempts**. Enemy IDs restart
+for every discarded attempt so the number of retries cannot alter stable IDs or
+replay ordering in the accepted world.
 
 Tile and ASCII modes distinguish locked, intact-open and breached progression
 gates, while reusing the normal solid dwarven door sprites for room entrances
 and progression gates. The bars beside a prison cell use
 `dwarven-prison-bars.png`; closed and locked cell leaves use
-`dwarven-prison-door-locked.png`, with `dwarven-gate-open.png` reserved for their
-open state. Breached prison doors have their own broken barred-door artwork,
-distinct from breached solid gates. The pulled lever has dedicated
-`dwarven-lever-pulled.png` art.
-Room furniture/barricades are mechanical terrain with dedicated ASCII glyphs,
-colors, inspect strings, and tile art displayed at 40×40 for beds, dragged-bed barricades,
-bookshelves, tables, crates, and prison bars. The bed barricade and smashed-crate
-pieces use transparent 100×100 source sprites; the barricade keeps a recognizable
-headboard, mattress and legs with simple shapes. These images are precached for
-offline play alongside the prison-door and pulled-lever sprites. The
-Dwarven Key uses `img/tiles/dwarven-key.png` consistently on the ground and in
-inventory.
+`dwarven-prison-door-locked.png`, with `dwarven-gate-open.png` reserved for
+their open state. Breached prison doors have their own broken barred-door
+artwork, distinct from breached solid gates. The pulled lever has dedicated
+`dwarven-lever-pulled.png` art. Room furniture/barricades are mechanical terrain
+with dedicated ASCII glyphs, colors, inspect strings, and tile art displayed at
+40×40 for beds, dragged-bed barricades, bookshelves, tables, crates, and prison
+bars. The bed barricade and smashed-crate pieces use transparent 100×100 source
+sprites; the barricade keeps a recognizable headboard, mattress and legs with
+simple shapes. These images are precached for offline play alongside the
+prison-door and pulled-lever sprites. The Dwarven Key uses
+`img/tiles/dwarven-key.png` consistently on the ground and in inventory.
 
 The surface `dwarvengate` must remain spatially distinct from ordinary cave
 entrances. After the fort is generated, every non-crypt random cave entrance is
@@ -2769,8 +2832,9 @@ there is no guaranteed reward (5–9 skeletons yield 0.5–0.9 rewards on averag
 The other 90% can be searched once but are empty. Searching never rerolls loot
 eligibility. If a discovered weapon is automatically equipped, its discovery
 message appears before the automatic-equip message; equipping still resolves
-immediately in the same action. Skeletons, their loot flags, and searched state persist in saves
-and replay; loot stays on the skeleton's own level and map identity.
+immediately in the same action. Skeletons, their loot flags, and searched state
+persist in saves and replay; loot stays on the skeleton's own level and map
+identity.
 
 Fort ghost placement is guaranteed from actual valid floor candidates rather
 than from a fixed number of blind coordinate attempts. During world generation,
@@ -2821,26 +2885,26 @@ dedicated `cryptstairsdown` / `cryptstairsup` transitions and the saved
 
 ## Whole-world cardinal rotation
 
-Once a newly generated world has passed the dungeon population validator and
-all actors and loot have been placed, one seeded roll chooses
-one of four orientations with equal **25%** probability: unchanged (cold north),
-90° clockwise (cold east), 180° (cold south) or 270° (cold west). This is a true
-map rotation, not a movement or temperature modifier: the surface, shared caves,
-crypt, Dwarven Fort, every deeper Ruins floor, entrances, stairs, locks and their
-keys, traps and projectile directions, and terrain underlays are transformed
-together. This includes the secondary lock ID required by a progression key
-inside a locked side room: it must continue to identify the same rotated lock.
-The stone tower, including the surface footprint, entrance, four elevated
-terrain/discovery grids, every stair and door, monsters and chests, is generated
-**before** this cardinal rotation and transforms in the same pass. Each of its
-four directions is equally likely, and its local landing coordinates are
-translated into the final rotated layout.
-On rectangular worlds, a quarter-turn swaps width and height. Each fresh
-generation restores the configured, unrotated dimensions before allocating maps,
-including when regenerating multiple worlds in the same session. Stored
-coordinates already describe the rotated layout, so save/replay needs no new
-rotation flag, and seeded gameplay remains deterministic. Cosmetic cave decorations
-are then hashed against the final rotated coordinates without consuming RNG.
+Once a newly generated world has passed the dungeon population validator and all
+actors and loot have been placed, one seeded roll chooses one of four
+orientations with equal **25%** probability: unchanged (cold north), 90°
+clockwise (cold east), 180° (cold south) or 270° (cold west). This is a true map
+rotation, not a movement or temperature modifier: the surface, shared caves,
+crypt, Dwarven Fort, every deeper Ruins floor, entrances, stairs, locks and
+their keys, traps and projectile directions, and terrain underlays are
+transformed together. This includes the secondary lock ID required by a
+progression key inside a locked side room: it must continue to identify the same
+rotated lock. The stone tower, including the surface footprint, entrance, four
+elevated terrain/discovery grids, every stair and door, monsters and chests, is
+generated **before** this cardinal rotation and transforms in the same pass.
+Each of its four directions is equally likely, and its local landing coordinates
+are translated into the final rotated layout. On rectangular worlds, a
+quarter-turn swaps width and height. Each fresh generation restores the
+configured, unrotated dimensions before allocating maps, including when
+regenerating multiple worlds in the same session. Stored coordinates already
+describe the rotated layout, so save/replay needs no new rotation flag, and
+seeded gameplay remains deterministic. Cosmetic cave decorations are then hashed
+against the final rotated coordinates without consuming RNG.
 
 ## z:-1: Shared cave layer (includes crypt and mausoleum)
 
@@ -2871,12 +2935,12 @@ If the crypt contains more coffins than the four stored inscriptions:
 - one additional coffin says `Stone coffin. It's empty.`
 - all remaining coffins say `Stone coffin. The slab is heavy.`
 
-On surface, the cemetery next to the ruined chapel (crypt entrance) contains graves.
-Coffins use the `⚰` symbol and are the burial tiles generated by the crypt.
-On the first crypt level, their image is layered over crypt floor, rather than
-the surface grass fallback.
-The unfinished-grave description belongs to the Gravedigger's grave and is not
-used for crypt coffins. Graves and coffins of different locations should never be conflated.
+On surface, the cemetery next to the ruined chapel (crypt entrance) contains
+graves. Coffins use the `⚰` symbol and are the burial tiles generated by the
+crypt. On the first crypt level, their image is layered over crypt floor, rather
+than the surface grass fallback. The unfinished-grave description belongs to the
+Gravedigger's grave and is not used for crypt coffins. Graves and coffins of
+different locations should never be conflated.
 
 The crypt also has dedicated transition text:
 
@@ -2896,51 +2960,52 @@ brown tile/ASCII background inside its source footprint, ordinary grotto and
 silhouette regions retain their normal cave floor, and shared connectors use
 ordinary cave floor. At generation time each accepted connector has a **30%**
 chance to acquire a short water-lined section (up to 9 flank water tiles,
-requiring at least 3 connector tiles). **15% of these water-passage rolls**
-also flood the middle **1–3 tiles of the connector**, leaving at least one dry
+requiring at least 3 connector tiles). **15% of these water-passage rolls** also
+flood the middle **1–3 tiles of the connector**, leaving at least one dry
 connector tile at either end. Such a link has **no continuous dry causeway**:
-non-Merlings must learn Swimming (level 5 is enough for the crossing). All
-other water-lined links retain a dry causeway. The effective probability of
-attempting a flooded shortcut is **4.5% per eligible accepted connector**
-(30% × 15%), not 15% of all cave links. Flooded connectors remain optional:
-all source caves keep their own independently accessible stairs and dry interior;
-Swimming never gates mandatory story progression or the only exit. Flank water
-replaces only unowned rock, and flood water replaces only the central carved
-connector cells. No water overwrites source cave maps, entrances, or special
-dungeons. Water-lined links without suitable flanks stay dry unless their
-central segment is selected for flooding.
-Nearby source components may be joined by short, carved dry corridors (**2–12
-rock tiles**). For two previously separate source caves, the baseline chance now
-varies by rock gap: **85–70%** across 2–4 tiles, **60–40%** across 5–8 tiles,
-and **30–16%** across 9–12 tiles (previously an exponential falloff from 85%
-to 5%). A world-seeded affinity of **85–115%** and a mild dry-area modifier
-(1 + combined dry area / 15,000)^−0.5 adjust these chances; large complexes
-retain the stronger **0.6 multiplier per already joined extra component**.
-The resulting chances are typically about **60–80%**, **35–55%**, and **10–25%**
-for small separate caves in the respective bands, and are not guarantees.
-All original entrances, source cave identities and staircase pairs remain in place. A complex may
-contain a grotto, burrow and silhouette cave, while other caves remain
-independent. Connected layouts are still navigated as one shared z:-2 map.
+non-Merlings must learn Swimming (level 5 is enough for the crossing). All other
+water-lined links retain a dry causeway. The effective probability of attempting
+a flooded shortcut is **4.5% per eligible accepted connector** (30% × 15%), not
+15% of all cave links. Flooded connectors remain optional: all source caves keep
+their own independently accessible stairs and dry interior; Swimming never gates
+mandatory story progression or the only exit. Flank water replaces only unowned
+rock, and flood water replaces only the central carved connector cells. No water
+overwrites source cave maps, entrances, or special dungeons. Water-lined links
+without suitable flanks stay dry unless their central segment is selected for
+flooding. Nearby source components may be joined by short, carved dry corridors
+(**2–12 rock tiles**). For two previously separate source caves, the baseline
+chance now varies by rock gap: **85–70%** across 2–4 tiles, **60–40%** across
+5–8 tiles, and **30–16%** across 9–12 tiles (previously an exponential falloff
+from 85% to 5%). A world-seeded affinity of **85–115%** and a mild dry-area
+modifier (1 + combined dry area / 15,000)^−0.5 adjust these chances; large
+complexes retain the stronger **0.6 multiplier per already joined extra
+component**. The resulting chances are typically about **60–80%**, **35–55%**,
+and **10–25%** for small separate caves in the respective bands, and are not
+guarantees. All original entrances, source cave identities and staircase pairs
+remain in place. A complex may contain a grotto, burrow and silhouette cave,
+while other caves remain independent. Connected layouts are still navigated as
+one shared z:-2 map.
 
 Links are generated **after source cave carving** and exist only on the shared
 map. The original source masks, silhouette shapes and the brown burrow's local
 floor region are not altered. For each complex the generator stores sorted
-source membership and entrances, and partitions its traversable topology into irregular **territories** using
-walking-distance seeds. Flooded connector cells are included as potential
-Swimming routes in territory assignment, while dry-only exploration diagnostics
-exclude them. Territories guide initial enemy placement but do not constrain monster
-movement, change AI or add faction rules. Loot is allocated from a shared
-world budget by playable area; merging gives no additional reward.
+source membership and entrances, and partitions its traversable topology into
+irregular **territories** using walking-distance seeds. Flooded connector cells
+are included as potential Swimming routes in territory assignment, while
+dry-only exploration diagnostics exclude them. Territories guide initial enemy
+placement but do not constrain monster movement, change AI or add faction rules.
+Loot is allocated from a shared world budget by playable area; merging gives no
+additional reward.
 
 Connector cells and territory/complex metadata are saved and restored directly;
 the shared map is reconstructed by overlaying saved **connector cells, then
 water cells (which may overlap the connector's own central cells)** after the
-source maps. Rotation transforms both
-sets of connector cells and territory anchors along with all stairs and source
-caves. The new flank-water field is persistent link metadata: save schema
-**101 → 102** for flank water and **102 → 103** for the new flooded-connector
-semantics. Neither cave connections nor silhouette choices are rerolled on
-save/load or replay. No compatibility code is added for older saves.
+source maps. Rotation transforms both sets of connector cells and territory
+anchors along with all stairs and source caves. The new flank-water field is
+persistent link metadata: save schema **101 → 102** for flank water and **102 →
+103** for the new flooded-connector semantics. Neither cave connections nor
+silhouette choices are rerolled on save/load or replay. No compatibility code is
+added for older saves.
 
 The generator requires **at least three generic z:-2 source caves**: one
 silhouette, one grotto with connected irregular chambers and winding passages,
@@ -2964,33 +3029,32 @@ several distinct silhouette sources, but joining them never merges their
 original source masks. Each component adds its ordinary area-weighted threat
 and loot capacity; simply choosing silhouette instead of burrow adds no reward.
 
-Grotto footprints vary from 92×72 down to 42×36 tiles, with irregular
-rooms linked into a connected chamber network. Burrows vary from 68×52 down to
-28×24 tiles and retain their branching, narrow-tunnel identity. One burrow
-retains its distinct brown floor. **Topology variation (Deep Caves 2.0,
-geometry batch)** now samples connectivity and shape parameters separately
-for each grotto or burrow: the cave may have few or many meaningful loops,
-small or large chambers/pockets, narrow or wider passages, shorter or longer
-branches and up to three water pockets in a grotto or two in a burrow.
-Water is optional and may not cut off any dry-floor route. Burrows stay below
-63% dry-footprint coverage, with usual tunnels just one or three tiles wide;
-large room networks remain the domain of grottos. All dry floor tiles remain
-connected to their own staircase. Subsequent Deep Caves 2.0 batches allow optional connecting corridors and
-territory-based populations, but do not change the silhouette extraction
-or source layout algorithm. The later loot-budget work is still pending.
-Crypt maps and the Dwarven Fort remain separate.
+Grotto footprints vary from 92×72 down to 42×36 tiles, with irregular rooms
+linked into a connected chamber network. Burrows vary from 68×52 down to 28×24
+tiles and retain their branching, narrow-tunnel identity. One burrow retains its
+distinct brown floor. **Topology variation (Deep Caves 2.0, geometry batch)**
+now samples connectivity and shape parameters separately for each grotto or
+burrow: the cave may have few or many meaningful loops, small or large
+chambers/pockets, narrow or wider passages, shorter or longer branches and up to
+three water pockets in a grotto or two in a burrow. Water is optional and may
+not cut off any dry-floor route. Burrows stay below 63% dry-footprint coverage,
+with usual tunnels just one or three tiles wide; large room networks remain the
+domain of grottos. All dry floor tiles remain connected to their own staircase.
+Subsequent Deep Caves 2.0 batches allow optional connecting corridors and
+territory-based populations, but do not change the silhouette extraction or
+source layout algorithm. The later loot-budget work is still pending. Crypt maps
+and the Dwarven Fort remain separate.
 
 ### Monster silhouette cave prototype
 
 Only generic **z:-2** receives silhouette caves. A world-seeded selection from
 `content/cave_silhouettes.json` determines each preloaded composite shape, with
 optional horizontal mirroring. Transparent enemy images provide geometry only:
-the selected monster
-has **no influence on inhabitants, rewards or tier preferences**.
-Normal deep-cave population and entrance safety rules still apply. Each
-silhouette component is populated by the same parametric ecosystem rules as
-other z:-2 source caves. More silhouettes increase shape variety rather than
-creating separate fixed scenarios.
+the selected monster has **no influence on inhabitants, rewards or tier
+preferences**. Normal deep-cave population and entrance safety rules still
+apply. Each silhouette component is populated by the same parametric ecosystem
+rules as other z:-2 source caves. More silhouettes increase shape variety rather
+than creating separate fixed scenarios.
 
 The alpha silhouette becomes dry ordinary cave floor, surrounded by rock. The
 prototype receives a uniformly world-seeded target of **700–2,800 dry floor
@@ -3026,14 +3090,13 @@ obstructions are placed afterwards, so smoothing cannot bypass the 15-tile
 limit or turn swimming into a requirement. Other cave generators are unchanged.
 The resulting map is saved directly; save format remains **97**.
 
-Horizontal and vertical uninterrupted **dry-floor**
-runs are capped at **15 tiles** inside silhouette caves. Water is chosen
-individually for each cave: a **40% chance of exactly 0% water** (rock-only
-separators); otherwise the water probability is sampled from **0–25%**
-(previously **30% for every cave**). Every long-run separator then selects
-water or rock using that cave's probability. Its choice is retained throughout
-placement retries. The original silhouette shape, 15-tile cap and mandatory
-dry reachability remain unchanged.
+Horizontal and vertical uninterrupted **dry-floor** runs are capped at **15
+tiles** inside silhouette caves. Water is chosen individually for each cave: a
+**40% chance of exactly 0% water** (rock-only separators); otherwise the water
+probability is sampled from **0–25%** (previously **30% for every cave**). Every
+long-run separator then selects water or rock using that cave's probability. Its
+choice is retained throughout placement retries. The original silhouette shape,
+15-tile cap and mandatory dry reachability remain unchanged.
 
 Rock uses seeded, asymmetric outlines instead of solid square blocks: chipped
 corners, notched boulders, L-shaped pieces and compact cross-shaped clusters.
@@ -3041,30 +3104,32 @@ Larger pieces occupy **5–8 cells in a 3×3 footprint** (previously a solid
 **9-cell square**); smaller pieces use **3-cell L shapes** (previously solid
 **4-cell squares**). Outlines are clipped to existing floor. A rock placement
 that forms or completes a small isolated solid rectangle is rejected, including
-rectangles formed by adjoining clusters. The surrounding
-rock mass and pre-existing holes are not reshaped by this rule. Narrow passages
-retain a single-tile fallback where a larger shape would break connectivity.
-Water keeps its existing irregular seven-cell or three-cell outlines; each
-obstruction uses its cave's independently sampled **0–25% water** chance. Existing rock boundaries and
-earlier obstructions are preserved. Placement keeps every dry floor reachable
-from the clear 3×3 stair landing; if an obstruction cuts a narrow passage, a
-short dry bend reconnects it. Swimming is never required to explore the cave.
-A layout that cannot satisfy both the limit and connectivity is retried rather
-than accepted with blocked or oversized passages. Diagonals are not capped.
-Rock blocks movement, visibility and projectiles under the existing cave-wall
-rules. Pools use ordinary deep `water`: they interrupt dry runs but remain
-transparent to sight and projectiles. Swimmers and Merlings may cross them under
-normal swimming/drowning rules; non-swimmers can always use the dry route.
-Thus the 15-tile rule limits continuous dry floor, not swimmers' travel distance
-or ranged sightlines. No freezing or special water status is introduced. Other cave styles retain their previous generation rules.
-No special terrain, monster affinity or new status is introduced. Tile mode and ASCII mode use the existing cave terrain rules.
+rectangles formed by adjoining clusters. The surrounding rock mass and
+pre-existing holes are not reshaped by this rule. Narrow passages retain a
+single-tile fallback where a larger shape would break connectivity. Water keeps
+its existing irregular seven-cell or three-cell outlines; each obstruction uses
+its cave's independently sampled **0–25% water** chance. Existing rock
+boundaries and earlier obstructions are preserved. Placement keeps every dry
+floor reachable from the clear 3×3 stair landing; if an obstruction cuts a
+narrow passage, a short dry bend reconnects it. Swimming is never required to
+explore the cave. A layout that cannot satisfy both the limit and connectivity
+is retried rather than accepted with blocked or oversized passages. Diagonals
+are not capped. Rock blocks movement, visibility and projectiles under the
+existing cave-wall rules. Pools use ordinary deep `water`: they interrupt dry
+runs but remain transparent to sight and projectiles. Swimmers and Merlings may
+cross them under normal swimming/drowning rules; non-swimmers can always use the
+dry route. Thus the 15-tile rule limits continuous dry floor, not swimmers'
+travel distance or ranged sightlines. No freezing or special water status is
+introduced. Other cave styles retain their previous generation rules. No special
+terrain, monster affinity or new status is introduced. Tile mode and ASCII mode
+use the existing cave terrain rules.
 
 The browser extracts prototypes directly from transparent PNGs. The JSON at
 `content/cave_silhouettes.json` contains only the ordered source IDs and image
-paths (91 entries; previously 72), not precomputed shapes. Changing an existing source PNG
-requires no build step; a newly added image needs an entry in this list because
-static hosting cannot enumerate a directory. No Python or image tooling is
-required to run or update the game.
+paths (91 entries; previously 72), not precomputed shapes. Changing an existing
+source PNG requires no build step; a newly added image needs an entry in this
+list because static hosting cannot enumerate a directory. No Python or image
+tooling is required to run or update the game.
 
 Before world generation starts, a fixed integer hash of the world seed selects
 two, three or four distinct sources, without consuming gameplay RNG:
@@ -3119,18 +3184,19 @@ source** after all additions, so a later shape cannot erase an earlier one.
 Overlap is measured on the extracted masks before fitting and cave repairs.
 These connections make distinct lobes and branches rather than a central stack.
 
-Each combined outline is still fitted to the same per-cave footprint bounds.
-A different source composition does not multiply that cave's inhabitants or
-extra loot. Raster fitting can narrow limbs; the existing dry connectivity,
-clear stairs, 15-tile dry-floor limit and per-cave **0–25% water** separator
-rules still apply. This provides more route and pursuit choices while preserving the
+Each combined outline is still fitted to the same per-cave footprint bounds. A
+different source composition does not multiply that cave's inhabitants or extra
+loot. Raster fitting can narrow limbs; the existing dry connectivity, clear
+stairs, 15-tile dry-floor limit and per-cave **0–25% water** separator rules
+still apply. This provides more route and pursuit choices while preserving the
 existing balance envelope. Source choice still has no monster affinity.
 
 Cave style, all source IDs, combined prototype ID and complete generated
 geometry use the existing cave descriptor and map save fields. Loading and
 replay initialization restore them directly without fetching source images or
-regenerating layouts. These shape-selection changes introduce no persistent per-actor status; the
-complete result remains stored in the existing cave descriptors and map data.
+regenerating layouts. These shape-selection changes introduce no persistent
+per-actor status; the complete result remains stored in the existing cave
+descriptors and map data.
 
 The crypt's dedicated second level also uses z:-2, but it has its own map and
 uses `cryptstairsdown` / `cryptstairsup`. Generic z:-2 entities are marked as
@@ -3158,15 +3224,15 @@ whole-world rotation.
 
 Reserved for the Dwarven Fort. It is the third level in the generic depth chain
 and is not generated as a normal random cave. It is also D0, the entrance
-complex for the Dwarven Ruins.
-Its `dwarvenfortexit` tile leads directly to the surface `dwarvengate` at the
-same coordinates. A one-way hole from a generic z:-2 grotto can land only on **pre-existing,
-gate-accessible Fort marble at precisely the hole's X/Y**. It neither creates
-a connecting passage nor changes the Fort's walls or doors. If no such safe
-intersection with the grotto exists, there is no hole in that world.
-A generated `dwarvenstairsdown` elsewhere on reachable fort marble begins the
-Ruins chain at z:-4. Generic `caveup` tiles still ascend to the preceding cave
-depth, including any encountered elsewhere on z:-3.
+complex for the Dwarven Ruins. Its `dwarvenfortexit` tile leads directly to the
+surface `dwarvengate` at the same coordinates. A one-way hole from a generic
+z:-2 grotto can land only on **pre-existing, gate-accessible Fort marble at
+precisely the hole's X/Y**. It neither creates a connecting passage nor changes
+the Fort's walls or doors. If no such safe intersection with the grotto exists,
+there is no hole in that world. A generated `dwarvenstairsdown` elsewhere on
+reachable fort marble begins the Ruins chain at z:-4. Generic `caveup` tiles
+still ascend to the preceding cave depth, including any encountered elsewhere on
+z:-3.
 
 ## z:-4 and deeper: Dwarven Ruins
 
@@ -3178,26 +3244,26 @@ z:-8 depending on the rolled floor count. Each floor is stored as another
 Adjacent floors use dedicated dwarven stair tiles. `dwarvenstairsdown` uses
 ASCII `>` and `dwarvenstairsup` uses `<`; tile-image mode uses dedicated dwarven
 stone stair art rather than cave-stair artwork. Every Dwarven stair has a full
-3×3 marble landing: the eight surrounding cells must be free of walls, furniture,
-props, and initially placed occupants. The Fort descent and later Ruins exits
-are selected only at valid clear landings; decoration and loot placement protect
-them on both ends of each paired stair. The sealed Deep Mines
+3×3 marble landing: the eight surrounding cells must be free of walls,
+furniture, props, and initially placed occupants. The Fort descent and later
+Ruins exits are selected only at valid clear landings; decoration and loot
+placement protect them on both ends of each paired stair. The sealed Deep Mines
 continuation uses `X` in ASCII and its own collapsed-shaft image. A Pickaxe is
 needed to clear it; excavation costs one turn and permanently opens the passage
-without immediately changing floors. Inspecting the cleared entrance descends
-to the Mines.
-The world-map level selector derives arbitrary chain depths instead of assuming
-that z:-3 is the deepest possible level, and labels discovered Ruins floors by
-their generated floor number.
+without immediately changing floors. Inspecting the cleared entrance descends to
+the Mines. The world-map level selector derives arbitrary chain depths instead
+of assuming that z:-3 is the deepest possible level, and labels discovered Ruins
+floors by their generated floor number.
 
 The generated Ruins map and its single serialized local map intentionally share
 the same runtime object. Persistent terrain mutations on these floors, including
 ordinary doors changing from `dwarvendoorclosed` (`+` in ASCII) to
 `dwarvendooropen` (`/`), keyed progression gates changing to a distinct intact
-open state, and the lift lever changing to its pulled state, therefore use the existing `deepLevels[].caveMaps` save
-representation without a second copy drifting out of sync. Closed doors also use
-the same opacity rule for player FOV and enemy sight and the same terrain blocker
-rule used by ranged projectiles. Each floor has its own discovery grid.
+open state, and the lift lever changing to its pulled state, therefore use the
+existing `deepLevels[].caveMaps` save representation without a second copy
+drifting out of sync. Closed doors also use the same opacity rule for player FOV
+and enemy sight and the same terrain blocker rule used by ranged projectiles.
+Each floor has its own discovery grid.
 
 ## z:-9 and deeper: Dwarven Mines
 
@@ -3206,18 +3272,17 @@ always starting at **z:-9**. The established 3–5-floor Dwarven Ruins generator
 is unchanged. If the Ruins end at z:-6 or z:-7, a direct staircase leads to
 z:-9; unused depths are not accessible play areas. When the Ruins end at z:-8,
 they connect directly to z:-9. Mines extend through z:-12 or z:-13 and contain
-paired up/down stairs, allowing the player to return along the same route. 
-Every ordinary mine staircase and the Ruins entrance share identical X/Y 
-on both connected global Z-levels. The generator anchors each new floor 
-to the preceding exit, keeps it within world bounds and checks reachability;
-transitions never relocate the player horizontally. Mine depths must remain
-reserved in the global chain rather than overwrite another dungeon.
-The first floor offers a comparatively quiet respite after the Dwarven Fort;
-the second is a deliberate difficulty spike. Mine floors use **brown cave-floor
-tiles**, with dedicated brownish **Shoddy Mine Stairs** art for stair travel.
-After a pickaxe clears the collapsed mine entrance in the Ruins, the revealed
-entrance uses a cleared dwarven mineshaft image, distinct from the shoddy
-staircases within the Mines.
+paired up/down stairs, allowing the player to return along the same route. Every
+ordinary mine staircase and the Ruins entrance share identical X/Y on both
+connected global Z-levels. The generator anchors each new floor to the preceding
+exit, keeps it within world bounds and checks reachability; transitions never
+relocate the player horizontally. Mine depths must remain reserved in the global
+chain rather than overwrite another dungeon. The first floor offers a
+comparatively quiet respite after the Dwarven Fort; the second is a deliberate
+difficulty spike. Mine floors use **brown cave-floor tiles**, with dedicated
+brownish **Shoddy Mine Stairs** art for stair travel. After a pickaxe clears the
+collapsed mine entrance in the Ruins, the revealed entrance uses a cleared
+dwarven mineshaft image, distinct from the shoddy staircases within the Mines.
 The collapsed entrance is highlighted **red** on the maps like other exits.
 
 The initial mine layout uses a narrow winding excavated spine, side branches,
@@ -3225,26 +3290,26 @@ short pockets, and at least one alternate route. Generation checks a single
 connected walkable component and a minimum 30-step stair-to-stair route. Floor
 count, geometry, retries, encounter density, pack sizes, group weights, and
 spacing are configured in `content/world_generation.json`. A flooded side
-chamber is guaranteed on mine floor 4 and may appear on floors 3 or 5
-(**35% each**). Each chamber branches from a dry passage, has a dry shoreline
-around a pool of deep water, and never cuts through existing corridors,
-staircases or cage landings. Swimming is optional for reaching all dungeon
-stairs. **Xibal spawns inside the flooded pools**, not on dry mine floors;
-its Swimming ability lets it leave the water to pursue the player. The haulage cage
-occupies the **same x/y position on every mine floor**: reachable cage landings
-on the first and final floors, and an **open shaft with a dangling rope** on
-intermediate floors. The exposed shaft cannot be crossed or climbed, but all
-eight surrounding tiles are walkable and connected to the passages. The shaft
-remains clear of stair approaches and never replaces an ordinary staircase.
+chamber is guaranteed on mine floor 4 and may appear on floors 3 or 5 (**35%
+each**). Each chamber branches from a dry passage, has a dry shoreline around a
+pool of deep water, and never cuts through existing corridors, staircases or
+cage landings. Swimming is optional for reaching all dungeon stairs. **Xibal
+spawns inside the flooded pools**, not on dry mine floors; its Swimming ability
+lets it leave the water to pursue the player. The haulage cage occupies the
+**same x/y position on every mine floor**: reachable cage landings on the first
+and final floors, and an **open shaft with a dangling rope** on intermediate
+floors. The exposed shaft cannot be crossed or climbed, but all eight
+surrounding tiles are walkable and connected to the passages. The shaft remains
+clear of stair approaches and never replaces an ordinary staircase.
 
 Exactly one Pickaxe is placed in reachable space on the penultimate Dwarven
-Ruins floor. It is a normal inventory item, **40 gold** base value and **20 gold**
-sell value, and is not consumed by clearing the mine entrance. The opened
+Ruins floor. It is a normal inventory item, **40 gold** base value and **20
+gold** sell value, and is not consumed by clearing the mine entrance. The opened
 entrance, every mine floor and transition, monster positions, discovery, and
 inventory state persist through current saves and replay. Gameplay transitions
-and excavation resolve on the turn; animations never determine their outcomes. 
-Excavation and any released water immediately refresh both maps without revealing
-unexplored terrain.
+and excavation resolve on the turn; animations never determine their outcomes.
+Excavation and any released water immediately refresh both maps without
+revealing unexplored terrain.
 
 The separate mine encounter generator uses **19 new species** grouped into
 early, middle, and late threats. The floor-by-floor progression is:
@@ -3266,15 +3331,15 @@ first; these weaker packs consume only available slots in the ordinary floor
 population limit. Spawn spacing and entrance safety are unchanged. If a rolled
 pack cannot be fully accommodated, fewer creatures appear, potentially none if
 there are no legal sites or free slots. This keeps the mine's characteristic
-species from being displaced by the weaker fauna. Floor 1 borrows existing basic enemies without changing their
-ordinary surface spawn pools. When `guaranteeEachSpecies` is enabled,
-generation reserves at least one of every early species on mine floor 2,
-every middle species on floor 3, and every late species on floor 4. Those
-encounters count toward the normal floor population budget; remaining slots
-use weighted groups and packs. Monster stats, rarity, existing
-abilities, and `z-n` spawn biomes live in `content/enemy_templates.json`. The
-abilities listed in **Enemy Special Properties** are active. No species
-receives an unimplemented ability string.
+species from being displaced by the weaker fauna. Floor 1 borrows existing basic
+enemies without changing their ordinary surface spawn pools. When
+`guaranteeEachSpecies` is enabled, generation reserves at least one of every
+early species on mine floor 2, every middle species on floor 3, and every late
+species on floor 4. Those encounters count toward the normal floor population
+budget; remaining slots use weighted groups and packs. Monster stats, rarity,
+existing abilities, and `z-n` spawn biomes live in
+`content/enemy_templates.json`. The abilities listed in **Enemy Special
+Properties** are active. No species receives an unimplemented ability string.
 Like the Dwarven Ruins, Mines interpret `z-n` as a **minimum eligible depth**:
 `z-10` permits a species on z:-10 and every deeper mine floor, while `z-12`
 permits it on z:-12 and z:-13 but not above. Each mine species needs only its
@@ -3285,27 +3350,26 @@ Mine encounters use the ordinary non-Champion prefix and humanoid-equipment
 systems. Among the mine roster, **Wyrdhag, Naledi, Troglodyte, and Cave Troll**
 are humanoids; the others remain non-humanoid. Equipped humanoids gain normal
 gear stat effects and drop their worn gear on death. All retain normal XP,
-artifact-loot, and Bestiary rules. The ordinary surface and cave spawn pools
-are unaffected.
+artifact-loot, and Bestiary rules. The ordinary surface and cave spawn pools are
+unaffected.
 
-**Haulage cage.** The upper cage is on mine floor 1 (z:-9), and the lower
-cage is directly below it on the final generated floor (z:-12 or z:-13). Both begin locked. The
-player must reach the **lower cage** by ordinary stairs and Inspect it to release
-the counterweight. This consumes **one gameplay turn** and does not also move
-the player. The single unlocked state then enables travel in **both directions**
-between those two floors. Inspecting the upper cage while locked consumes no
-turn; riding a released cage uses the existing dungeon-stair transition turn
-rules, with no resource cost or simulation of skipped floors. As on other mine
-transitions, pending monster warnings are canceled when changing floors.
-All mine transitions, including the cage and the Ruins entrance, 
-displace a creature occupying the landing to the nearest safe, 
-unoccupied dry tile on the destination level, in a fixed search order.
-The player keeps their X/Y; only invalid geometry or a completely saturated landing
-can prevent travel.
+**Haulage cage.** The upper cage is on mine floor 1 (z:-9), and the lower cage
+is directly below it on the final generated floor (z:-12 or z:-13). Both begin
+locked. The player must reach the **lower cage** by ordinary stairs and Inspect
+it to release the counterweight. This consumes **one gameplay turn** and does
+not also move the player. The single unlocked state then enables travel in
+**both directions** between those two floors. Inspecting the upper cage while
+locked consumes no turn; riding a released cage uses the existing dungeon-stair
+transition turn rules, with no resource cost or simulation of skipped floors. As
+on other mine transitions, pending monster warnings are canceled when changing
+floors. All mine transitions, including the cage and the Ruins entrance,
+displace a creature occupying the landing to the nearest safe, unoccupied dry
+tile on the destination level, in a fixed search order. The player keeps their
+X/Y; only invalid geometry or a completely saturated landing can prevent travel.
 Locked platforms use a muted cage graphic; the released upper and lower cages
-have distinct directional tile and ASCII visuals. The endpoint coordinates,
-both tile states and the **one shared unlock flag** persist through saves and
-replay. Settings and messages are in `content/world_generation.json`.
+have distinct directional tile and ASCII visuals. The endpoint coordinates, both
+tile states and the **one shared unlock flag** persist through saves and replay.
+Settings and messages are in `content/world_generation.json`.
 
 The mine-specific monster abilities use the generic handlers documented in
 **Enemy Special Properties**. Mine terrain and stair geometry constrain their
@@ -3319,105 +3383,102 @@ nonhumanoid species, selected for that floor. **One or two non-water chambers
 per floor start with their passage already open**; the other pockets remain
 sealed until their mineable seams are broken. The first floor's nearby one-wall
 training seam stays closed so the player can learn to mine. Primary approaches
-are generated as fully mineable routes through otherwise
-solid rock: **15%** shallow (1–3 walls), **25%** medium (4–9), and **60%** deep
-(10–20). Each chamber's distance is also checked against the original corridor
-network, so a long route does not lead to a chamber already beside another
-tunnel. Failed long placements can fall back to shorter ones rather than
-breaking floor generation. The routes mostly contain weak stone, with a
-**15%** chance of a hard wall at each step after the first. Larger pockets can
-have multiple marked approaches; nearby pockets may rarely connect through
-another mineable seam. Each floor also exposes **18–35 additional mineable cracked walls** adjacent
-to its accessible tunnels. These are mostly weak stone, may lead nowhere,
-and give the pickaxe more exploratory uses without adding gem value.
-Most remaining ordinary mine walls stay solid. Mineral
-deposits may be embedded in walls or exposed in corridor alcoves, widened
-corridor floors and pockets; veins contain 1–4 connected deposits of a single
-mineral. Different mineral types are separated by at least **10 tiles of
-Chebyshev distance**, including across adjacent pockets; crystals in a geode
-share one mineral type. Floor-level crystals require a locally connected bypass, so they never
-obstruct a narrow passage or its only exit. Until extracted, they are obstacles
-for ordinary monster movement and player auto-travel; monsters do not spawn on
-them. Players still mine a formation by attempting to step into it.
-Extracting an exposed crystal yields exactly one gem. Gem
-values, veins, pocket content weights and floor budgets are data-driven.
-The respite floor teaches mining through exploration rather than a mandatory
-tutorial.
+are generated as fully mineable routes through otherwise solid rock: **15%**
+shallow (1–3 walls), **25%** medium (4–9), and **60%** deep (10–20). Each
+chamber's distance is also checked against the original corridor network, so a
+long route does not lead to a chamber already beside another tunnel. Failed long
+placements can fall back to shorter ones rather than breaking floor generation.
+The routes mostly contain weak stone, with a **15%** chance of a hard wall at
+each step after the first. Larger pockets can have multiple marked approaches;
+nearby pockets may rarely connect through another mineable seam. Each floor also
+exposes **18–35 additional mineable cracked walls** adjacent to its accessible
+tunnels. These are mostly weak stone, may lead nowhere, and give the pickaxe
+more exploratory uses without adding gem value. Most remaining ordinary mine
+walls stay solid. Mineral deposits may be embedded in walls or exposed in
+corridor alcoves, widened corridor floors and pockets; veins contain 1–4
+connected deposits of a single mineral. Different mineral types are separated by
+at least **10 tiles of Chebyshev distance**, including across adjacent pockets;
+crystals in a geode share one mineral type. Floor-level crystals require a
+locally connected bypass, so they never obstruct a narrow passage or its only
+exit. Until extracted, they are obstacles for ordinary monster movement and
+player auto-travel; monsters do not spawn on them. Players still mine a
+formation by attempting to step into it. Extracting an exposed crystal yields
+exactly one gem. Gem values, veins, pocket content weights and floor budgets are
+data-driven. The respite floor teaches mining through exploration rather than a
+mandatory tutorial.
 
 The seven initial minerals are **Quartz, Amethyst, Topaz, Aquamarine, Emerald,
-Sapphire, and Ruby**. Fully exposed crystal formations illuminate their surroundings with nearly neutral light and a very subtle mineral-colored tint;
+Sapphire, and Ruby**. Fully exposed crystal formations illuminate their
+surroundings with nearly neutral light and a very subtle mineral-colored tint;
 visibly embedded crystals also emit a smaller, dimmer glow. Concealed mineral
 seams do not reveal themselves by glowing. Mineral-specific light radii
-illuminate unobstructed tiles and creatures
-beyond the normal mine sight radius, regardless of how far the formation is
-from the player, provided each lit tile is in the player's line of sight and
-the light reaches it from its source. The formation itself need not be visible
-to illuminate a tile around a corner. Crystal-lit terrain can be visible outside
-ordinary FOV, but does not become explored until it enters the player's normal
-sight range. Neither minimap may reveal distant mineral locations. Solid walls
-and obstructed wall corners block the
-light. An opaque wall only receives crystal light when the visible wall face
-and the light source are on the same side, preventing colored light from
-showing through the opposite face. Diagonal light can pass an open corner
-beside one wall, but not squeeze between two walls meeting diagonally.
-Extraction removes the light. Extracted crystals can also be dropped from their
-inventory stack, **one per action**, onto an unoccupied, walkable dry tile.
-They reuse their existing crystal artwork on the ground and emit light on any
-underground floor, including outside the Mines. Dropped crystals of the same
-mineral stack on one tile without multiplying light strength. Their light radius
-is one tile smaller than the natural formation's, but never less than two tiles
-(Quartz/Amethyst/Topaz: 2; Aquamarine/Emerald/Sapphire: 2; Ruby: 3).
-Dropping consumes a turn; standing over a dropped crystal and pressing **F**
-recovers its whole stack in one turn, extinguishing its light. The same crystal
-can be sold or retained for portable illumination. Surface drops persist but
-do not glow. Floor items and their light sources follow normal save/replay
-restoration, and player-placed crystals are exempt from natural-vein spacing.
-Within the normal **five-tile** mine sight circle, tiles three, four and five
-steps away receive **25%, 50% and 75%** darkness, respectively; the two nearest
-steps remain clear. The shading covers creatures as well as terrain but does
-not reduce visibility or monster targeting. Previously explored mine tiles
-outside current sight are **85%** dark, and crystals can illuminate
-tiles independently of the player's sight radius without marking them explored.
-These visual levels are
-configurable and do not affect turn resolution or replay. Crystal illumination
-**overrides the distance-based darkness** wherever it reaches: the crystal tile
-is fully relieved of the overlay, and the surrounding darkness returns smoothly
-toward the edge of its light radius. Opaque walls still cast shadows.
-In mine tile graphics, **terrain light has a continuous radial falloff, while
-opaque walls block light into corridors and rooms behind them**. Only rock
-faces next to a directly illuminated open tile receive light; brightness fades
-smoothly across that wall tile into the rock. Further layers of solid rock and
-hidden passages remain dark, without patchy shadows across the illuminated
-faces or any glow spilling through a wall. The light's softened edge
-can reach roughly one tile past the ordinary five-tile sight boundary along an
-open sightline or around an open corner; two diagonal walls meeting at a corner
-block that passage. Several close rays from within the player's tile form a
-small, continuous penumbra for open terrain instead of a grid-shaped cutoff.
-Unexplored terrain outside this visual reach is black, while previously visited
-terrain hidden from sight remains **85%** dark. Open but unexplored terrain
-fades fully to black over **1.5 tiles** beyond the main light radius, without
-a bright seam between remembered ground and the fog. Soft lighting does not
-mark new cells explored: creatures, items, geological clues, targeting,
-exploration and the minimap continue using the ordinary wall-aware field of
-view. The crystal's primary effect is to reveal the terrain by relieving
-darkness; a faint, close halo adds atmosphere without covering the crystal's
-own sprite or creating a broad colored haze. Radial light and its softly fading
-wall-aware shadows have no rectangular cutoffs. Portable underground crystals
-share the restrained glow; sunlight entering cave exits remains warmer and
-brighter. The underlying visibility and targeting rules remain tile-based and
-deterministic; only the mine's tile-mode presentation is softened. ASCII
-graphics retain cell-by-cell illumination. Light tint, visual intensity,
-spread and gentle pulse are data-driven, and animation does not alter visibility
-rules, turns or RNG. The tile renderer builds crystal masks only for light
-footprints intersecting the rendered cells, preserving the full visible halo.
-Mine-only lighting and fog buffers are released when leaving tile-mode mines;
-ordinary underground tile glow retains its shared layer, which is released on
-returning above ground or switching to ASCII. Re-entering the mines recreates
-these visual resources on demand without changing exploration or save state.
-Breaking into a water pocket can fill 2–5 nearby tiles only when the pocket's
-interior is actually breached, reusing the existing
-Swimming, drowning and shore-escape behavior. Flooding must preserve safe
-access to mandatory routes.
+illuminate unobstructed tiles and creatures beyond the normal mine sight radius,
+regardless of how far the formation is from the player, provided each lit tile
+is in the player's line of sight and the light reaches it from its source. The
+formation itself need not be visible to illuminate a tile around a corner.
+Crystal-lit terrain can be visible outside ordinary FOV, but does not become
+explored until it enters the player's normal sight range. Neither minimap may
+reveal distant mineral locations. Solid walls and obstructed wall corners block
+the light. An opaque wall only receives crystal light when the visible wall face
+and the light source are on the same side, preventing colored light from showing
+through the opposite face. Diagonal light can pass an open corner beside one
+wall, but not squeeze between two walls meeting diagonally. Extraction removes
+the light. Extracted crystals can also be dropped from their inventory stack,
+**one per action**, onto an unoccupied, walkable dry tile. They reuse their
+existing crystal artwork on the ground and emit light on any underground floor,
+including outside the Mines. Dropped crystals of the same mineral stack on one
+tile without multiplying light strength. Their light radius is one tile smaller
+than the natural formation's, but never less than two tiles
+(Quartz/Amethyst/Topaz: 2; Aquamarine/Emerald/Sapphire: 2; Ruby: 3). Dropping
+consumes a turn; standing over a dropped crystal and pressing **F** recovers its
+whole stack in one turn, extinguishing its light. The same crystal can be sold
+or retained for portable illumination. Surface drops persist but do not glow.
+Floor items and their light sources follow normal save/replay restoration, and
+player-placed crystals are exempt from natural-vein spacing. Within the normal
+**five-tile** mine sight circle, tiles three, four and five steps away receive
+**25%, 50% and 75%** darkness, respectively; the two nearest steps remain clear.
+The shading covers creatures as well as terrain but does not reduce visibility
+or monster targeting. Previously explored mine tiles outside current sight are
+**85%** dark, and crystals can illuminate tiles independently of the player's
+sight radius without marking them explored. These visual levels are configurable
+and do not affect turn resolution or replay. Crystal illumination **overrides
+the distance-based darkness** wherever it reaches: the crystal tile is fully
+relieved of the overlay, and the surrounding darkness returns smoothly toward
+the edge of its light radius. Opaque walls still cast shadows. In mine tile
+graphics, **terrain light has a continuous radial falloff, while opaque walls
+block light into corridors and rooms behind them**. Only rock faces next to a
+directly illuminated open tile receive light; brightness fades smoothly across
+that wall tile into the rock. Further layers of solid rock and hidden passages
+remain dark, without patchy shadows across the illuminated faces or any glow
+spilling through a wall. The light's softened edge can reach roughly one tile
+past the ordinary five-tile sight boundary along an open sightline or around an
+open corner; two diagonal walls meeting at a corner block that passage. Several
+close rays from within the player's tile form a small, continuous penumbra for
+open terrain instead of a grid-shaped cutoff. Unexplored terrain outside this
+visual reach is black, while previously visited terrain hidden from sight
+remains **85%** dark. Open but unexplored terrain fades fully to black over
+**1.5 tiles** beyond the main light radius, without a bright seam between
+remembered ground and the fog. Soft lighting does not mark new cells explored:
+creatures, items, geological clues, targeting, exploration and the minimap
+continue using the ordinary wall-aware field of view. The crystal's primary
+effect is to reveal the terrain by relieving darkness; a faint, close halo adds
+atmosphere without covering the crystal's own sprite or creating a broad colored
+haze. Radial light and its softly fading wall-aware shadows have no rectangular
+cutoffs. Portable underground crystals share the restrained glow; sunlight
+entering cave exits remains warmer and brighter. The underlying visibility and
+targeting rules remain tile-based and deterministic; only the mine's tile-mode
+presentation is softened. ASCII graphics retain cell-by-cell illumination. Light
+tint, visual intensity, spread and gentle pulse are data-driven, and animation
+does not alter visibility rules, turns or RNG. The tile renderer builds crystal
+masks only for light footprints intersecting the rendered cells, preserving the
+full visible halo. Mine-only lighting and fog buffers are released when leaving
+tile-mode mines; ordinary underground tile glow retains its shared layer, which
+is released on returning above ground or switching to ASCII. Re-entering the
+mines recreates these visual resources on demand without changing exploration or
+save state. Breaking into a water pocket can fill 2–5 nearby tiles only when the
+pocket's interior is actually breached, reusing the existing Swimming, drowning
+and shore-escape behavior. Flooding must preserve safe access to mandatory
+routes.
 
 Outside the Mines, the normal encounter pools are unchanged. The two approved
 exceptions are: an independent **10% per-world chance** to add one Cave Troll
@@ -3456,8 +3517,8 @@ The mausoleum has a separate defensive validation after the random z:-1 caves
 have been merged. Its 9x9 template is anchored on the mausoleum hut, with the
 actual stamped interior occupying approximately `x = hut.x-3..hut.x+3` and
 `y = hut.y-6..hut.y`. Random cave floor/entrance tiles are forbidden from the
-larger safety rectangle `x = hut.x-4..hut.x+4`,
-`y = hut.y-7..hut.y+1`, providing a one-tile buffer around that footprint.
+larger safety rectangle `x = hut.x-4..hut.x+4`, `y = hut.y-7..hut.y+1`,
+providing a one-tile buffer around that footprint.
 
 This mausoleum check is paired with two surface-spacing rules:
 
@@ -3502,9 +3563,8 @@ detour to shorten, using an existing dry-path / direct-distance ratio of at
 least **1.8**. Burrows have a **55% dry roll**; otherwise the chance of
 attempting **0–2 small water pockets** is sampled from **0–25%** (previously
 fixed at **35%**), preserving the same dry reachability guarantee. Their dry
-footprint must cover
-less than **63%** of the reserved rectangle, retaining meaningful tunnel space
-instead of becoming another irregular grotto.
+footprint must cover less than **63%** of the reserved rectangle, retaining
+meaningful tunnel space instead of becoming another irregular grotto.
 
 Both styles retain their **original maximum footprint choices** (modulo Cursed
 World modifiers), existing paired stairs and deterministic worldgen. Cursed
@@ -3527,10 +3587,10 @@ no new runtime or replay status is needed.
 ## Decorative cave props
 
 Ordinary caves on z:-1 and z:-2 contain cobwebs, small stalagmite clusters and
-small mushrooms. These are cosmetic overlays: they do not block movement,
-vision or projectiles, alter terrain bonuses, slow actors, offer harvesting or
-loot, or participate in quests. Crypts and mausoleums are excluded. The Dwarven Fort and deeper
-Dwarven Ruins also receive webs (35% of eligible masonry corners),
+small mushrooms. These are cosmetic overlays: they do not block movement, vision
+or projectiles, alter terrain bonuses, slow actors, offer harvesting or loot, or
+participate in quests. Crypts and mausoleums are excluded. The Dwarven Fort and
+deeper Dwarven Ruins also receive webs (35% of eligible masonry corners),
 without extra stalagmites or mushrooms. Each eligible marble-floor corner
 anchors a web on **one of its two adjacent perpendicular masonry wall tiles**,
 chosen by a seeded coordinate hash. Webs never lie on the room floor, cover an
@@ -3556,38 +3616,38 @@ are spaced roughly eight eligible tiles apart and avoid initial creature, loot
 and exposed-crystal positions. They also require a dry walking route from that
 floor's entry staircase, without digging: sealed mineral pockets never receive
 supports, even if their hidden geometry contains a perfectly straight passage.
-They are visual only: the mine floor, movement,
-vision, mining and lighting rules remain unchanged.
+They are visual only: the mine floor, movement, vision, mining and lighting
+rules remain unchanged.
 
 Additional cave decorations include beast remains, skulls, scattered bones,
 stones and other debris on the floors of ordinary caves, but not crypts or
 mausoleums. A cave with at least two Goblins, Skinks or Kobolds has an
 independent **90% chance** to receive two to five scraps of refuse close to
 those creatures (fishbones, torn cloth, banana peels, broken swords or gnawed
-bones), including at least one fishbone. Such refuse is a clue, not proof of present monsters: it is generated
-once from their initial placement and does not move with them or disappear
-when they die.
+bones), including at least one fishbone. Such refuse is a clue, not proof of
+present monsters: it is generated once from their initial placement and does not
+move with them or disappear when they die.
 
 Every Dwarven Fort and Ruins floor receives at least **two alcohol barrels on
 open floor and two carved reliefs on the walls**. Abandoned Mines have neither
 barrels nor dwarven wall reliefs; their decorations are instead wooden passage
 supports and occasional wall mushrooms on cave walls beside walkable passages.
 Mushrooms do not appear on mineral-bearing walls, leaving embedded crystals and
-mining clues unobscured.
-All of these new props are tile-image-only and do not change wall blocking,
-walking, visibility or loot. They are drawn below creatures and items.
+mining clues unobscured. All of these new props are tile-image-only and do not
+change wall blocking, walking, visibility or loot. They are drawn below
+creatures and items.
 
 Placement uses a stable hash of world seed, depth and coordinates, without
 consuming gameplay RNG. At eligible corners, webs have an 18% placement chance;
 eligible floor positions have separate 1.8% stalagmite and 2.5% mushroom bands.
 On the surface, living Giant Spiders generate up to two decorative webs per
 spider on nearby **grass** tiles, **2–3 tiles from the original spawn point**
-(Chebyshev distance). Forest, hill and grassland-tree tiles are excluded. They never occupy the
-spider's tile or an immediately adjacent tile, existing loot, NPCs, or enemy
-spawn tiles, and overlapping webs are prevented. Their placement uses the
-same seeded coordinate-hash method, not combat RNG. They remain in place if
-the spider wanders or dies. As with cave webs, they confer no status, hazard,
-loot, or obstruction, and render behind items and creatures.
+(Chebyshev distance). Forest, hill and grassland-tree tiles are excluded. They
+never occupy the spider's tile or an immediately adjacent tile, existing loot,
+NPCs, or enemy spawn tiles, and overlapping webs are prevented. Their placement
+uses the same seeded coordinate-hash method, not combat RNG. They remain in
+place if the spider wanders or dies. As with cave webs, they confer no status,
+hazard, loot, or obstruction, and render behind items and creatures.
 
 On generic z:-2 each source cave now samples a stable seed-derived
 **0–4× decoration-density multiplier**, with additional nine-tile local
@@ -3598,12 +3658,12 @@ species detectors. The original z:-1 and Dwarven decoration probabilities
 remain unchanged. No decoration consumes gameplay RNG or overlaps a static
 Tracking clue.
 
-One position holds at most one decoration. The generated placement is saved
-and restored directly, survives normal deaths and reused-world characters, and
-is cleared and regenerated for a new world. Props draw below items and actors
-and respect underground visibility. Only the older cave decorations have ASCII
-glyphs: `%` (web), `^`
-(stalagmites), `♣` (small mushrooms) and `Π` (mine supports).
+One position holds at most one decoration. The generated placement is saved and
+restored directly, survives normal deaths and reused-world characters, and is
+cleared and regenerated for a new world. Props draw below items and actors and
+respect underground visibility. Only the older cave decorations have ASCII
+glyphs: `%` (web), `^` (stalagmites), `♣` (small mushrooms) and `Π` (mine
+supports).
 
 ## Guaranteed underground Vampire
 
@@ -3655,9 +3715,9 @@ The ecosystem parameters live under `cavePopulation.ecosystem` in
 `content/world_generation.json`. For each complex, the generator samples a
 center-weighted population density between **6 and 43 monsters per 1000 source
 dry-floor tiles**, scaled by the existing `deepMonsterMin` and `deepMonsterMax`
-world-trait modifiers. Population is capped at **70 monsters per source component**,
-not at 105 per merged complex. A separate threat budget limits effective
-population strength; stronger encounters consume more of that budget.
+world-trait modifiers. Population is capped at **70 monsters per source
+component**, not at 105 per merged complex. A separate threat budget limits
+effective population strength; stronger encounters consume more of that budget.
 
 Each territory receives a randomized population share weighted by its usable
 area and local density, with a **16% initial chance of being empty**. Actual
@@ -3681,18 +3741,18 @@ crypt-or-bat-cave placement, not the new ordinary selection pool. Generic
 z:-2 scenarios never rewrite an enemy template's stats, abilities or AI.
 Existing `far`-wander species use the ordinary underground `roam` conversion.
 
-Every existing staircase retains **at least eight Chebyshev tiles** of
-monster clearance for ordinary ecosystem spawns. Ordinary monsters prefer
-at least three tiles between recent spawns, with spacing relaxed when space
-is limited. Source cave floors are owned by their original descriptors, and
-carved connector tiles are left clear. Champions remain **optional**; the
-current number of attempts, escort and territory budget rules are specified
-in the v194 section below. A separate **10%** roll may add one tier-4 enemy;
-neither encounter is guaranteed and attempts may fail if no safe space or
-budget remains. Tier-4 choices exclude `ultraRare`
-and tier-5 species. Ordinary prefix rolls use the existing deep-cave prefix
-chance, preserving `champions_age`, `mundane_age`, `things_below` and other
-world traits that modify it. Champions have their normal existing properties.
+Every existing staircase retains **at least eight Chebyshev tiles** of monster
+clearance for ordinary ecosystem spawns. Ordinary monsters prefer at least three
+tiles between recent spawns, with spacing relaxed when space is limited. Source
+cave floors are owned by their original descriptors, and carved connector tiles
+are left clear. Champions remain **optional**; the current number of attempts,
+escort and territory budget rules are specified in the v194 section below. A
+separate **10%** roll may add one tier-4 enemy; neither encounter is guaranteed
+and attempts may fail if no safe space or budget remains. Tier-4 choices exclude
+`ultraRare` and tier-5 species. Ordinary prefix rolls use the existing deep-cave
+prefix chance, preserving `champions_age`, `mundane_age`, `things_below` and
+other world traits that modify it. Champions have their normal existing
+properties.
 
 ### Deep Caves 2.0 — per-cave tiers, clusters, synergies and route measurements (v194 / schema 101)
 
@@ -3749,9 +3809,9 @@ loot sites, distance from stairs to first event, the longest geodesic distance
 to an event, lengths and out-and-back travel costs of empty dead-end branches,
 and actual route alternatives. An alternate route is counted if one of up to
 **12** sampled distant destinations remains accessible within **2.2×** its
-original shortest route after blocking a **3×3** middle section **and** its path differs from the
-original by at least **8 distinct tiles**. This rejects superficial detours
-around an isolated tile in a room. All metrics use stored
+original shortest route after blocking a **3×3** middle section **and** its path
+differs from the original by at least **8 distinct tiles**. This rejects
+superficial detours around an isolated tile in a room. All metrics use stored
 terrain, inhabitants and rewards and **consume no RNG**. They are diagnostics
 for balancing world generation, not random values themselves or gameplay rules.
 The finished metadata persists through world rotation, save/load and replay.
@@ -3806,21 +3866,20 @@ with no eligible inhabitants has no old tracks.
 Each stair has a **20–35% seeded chance** to receive **1–4** clues on suitable
 floor tiles **3–16 cardinal walking steps** away. Territories have an
 independent **18%** chance for an additional clue; no complex exceeds **12**.
-Tracks identify a species that genuinely existed in that same connected
-complex at generation, usually from the entrance's vicinity; the bearing
-points toward that original individual at generation time, not its current
-location. Clues persist if the creature moves or dies, do not expire, and
-do **not** cause underground `far` wandering or participate in the surface
-track-aging system. They never reveal the existence of a Champion or exact
-coordinates. Untrained characters cannot interpret them; trained Tracking
-reveals direction and reveals species only after at least one normal kill of
-that species. Previously saved clues from ineligible species are ignored when
-viewed or inspected, without changing stored saves. Valid clues render as small,
-permanent paw/arrow marks in discovered, currently visible generic z:-2 cave
-terrain, and are inspectable without
-consuming a turn. The old tracks are persisted as `caveSpoor`, rotated with
-the world (including their eight-direction bearing), restored on save/replay,
-and retained when a new character reuses the same world.
+Tracks identify a species that genuinely existed in that same connected complex
+at generation, usually from the entrance's vicinity; the bearing points toward
+that original individual at generation time, not its current location. Clues
+persist if the creature moves or dies, do not expire, and do **not** cause
+underground `far` wandering or participate in the surface track-aging system.
+They never reveal the existence of a Champion or exact coordinates. Untrained
+characters cannot interpret them; trained Tracking reveals direction and reveals
+species only after at least one normal kill of that species. Previously saved
+clues from ineligible species are ignored when viewed or inspected, without
+changing stored saves. Valid clues render as small, permanent paw/arrow marks in
+discovered, currently visible generic z:-2 cave terrain, and are inspectable
+without consuming a turn. The old tracks are persisted as `caveSpoor`, rotated
+with the world (including their eight-direction bearing), restored on
+save/replay, and retained when a new character reuses the same world.
 
 Natural Fungus still uses its previous independent per-source rolls and the
 world-wide minimum of three across z:-1 and z:-2. These changes never
@@ -3855,18 +3914,18 @@ created during world generation and stored as ordinary cave floor; loading a
 save or replay restores the stored map. Save version remains 97.
 
 Initial z:-1 caves choose independently between a compact cardinal random walk
-(90–300 steps, radius 5–11) and three to six linked irregular chambers
-(radius 9–15). They all retain the ordinary cave floor. On generic z:-2, the
-burrow's descriptor stores `brownFloor`, and `terrainVisual()` selects the
-`cavefloorBrown` entry (`img/tiles/cave-floor-brown-dark.png`) for every floor tile
-in that cave, including the floor beneath its staircase. The visual is chosen
-by the z:-2 cave map coordinate, not by the active z:-1 cave index. Brown cave
-floors use `minimap.brownCave`, a slightly darker brown than ordinary stone
+(90–300 steps, radius 5–11) and three to six linked irregular chambers (radius
+9–15). They all retain the ordinary cave floor. On generic z:-2, the burrow's
+descriptor stores `brownFloor`, and `terrainVisual()` selects the
+`cavefloorBrown` entry (`img/tiles/cave-floor-brown-dark.png`) for every floor
+tile in that cave, including the floor beneath its staircase. The visual is
+chosen by the z:-2 cave map coordinate, not by the active z:-1 cave index. Brown
+cave floors use `minimap.brownCave`, a slightly darker brown than ordinary stone
 floors on both underground maps. The `caveup` exit keeps its dedicated bright
-minimap color even inside the brown cave. Inspecting either generic cave floor reports
-stone or brown dirt according to the marked z:-2 cave at that coordinate,
-regardless of depth. No new gameplay terrain key is needed; the map still
-stores `cavefloor2`.
+minimap color even inside the brown cave. Inspecting either generic cave floor
+reports stone or brown dirt according to the marked z:-2 cave at that
+coordinate, regardless of depth. No new gameplay terrain key is needed; the map
+still stores `cavefloor2`.
 
 Brown deep-cave floor textures alternate horizontal and vertical mirroring by
 world-coordinate parity so neighboring edges match without new art or RNG.
@@ -3893,7 +3952,9 @@ to the surface or renders from the canonical surface state.
 
 # 16. World Connectivity
 
-World generation checks whether the Temple can reach a map edge through walkable terrain. This is to prevent situation where player is stuck in a village surrounded by non-walkable tiles.
+World generation checks whether the Temple can reach a map edge through walkable
+terrain. This is to prevent situation where player is stuck in a village
+surrounded by non-walkable tiles.
 
 The Big Bell also has a strict Temple-reachability invariant: placement scans
 the Temple's eight-direction walkable component and only accepts mountain tiles
@@ -3903,7 +3964,13 @@ After volcanoes and cave/fort entrances are stamped, reachability is checked
 again. An absent or isolated bell rejects the world attempt rather than
 creating a disconnected patch of grass inside the mountains.
 
-The surface Dwarven Fort entrance has a separate reachability invariant. Natural Fort candidates must border the same 8-direction walkable component as the Temple; a fallback mountain outcrop may likewise only be created on that component. After the Fort gate is stamped, cave/fort generation defensively flood-fills from the Temple again and rejects the world if the gate is not reachable. This prevents visually valid mountain pockets from containing an inaccessible Fort entrance.
+The surface Dwarven Fort entrance has a separate reachability invariant. Natural
+Fort candidates must border the same 8-direction walkable component as the
+Temple; a fallback mountain outcrop may likewise only be created on that
+component. After the Fort gate is stamped, cave/fort generation defensively
+flood-fills from the Temple again and rejects the world if the gate is not
+reachable. This prevents visually valid mountain pockets from containing an
+inaccessible Fort entrance.
 
 If these surface connectivity checks fail, the world attempt is regenerated.
 
@@ -3929,8 +3996,8 @@ mausoleum. Specifically:
 These checks occur during cave generation. They do not move or delete only the
 offending cave; `generateCaves()` fails and `generateMap()` retries the **whole
 world**, subject to the same maximum-attempt limit. At the beginning of every
-full retry, transient generated `enemies`, `groundItems`, and `occupied` state is
-cleared so content from a rejected cave/fort layout cannot leak into the next
+full retry, transient generated `enemies`, `groundItems`, and `occupied` state
+is cleared so content from a rejected cave/fort layout cannot leak into the next
 world attempt.
 
 Maximum attempts:
@@ -3943,12 +4010,12 @@ Maximum attempts:
 
 # 17. Enemy Population
 
-The initial surface world attempts to spawn about one random enemy per
-**260 eligible walkable tiles** (before any Cursed world density multiplier), configured by
-`content/map_config.json` (`spawning.surfaceTilesPerEnemy`). Eligible tiles
-exclude water, other impassable terrain, the outer two-tile border, major
-landmarks, the Temple's safe area, and the bell guard's exclusion area.
-This preserves roughly the former density of:
+The initial surface world attempts to spawn about one random enemy per **260
+eligible walkable tiles** (before any Cursed world density multiplier),
+configured by `content/map_config.json` (`spawning.surfaceTilesPerEnemy`).
+Eligible tiles exclude water, other impassable terrain, the outer two-tile
+border, major landmarks, the Temple's safe area, and the bell guard's exclusion
+area. This preserves roughly the former density of:
 
 ```text
 120 enemies across ~31,250 eligible tiles in a 260 × 180 world
@@ -4045,12 +4112,12 @@ chase, never retaliate after being hit (including invisible attacks), and
 `enemyAttackPlayer()` defensively refuses to let them attack. This is
 data-driven, so any current or future enemy with AGGRO 0 receives the same
 passive behavior automatically. `Fungus` should use AGGRO 0 and `wander: false`
-so it remains both harmless and stationary.
-Passive AGGRO 0 enemies cannot become Alarmed.
+so it remains both harmless and stationary. Passive AGGRO 0 enemies cannot
+become Alarmed.
 
-Spawned enemies receive approximately 95%–105% random variance from template stats.
-Every enemy template declares a family. Undead (including vampires, ghouls,
-ghosts, banshees and gravehounds) and constructs (gargoyles) cannot be
+Spawned enemies receive approximately 95%–105% random variance from template
+stats. Every enemy template declares a family. Undead (including vampires,
+ghouls, ghosts, banshees and gravehounds) and constructs (gargoyles) cannot be
 poisoned; susceptibility checks use family rather than individual species.
 
 ---
@@ -4214,50 +4281,50 @@ Saves from previous formats are rejected; no old boolean conversion is added.
 
 **Rupture** is a generic telegraphed attack, currently used by Duiwel. On an
 eligible turn it has a **25%** chance to mark the player's tile and up to two
-nearby legal floor tiles, at most **four tiles** from a normally detected target.
-The marked floor is visible in tile and ASCII modes and interrupts auto-travel.
-The monster waits for **one complete player action** before erupting; moving
-off every marked tile prevents the hit. A player is never deliberately left
-without an initially unoccupied one-step escape, although other hazards,
-rooting or moving actors can subsequently block it. A caught player takes an
-ordinary damage roll with **375% of the monster's effective ATK** against the
-player's DEF, without a separate miss/critical/glancing roll. It applies
-the same damage roll against the DEF of **every other grounded, non-ethereal
-monster on a marked tile**, even if the player escaped. The erupting Duiwel is
-immune to its own rupture, as are flying and ethereal creatures. Monsters killed
-by rupture drop normal loot, but grant no player XP, kill count or quest credit.
-Monster damage and deaths resolve deterministically with the eruption, not its
-shake animation. Eruption gives the visible game canvas a pronounced **650 ms**
-visual shake whether it hits or misses; the animation
-does not affect turns, damage or replay outcomes. Resolution consumes the
-monster's action and starts **five complete subsequent active-floor turns**
+nearby legal floor tiles, at most **four tiles** from a normally detected
+target. The marked floor is visible in tile and ASCII modes and interrupts
+auto-travel. The monster waits for **one complete player action** before
+erupting; moving off every marked tile prevents the hit. A player is never
+deliberately left without an initially unoccupied one-step escape, although
+other hazards, rooting or moving actors can subsequently block it. A caught
+player takes an ordinary damage roll with **375% of the monster's effective
+ATK** against the player's DEF, without a separate miss/critical/glancing roll.
+It applies the same damage roll against the DEF of **every other grounded,
+non-ethereal monster on a marked tile**, even if the player escaped. The
+erupting Duiwel is immune to its own rupture, as are flying and ethereal
+creatures. Monsters killed by rupture drop normal loot, but grant no player XP,
+kill count or quest credit. Monster damage and deaths resolve deterministically
+with the eruption, not its shake animation. Eruption gives the visible game
+canvas a pronounced **650 ms** visual shake whether it hits or misses; the
+animation does not affect turns, damage or replay outcomes. Resolution consumes
+the monster's action and starts **five complete subsequent active-floor turns**
 of cooldown. Warnings and cooldowns persist in saves/replay; pending attacks
 disappear on the caster's death or the player's departure. Thresholds and
 messages are configurable in `enemy_config.json`.
 
-**Burrow** is a generic repositioning action, currently used by Marsutal.
-On an eligible chase turn within **four tiles**, Blind hesitation is checked
-first; there is then a **25% chance** to retreat underground. It vanishes
-immediately, freeing its original tile and leaving a disturbance where it
-disappeared. No destination marker is shown. The destination is selected at
-preparation time from free tiles adjacent to the player's position, reachable
-from the monster's origin within **four terrain-traversable steps** without
-crossing solid walls, gates or closed doors. The monster remains hidden and
-untargetable for **two complete player actions**, then emerges on the following
-enemy action. If its chosen tile is still free, it may make **one ordinary
-melee attack** when adjacent; it cannot gain an extra weapon-speed attack.
-If the player is standing on the disturbed origin or the secret landing tile,
-the monster instead attempts **one 90%-accuracy collision attack** from that
-tile. A successful hit uses ordinary melee damage, armor, critical and status
-rules, then shoves the player onto one randomly selected adjacent walkable
-tile (including hazardous tiles, which trigger normally); no second attack or
-critical knockback occurs. If the collision misses, the monster emerges at its
-origin or a free adjacent tile without attacking again. If an ordinary landing
-is blocked, it uses the same harmless fallback. If there is nowhere to push a
-player occupying its landing, or no safe return space exists after a miss,
-it stays buried until an opening appears. A successful emergence or canceled Burrow begins
-**six complete active-floor turns** of cooldown. Origin, destination, remaining
-wait time, and cooldown are deterministic save/replay state.
+**Burrow** is a generic repositioning action, currently used by Marsutal. On an
+eligible chase turn within **four tiles**, Blind hesitation is checked first;
+there is then a **25% chance** to retreat underground. It vanishes immediately,
+freeing its original tile and leaving a disturbance where it disappeared. No
+destination marker is shown. The destination is selected at preparation time
+from free tiles adjacent to the player's position, reachable from the monster's
+origin within **four terrain-traversable steps** without crossing solid walls,
+gates or closed doors. The monster remains hidden and untargetable for **two
+complete player actions**, then emerges on the following enemy action. If its
+chosen tile is still free, it may make **one ordinary melee attack** when
+adjacent; it cannot gain an extra weapon-speed attack. If the player is standing
+on the disturbed origin or the secret landing tile, the monster instead attempts
+**one 90%-accuracy collision attack** from that tile. A successful hit uses
+ordinary melee damage, armor, critical and status rules, then shoves the player
+onto one randomly selected adjacent walkable tile (including hazardous tiles,
+which trigger normally); no second attack or critical knockback occurs. If the
+collision misses, the monster emerges at its origin or a free adjacent tile
+without attacking again. If an ordinary landing is blocked, it uses the same
+harmless fallback. If there is nowhere to push a player occupying its landing,
+or no safe return space exists after a miss, it stays buried until an opening
+appears. A successful emergence or canceled Burrow begins **six complete
+active-floor turns** of cooldown. Origin, destination, remaining wait time, and
+cooldown are deterministic save/replay state.
 
 **Jump** is a generic fast repositioning action, used by Naledi and Giant Toad.
 It prepares a straight leap of **two to four tiles** when it can bypass
@@ -4305,19 +4372,19 @@ without a separate floating "Linked!" popup.
 
 The detecting member becomes the designated scout. It chooses a reachable
 **different pack**, preferring packs with **at least two other surviving
-members**, then the shortest legal travel path; an isolated surviving ally is
-an acceptable fallback. Equal choices use stable identifiers. The scout
-spends its actions moving toward an adjacent reachable space near those allies
-instead of attacking the player. If no separate group is reachable, it **flees
-away from the player and searches** instead. If trapped adjacent to the
-player with no legal step farther away, it fights back using normal melee;
-otherwise it keeps searching rather than pursuing the player. Normal movement or
-an eligible, prepared **Jump** may be used; Jump follows its ordinary cooldown
-and never grants a landing attack. A blocked route or loss of the chosen group
-ends that route; the scout searches for another reachable pack, defending
-itself only if cornered. Regrouping ends its flight. Floor alert, permanent-regrouped state,
-pack identity, destination and retreat are saved and replayed independently
-of animation. Parameters and messages are configured in `enemy_config.json`.
+members**, then the shortest legal travel path; an isolated surviving ally is an
+acceptable fallback. Equal choices use stable identifiers. The scout spends its
+actions moving toward an adjacent reachable space near those allies instead of
+attacking the player. If no separate group is reachable, it **flees away from
+the player and searches** instead. If trapped adjacent to the player with no
+legal step farther away, it fights back using normal melee; otherwise it keeps
+searching rather than pursuing the player. Normal movement or an eligible,
+prepared **Jump** may be used; Jump follows its ordinary cooldown and never
+grants a landing attack. A blocked route or loss of the chosen group ends that
+route; the scout searches for another reachable pack, defending itself only if
+cornered. Regrouping ends its flight. Floor alert, permanent-regrouped state,
+pack identity, destination and retreat are saved and replayed independently of
+animation. Parameters and messages are configured in `enemy_config.json`.
 
 ## Monster-applied status effects
 
@@ -4348,13 +4415,13 @@ Confusion tracks the **individual Banshee's ID**. Killing that specific Banshee
 immediately removes its confusion, but killing a different Banshee does not.
 Root likewise ends immediately when its actual source monster dies, with the
 normal release message and no additional struggle turn; killing another monster
-does not free the player.
-Wails from a different caster refresh the timer and replace the source.
-Normal expiration also clears the source. Statuses survive save/load and replay;
-all application, struggle, misstep, expiration, and caster-death events have
-combat logs, with floating text on their most important effects. Active effects
-are visible on the player status strip. Both the player's counters and the
-monsters' absolute ready-turn deadlines are persisted by save schema **57**.
+does not free the player. Wails from a different caster refresh the timer and
+replace the source. Normal expiration also clears the source. Statuses survive
+save/load and replay; all application, struggle, misstep, expiration, and
+caster-death events have combat logs, with floating text on their most important
+effects. Active effects are visible on the player status strip. Both the
+player's counters and the monsters' absolute ready-turn deadlines are persisted
+by save schema **57**.
 
 Root's chance, duration, cooldown, and source-dependent messages are defined
 in `content/enemy_config.json`. The active root's source and flavor persist in
@@ -4371,14 +4438,14 @@ tiles among all eight neighbors of both the creature and the player:
 | 3+ | 1–2 | **40%** |
 | 3+ | 3+ | **60%** |
 
-An open monster position overrides the narrow-player exception; a blind
-creature in open space may still become uncertain even when the player is in
-a tight passage. Checks only happen with a legal pursuit step, outside melee
-range, and do not consume RNG at 0%. The existing Pull mechanic now supports
-configurable messages and visuals: a non-web grasp can
-move a player without showing spider webs or applying their separate status.
-Blind enemies show only the **Blind** ability label in inspection; their spotting and hesitation
-messages describe sensing rather than seeing the player.
+An open monster position overrides the narrow-player exception; a blind creature
+in open space may still become uncertain even when the player is in a tight
+passage. Checks only happen with a legal pursuit step, outside melee range, and
+do not consume RNG at 0%. The existing Pull mechanic now supports configurable
+messages and visuals: a non-web grasp can move a player without showing spider
+webs or applying their separate status. Blind enemies show only the **Blind**
+ability label in inspection; their spotting and hesitation messages describe
+sensing rather than seeing the player.
 
 ## Defensive mine abilities (generic)
 
@@ -4400,8 +4467,9 @@ does not alter the player Troll race's separate healing mechanics.
 
 ## Enemy support abilities: Haste, Inspired and HealSelf
 
-These monster abilities resolve during the normal deterministic combat turn. They
-cannot add bonus attacks, and their feedback is logged with brief floating text.
+These monster abilities resolve during the normal deterministic combat turn.
+They cannot add bonus attacks, and their feedback is logged with brief floating
+text.
 
 | Source | Activation | Result | Restriction |
 |---|---|---|---|
@@ -4427,28 +4495,27 @@ the displayed HP number reflecting the true value immediately.
 Haste uses the existing walkable pathfinder, and opening a door takes the normal
 separate action; a sprint cannot open a door and then run through it. The two
 steps are animated in sequence, but movement and any hazards resolve before
-presentation. Naturally faster enemies can still earn **one extra pursuit action**, with a
-chance of 5 percentage points per point of effective SPD advantage (maximum
-50%). Haste replaces that roll on its activation turn, so neither effect can
-produce three actions. A Haste
-activation can finish adjacent to the player, but never attacks on that turn.
+presentation. Naturally faster enemies can still earn **one extra pursuit
+action**, with a chance of 5 percentage points per point of effective SPD
+advantage (maximum 50%). Haste replaces that roll on its activation turn, so
+neither effect can produce three actions. A Haste activation can finish adjacent
+to the player, but never attacks on that turn.
 
-Inspired modifies *effective* combat stats, after spawning/prefixes, rather
-than permanently adding ATK or DEF to monsters. It uses the same radius as the
+Inspired modifies *effective* combat stats, after spawning/prefixes, rather than
+permanently adding ATK or DEF to monsters. It uses the same radius as the
 Champion's gold visual aura; buffed allies have a small golden star on the tile
-and an Inspired tooltip. The Champion can announce its inspiration upon
-spotting the player. The Champion tooltip omits its redundant aura summary;
-the Inspired status remains visible on affected followers. Defeating a visible Champion with followers gives a log
-and fading-aura popup. Nymph healing shows its exact HP gained; its spent use
-and Haste cooldown appear in monster inspection.
+and an Inspired tooltip. The Champion can announce its inspiration upon spotting
+the player. The Champion tooltip omits its redundant aura summary; the Inspired
+status remains visible on affected followers. Defeating a visible Champion with
+followers gives a log and fading-aura popup. Nymph healing shows its exact HP
+gained; its spent use and Haste cooldown appear in monster inspection.
 
-`hasteReadyTurn`, `healSelfReadyTurn`, `healSelfUsed`, and
-`consumableHealUsed` belong to each enemy
-instance and are initialized for new spawns and serialized/restored in **save
-schema 58**, including replay snapshots. Inspired needs no per-recipient status
-flag: it is recalculated directly from living Champion positions, so save/load
-and replays cannot preserve a stale aura. Animations never advance or change
-combat state.
+`hasteReadyTurn`, `healSelfReadyTurn`, `healSelfUsed`, and `consumableHealUsed`
+belong to each enemy instance and are initialized for new spawns and
+serialized/restored in **save schema 58**, including replay snapshots. Inspired
+needs no per-recipient status flag: it is recalculated directly from living
+Champion positions, so save/load and replays cannot preserve a stale aura.
+Animations never advance or change combat state.
 
 ## Swimming monsters
 
@@ -4493,23 +4560,23 @@ do not receive `evades`; their defense is ethereal immunity to mundane weapons.
 
 Ghost has `ethereal` ability. All Ghost spawn paths, including scripted
 dwarven-ruin Ghosts, receive it. Ghosts never enter surface wildlife or
-ancient-forest ambush pools; their underground spawns remain available.
-Ethereal creatures can traverse any in-bounds terrain, including walls,
-mountains, water, and lava.
-Actor collision and map boundaries still apply. Chasing, wandering, evasion,
-and invisible-attack retreat use the same terrain permission. Walls retain
-their normal sight-blocking behavior. A Ghost that has already detected the
-player continues phasing toward their last known direction while within aggro
-range even if a wall or bookshelf interrupts sight; ghosts do not acquire
+ancient-forest ambush pools; their underground spawns remain available. Ethereal
+creatures can traverse any in-bounds terrain, including walls, mountains, water,
+and lava. Actor collision and map boundaries still apply. Chasing, wandering,
+evasion, and invisible-attack retreat use the same terrain permission. Walls
+retain their normal sight-blocking behavior. A Ghost that has already detected
+the player continues phasing toward their last known direction while within
+aggro range even if a wall or bookshelf interrupts sight; ghosts do not acquire
 unseen targets through solid walls.
 
 An equipped artifact weapon or a weapon with a modifier prefix (`weapon.mod`)
 can damage an ethereal creature. Any weapon modifier qualifies, including
-non-damage modifiers; ordinary weapon tier, name, and unprefixed ATK alone do not. Unarmed and mundane attacks
-consume their normal player action but deal no damage, use no combat RNG, and
-show an immunity marker with an explanatory message. They do not trigger an
-extra strike or an invisible-attack reaction. Magical attacks use normal combat
-rules, including evasion, misses, armor, critical hits, and timing.
+non-damage modifiers; ordinary weapon tier, name, and unprefixed ATK alone do
+not. Unarmed and mundane attacks consume their normal player action but deal no
+damage, use no combat RNG, and show an immunity marker with an explanatory
+message. They do not trigger an extra strike or an invisible-attack reaction.
+Magical attacks use normal combat rules, including evasion, misses, armor,
+critical hits, and timing.
 
 An adjacent Ghost remains attackable even while standing inside a wall: player
 movement checks for a creature target before checking destination walkability.
@@ -4548,14 +4615,15 @@ Lich uses the same one-use Death Shield; it does not recharge.
 
 ## Shared monster spells
 
-Any monster template can independently add `weaken`, `slow`, `disarm`, `dispel`, `deathBolt`, `immunity`, `lowHpTeleport`, or `sacrifice`
-to its `abilities` array. Lich currently has all eight. **Low-HP survival
-spells are resolved before ordinary casting** using one seeded roll each
-eligible turn: Sacrifice takes the first **30%** of the roll, and Teleport
-the next **20%**. If **both** are eligible, their combined chance is **50%**
-per turn; if only one is eligible, its probability stays **30%** or **20%**,
-without inheriting the other's share. An unavailable spell's roll slice is
-unused, but ordinary magic may still be cast on that turn.
+Any monster template can independently add `weaken`, `slow`, `disarm`, `dispel`,
+`deathBolt`, `immunity`, `lowHpTeleport`, or `sacrifice` to its `abilities`
+array. Lich currently has all eight. **Low-HP survival spells are resolved
+before ordinary casting** using one seeded roll each eligible turn: Sacrifice
+takes the first **30%** of the roll, and Teleport the next **20%**. If **both**
+are eligible, their combined chance is **50%** per turn; if only one is
+eligible, its probability stays **30%** or **20%**, without inheriting the
+other's share. An unavailable spell's roll slice is unused, but ordinary magic
+may still be cast on that turn.
 
 If no survival spell fires, the caster gets the ordinary **20% spell-casting
 roll**. Eligible ordinary spells have equal weight except **Death Bolt, which
@@ -4587,8 +4655,9 @@ minimum final maximum HP/SPD of 1. Weaken immediately caps current HP to the new
 maximum; expiry restores the maximum without free healing. Slow applies after
 other SPD modifiers. Cast messages report the **actual numeric stat loss** after
 rounding and minimum-stat limits, not a percentage. Both appear in the status
-strip with remaining turns, do not stack, and clear on player death. Their generic `weakenTurns` and `slowTurns`
-counters persist in saves and replay initial states.
+strip with remaining turns, do not stack, and clear on player death. Their
+generic `weakenTurns` and `slowTurns` counters persist in saves and replay
+initial states.
 
 Disarm is announced as a **disarming spell**, not a physical disarm.
 It preserves the exact item's identity, modifiers, and identification state;
@@ -4615,12 +4684,13 @@ turn's eligible spell pool without consuming a cast or an RNG roll; the monster
 can still pursue or choose another spell. True Sight is required to target an
 invisible player. Sanctuary protections remain in force.
 
-The supplied pixel-art skull is rendered as a `deathBolt` projectile in tile mode
-(with an ASCII skull fallback), travelling for **650 ms** compared with **220 ms**
-for ordinary arrows/stones. Damage or a dodge resolves on the casting turn,
-not when the visual arrives; hit/miss floating text is delayed to match arrival.
-No extra game turn, projectile inventory, or persistent timer is created.
-Its ATK and flight duration are configurable in `content/enemy_config.json`.
+The supplied pixel-art skull is rendered as a `deathBolt` projectile in tile
+mode (with an ASCII skull fallback), travelling for **650 ms** compared with
+**220 ms** for ordinary arrows/stones. Damage or a dodge resolves on the casting
+turn, not when the visual arrives; hit/miss floating text is delayed to match
+arrival. No extra game turn, projectile inventory, or persistent timer is
+created. Its ATK and flight duration are configurable in
+`content/enemy_config.json`.
 
 Immunity is a one-use protective cast per monster, never refreshed by healing.
 It blocks player melee and extra strikes, as well as dungeon spike and arrow
@@ -4629,44 +4699,45 @@ while immunity is active. The cast protects the next five player actions and
 expires before monsters act on the fifth subsequent turn; its timer and
 ready/spent state appear in the inspected monster's tooltip. Active immunity
 also shows a violet rune on the creature in both tile and ASCII mode. Cast,
-blocked hit and expiry all display log messages and floating text. The player can retreat,
-heal or reposition while this temporary shield remains active.
+blocked hit and expiry all display log messages and floating text. The player
+can retreat, heal or reposition while this temporary shield remains active.
 
 Low-HP Teleport is a **one-use** escape spell triggered strictly below 25%
-maximum HP. Each eligible turn has a fixed **20%** teleport chance through
-the survival roll, independent of the availability of Sacrifice. A successful cast moves the caster at
-least 13 Chebyshev tiles away from the player (and at least 2 tiles beyond its **current effective aggro
-range**, including Alarmed bonuses), choosing uniformly with seeded RNG from
-safe, unoccupied, traversable floor within a 20-step connected-area search.
-It cannot escape into sealed chambers, sanctuary, traps, walls, NPCs or occupied
-tiles. Without a suitable destination it is ineligible and consumes no RNG.
-Teleport replaces the monster's action, reanchors its return-home position and
-breaks pursuit. It does not move the player, create a new turn or depend on
-visual timing. The disappearance and arrival show floating text.
+maximum HP. Each eligible turn has a fixed **20%** teleport chance through the
+survival roll, independent of the availability of Sacrifice. A successful cast
+moves the caster at least 13 Chebyshev tiles away from the player (and at least
+2 tiles beyond its **current effective aggro range**, including Alarmed
+bonuses), choosing uniformly with seeded RNG from safe, unoccupied, traversable
+floor within a 20-step connected-area search. It cannot escape into sealed
+chambers, sanctuary, traps, walls, NPCs or occupied tiles. Without a suitable
+destination it is ineligible and consumes no RNG. Teleport replaces the
+monster's action, reanchors its return-home position and breaks pursuit. It does
+not move the player, create a new turn or depend on visual timing. The
+disappearance and arrival show floating text.
 
-Sacrifice is available strictly below 50% maximum HP when another living
-monster is within **4 tiles** (Chebyshev distance) with unobstructed sight.
-The victim is chosen uniformly using seeded RNG and removed with the ordinary
-death animation; its **current HP** is transferred to the caster, capped at
-its missing HP. Sacrifice is repeatable while eligible, with a fixed
-**30%** per-turn chance through the survival roll, even if teleport is
-unavailable. Both abilities use the same seeded survival roll each turn,
-and each successful cast consumes the caster's action. It gives the player no XP, kills,
-quest progress or ordinary loot. Summoned monsters can be sacrificed. Monsters
-carrying progression keys or stolen items, active quest targets and temporarily
-immune monsters cannot be sacrificed; their progression or belongings must
-remain recoverable. Death Shield is not consumed in this sacrifice removal.
-Both spells obey normal caster sight, invisibility, forest cover, sanctuary
-and turn eligibility. Their resolution never depends on animations.
+Sacrifice is available strictly below 50% maximum HP when another living monster
+is within **4 tiles** (Chebyshev distance) with unobstructed sight. The victim
+is chosen uniformly using seeded RNG and removed with the ordinary death
+animation; its **current HP** is transferred to the caster, capped at its
+missing HP. Sacrifice is repeatable while eligible, with a fixed **30%**
+per-turn chance through the survival roll, even if teleport is unavailable. Both
+abilities use the same seeded survival roll each turn, and each successful cast
+consumes the caster's action. It gives the player no XP, kills, quest progress
+or ordinary loot. Summoned monsters can be sacrificed. Monsters carrying
+progression keys or stolen items, active quest targets and temporarily immune
+monsters cannot be sacrificed; their progression or belongings must remain
+recoverable. Death Shield is not consumed in this sacrifice removal. Both spells
+obey normal caster sight, invisibility, forest cover, sanctuary and turn
+eligibility. Their resolution never depends on animations.
 
 Auto-looting does not automatically equip a two-handed weapon while a shield is
 equipped; the dropped weapon enters the backpack instead. The player may
 manually equip it, which unequips the shield using the ordinary equipment rule.
 
-Every successful cast has a log message and floating text. Weaken/Slow expiry
-is logged without floating text. Choices, item moves,
-buff removal and stat changes resolve synchronously with seeded RNG; animation
-timing and tile/ASCII rendering never decide their results.
+Every successful cast has a log message and floating text. Weaken/Slow expiry is
+logged without floating text. Choices, item moves, buff removal and stat changes
+resolve synchronously with seeded RNG; animation timing and tile/ASCII rendering
+never decide their results.
 
 ## Gang power
 
@@ -4687,7 +4758,8 @@ There are no additional log messages.
 
 The bonus is derived from current creatures and their saved abilities,
 positions, HP, and aggro state. Base ATK is never changed; loading or replaying
-cannot stack bonuses. No new persistent flag, RNG roll, or save version is added.
+cannot stack bonuses. No new persistent flag, RNG roll, or save version is
+added.
 
 ## Wounded fleeing
 
@@ -4702,63 +4774,66 @@ pursuit action applies. With no distance-increasing escape tile, normal combat
 resumes, so an adjacent cornered monster fights back. Once outside aggro range,
 normal wandering rules apply. Invisible players retain ordinary detection rules.
 
-Wounded retreat stops while the player is invisible to that enemy. It resumes
-if the player becomes visible again while the HP threshold still applies.
-Crossing below the threshold on a surviving hit logs "Wounded <name> retreats!"
-once per crossing. Subsequent hits below the threshold do not repeat the message;
-fatal hits do not log retreat. Inspection shows Fleeing while the condition holds.
-Healing to 10% or higher ends it. The condition is derived from saved HP, maximum
-HP, and abilities, adding no persistent flag or save-version change. This is
-separate from rare-beast sighting flight and does not alter its rules.
+Wounded retreat stops while the player is invisible to that enemy. It resumes if
+the player becomes visible again while the HP threshold still applies. Crossing
+below the threshold on a surviving hit logs "Wounded <name> retreats!" once per
+crossing. Subsequent hits below the threshold do not repeat the message; fatal
+hits do not log retreat. Inspection shows Fleeing while the condition holds.
+Healing to 10% or higher ends it. The condition is derived from saved HP,
+maximum HP, and abilities, adding no persistent flag or save-version change.
+This is separate from rare-beast sighting flight and does not alter its rules.
 
 ## Thief
 
-Some humanoid monsters have "thief" ability.
-On each adjacent enemy turn (including diagonal adjacency), a visible player with an eligible backpack item
+Some humanoid monsters have "thief" ability. On each adjacent enemy turn
+(including diagonal adjacency), a visible player with an eligible backpack item
 has a **10%** chance to lose one randomly selected backpack entry. Equipped
-items are excluded; quest items are eligible. A selected stack loses exactly
-one unit. Entries have equal selection probability, regardless of stack size.
-A monster with no legal neighboring step that increases its Chebyshev distance
+items are excluded; quest items are eligible. A selected stack loses exactly one
+unit. Entries have equal selection probability, regardless of stack size. A
+monster with no legal neighboring step that increases its Chebyshev distance
 from the player is cornered and cannot attempt theft. Empty packs, invisibility,
-corners, and an already retreating monster consume no theft roll. Failed rolls permit normal combat and can
-retry next eligible turn; each monster can succeed only once.
+corners, and an already retreating monster consume no theft roll. Failed rolls
+permit normal combat and can retry next eligible turn; each monster can succeed
+only once.
 
 Success replaces the attack, logs “<name> has snatched <item> from you and runs
 away!”, and immediately grants one guaranteed escape step. Thereafter the thief
 reuses wounded retreat movement: one step per enemy turn, with a **10%** chance
-to hesitate. The special loot escape lasts **40 successful movement steps in total**
-(including the guaranteed first step), regardless of HP and aggro range while
-the player is visible. Hesitation, opened doors without movement, being cornered,
-invisibility, and off-level turns do not advance the counter. Losing sight of an
-invisible player suspends directed retreat without losing the loot or resetting
-the one-time theft. A cornered thief usually fights until it can escape again;
-under bow fire it can instead attempt a short, committed lateral detour around
-nearby obstacles. Actual movement on that detour counts toward the same
-40-step stolen-item escape budget; no extra free moves are granted.
+to hesitate. The special loot escape lasts **40 successful movement steps in
+total** (including the guaranteed first step), regardless of HP and aggro range
+while the player is visible. Hesitation, opened doors without movement, being
+cornered, invisibility, and off-level turns do not advance the counter. Losing
+sight of an invisible player suspends directed retreat without losing the loot
+or resetting the one-time theft. A cornered thief usually fights until it can
+escape again; under bow fire it can instead attempt a short, committed lateral
+detour around nearby obstacles. Actual movement on that detour counts toward the
+same 40-step stolen-item escape budget; no extra free moves are granted.
 
 On the 40th escape step, the thief anchors its home at the stopping tile and
 resumes normal wandering, aggro, and combat behavior from the following turn.
-The stolen item remains on the thief and the theft escape never restarts; ordinary
-low-HP fleeing can still apply to monsters with `flee`. Sacred-ground protection
-still prevents new thefts.
+The stolen item remains on the thief and the theft escape never restarts;
+ordinary low-HP fleeing can still apply to monsters with `flee`. Sacred-ground
+protection still prevents new thefts.
 
 A thief with an empty equipment slot immediately equips eligible stolen weapons,
 shields, or armor and logs "<name> has equipped <item>." Bows remain in the
-stolen loot bag unless the thief is an assigned arrow shooter. Monsters have one equipment slot;
-existing gear is never replaced by theft. Consumables and artifacts are carried
-without equipping. This uses the normal enemy equipment rules, including weapon
-ATK/GRACE, armor or shield DEF, and their usual speed penalty. Bonuses apply once,
-so a cornered thief can fight with the stolen gear. Death returns it through the
-bag only, without an additional equipment drop. Replacing that gear later through
-existing permadeath loot rules leaves the stolen item recoverable in its bag.
+stolen loot bag unless the thief is an assigned arrow shooter. Monsters have one
+equipment slot; existing gear is never replaced by theft. Consumables and
+artifacts are carried without equipping. This uses the normal enemy equipment
+rules, including weapon ATK/GRACE, armor or shield DEF, and their usual speed
+penalty. Bonuses apply once, so a cornered thief can fight with the stolen gear.
+Death returns it through the bag only, without an additional equipment drop.
+Replacing that gear later through existing permadeath loot rules leaves the
+stolen item recoverable in its bag.
 
 A red bag marks the carrier on the map in tiles and ASCII mode and in desktop
-and mobile inspection. Only dropped bags on the floor in tile mode use the shaded red bag SVG.
-Carrier map markers and desktop/mobile inspection retain the original flat
-red silhouette in both rendering modes; ASCII floor bags retain their existing drawing. Victory skull and Alarmed markers shift to avoid overlap.
-Killing it drops a bag at its exact map location; forage recovers the original
-item, preserving quest IDs and all other properties. Other monster loot is
-unchanged. Theft, random selection, hesitation, and movement resolve through
+and mobile inspection. Only dropped bags on the floor in tile mode use the
+shaded red bag SVG. Carrier map markers and desktop/mobile inspection retain the
+original flat red silhouette in both rendering modes; ASCII floor bags retain
+their existing drawing. Victory skull and Alarmed markers shift to avoid
+overlap. Killing it drops a bag at its exact map location; forage recovers the
+original item, preserving quest IDs and all other properties. Other monster loot
+is unchanged. Theft, random selection, hesitation, and movement resolve through
 seeded game rules before animation, so saves and replay preserve the outcome.
 
 ## Enrage
@@ -4766,19 +4841,21 @@ seeded game rules before animation, so saves and replay preserve the outcome.
 Orc, Minotaur, Owlbear, Lion, and GAUR have `enrage`. While alive and strictly
 below 30% of maximum HP, their melee ATK is multiplied by 1.25 before defense.
 At exactly 30%, the bonus does not apply. Healing to the threshold or higher
-ends enrage; entering the low-HP range again can trigger it again.
-The bonus combines multiplicatively with Charge and normal critical damage;
-an enraged Minotaur charging from the minimum three-tile distance uses `base ATK * 1.25 * 1.5`.
-Ranged projectile ATK and XP rewards remain unchanged.
+ends enrage; entering the low-HP range again can trigger it again. The bonus
+combines multiplicatively with Charge and normal critical damage; an enraged
+Minotaur charging from the minimum three-tile distance uses
+`base ATK * 1.25 * 1.5`. Ranged projectile ATK and XP rewards remain unchanged.
 
 Crossing the threshold after an attack logs "Pain drives <name> into a rage!".
-Healing out of enrage logs that its rage subsides. Fatal hits do not trigger
-an enrage message, and subsequent hits below the threshold do not repeat it.
-Each live threshold crossing also shows red rising **Enraged!** text for one
-second after a short delay so it remains readable beside damage numbers.
-The effect appears in tile and ASCII modes and is skipped during replay simulation.
-Enraged creatures have a red outline in tile and ASCII modes. Inspection shows
-Enraged (ATK +25%) and their current effective ATK on desktop and mobile.
+Healing out of enrage logs that its rage subsides. Fatal hits do not trigger an
+enrage message, and subsequent hits below the threshold do not repeat it. Each
+live threshold crossing also shows red rising **Enraged!** text for one second
+after a short delay so it remains readable beside damage numbers. The effect
+appears in tile and ASCII modes and is skipped during replay simulation. Enraged
+creatures have a dashed amber inner outline in tile and ASCII modes, independent
+of awareness. The solid red outline remains reserved for active pursuit; both
+outlines appear if a creature is enraged and aware. Inspection shows Enraged
+(ATK +25%) and current effective ATK on desktop and mobile.
 
 Enrage is derived from current HP, maximum HP, and the saved abilities array;
 base ATK is never mutated. Save/load and replay therefore restore it directly,
@@ -4801,17 +4878,17 @@ push moves the player out of melee range, weapon-timing extra attacks cannot
 follow. A blocked push leaves normal melee timing unchanged.
 
 Forced water entry applies normal drowning immediately and grants no swimming
-practice or walking progress. Visibility and camera position refresh immediately.
-The ability uses existing enemy ability serialization and replay, with no new
-persistent flag or save-version change.
+practice or walking progress. Visibility and camera position refresh
+immediately. The ability uses existing enemy ability serialization and replay,
+with no new persistent flag or save-version change.
 
 ## Wrestler
 
-Sasquatch, Yeti, Owlbear and Marsutal have `wrestler`. When they could otherwise melee
-an adjacent, visible player, they have a **25%** chance to exchange tiles with
-the player instead of attacking; both cardinal and diagonal adjacency count.
-A successful swap starts a **five-turn cooldown**: the next five enemy turns
-cannot activate Wrestler. Failed rolls do not start cooldown. The ability
+Sasquatch, Yeti, Owlbear and Marsutal have `wrestler`. When they could otherwise
+melee an adjacent, visible player, they have a **25%** chance to exchange tiles
+with the player instead of attacking; both cardinal and diagonal adjacency
+count. A successful swap starts a **five-turn cooldown**: the next five enemy
+turns cannot activate Wrestler. Failed rolls do not start cooldown. The ability
 cannot activate against an invisible/holy-ground-protected player, during
 passive or summoned-inactive turns, or when a valid two-way swap is impossible.
 The displaced player must be allowed onto the monster's tile; in particular,
@@ -4841,13 +4918,13 @@ No RNG is consumed while invisible, cooling down, idle/passive, or while the
 player is protected by invisibility or the Temple sanctuary. Existing evasion
 and theft abilities remain available.
 
-Invisible monsters still occupy their physical tile, move, take damage, and
-obey ordinary AI/terrain rules. Only on the **activation turn**, a monster within two tiles can show a
-translucent shimmer. On subsequent invisible turns it is entirely hidden,
-regardless of distance, and cannot be inspected via hover/tap. Players may
-still bump its occupied tile to attempt an attack; invisible targets have at
-least **80% miss chance**, regardless of relative SPD. A miss does not reveal
-the monster, while a successful hit breaks its invisibility. Invisible
+Invisible monsters still occupy their physical tile, move, take damage, and obey
+ordinary AI/terrain rules. Only on the **activation turn**, a monster within two
+tiles can show a translucent shimmer. On subsequent invisible turns it is
+entirely hidden, regardless of distance, and cannot be inspected via hover/tap.
+Players may still bump its occupied tile to attempt an attack; invisible targets
+have at least **80% miss chance**, regardless of relative SPD. A miss does not
+reveal the monster, while a successful hit breaks its invisibility. Invisible
 monsters do not generate the "has spotted you" log. The monster also reveals
 itself before its own attack or a theft attempt, including unsuccessful ones.
 Expiry produces a message; activation and revealing produce a floating text
@@ -4867,14 +4944,14 @@ straight-line abilities; it is not a third ability. While the player is visible
 and within current aggro range, an aligned target at distance **three or more**
 can trigger Charge; Pull requires **two or more** tiles. The monster's aggro
 range remains the maximum distance for either ability. Alignment is horizontal,
-vertical, or an exact diagonal.
-For Charge, every tile on the line must be walkable `grass`, `cavefloor`,
-`cavefloor2`, or `marble`, allowing Boars and Minotaurs to charge in caves and
-Dwarven floors as well as on grass. Pull uses the same terrain set and additionally
-allows `sand`, so Giant Spiders retain their broader surface coverage. Trees,
-other creatures, NPCs, walls, water, furniture, and other non-eligible terrain
-still break the line. Diagonal routes cannot cut blocked corners. There is no
-additional distance cap beyond aggro range. Invalid routes use no RNG.
+vertical, or an exact diagonal. For Charge, every tile on the line must be
+walkable `grass`, `cavefloor`, `cavefloor2`, or `marble`, allowing Boars and
+Minotaurs to charge in caves and Dwarven floors as well as on grass. Pull uses
+the same terrain set and additionally allows `sand`, so Giant Spiders retain
+their broader surface coverage. Trees, other creatures, NPCs, walls, water,
+furniture, and other non-eligible terrain still break the line. Diagonal routes
+cannot cut blocked corners. There is no additional distance cap beyond aggro
+range. Invalid routes use no RNG.
 
 Charge has a 60% chance per eligible turn. The monster crosses the gap and stops
 adjacent, then makes one melee attack with half the usual dodge chance. Before
@@ -4892,45 +4969,50 @@ This timing is cosmetic and does not change the number of turns, RNG, combat,
 or the resolved enemy position.
 
 Pull has a 70% chance to connect. The web drags the player onto the eligible
-floor tile adjacent to the spider, followed by one ordinary melee attack. The attack can
-miss normally and gains no damage bonus. Both abilities replace normal movement
-and allow no extra weapon-timing attacks or speed pursuit actions that turn.
-There is no cooldown or use limit; fleeing along a clear eligible line remains risky.
+floor tile adjacent to the spider, followed by one ordinary melee attack. The
+attack can miss normally and gains no damage bonus. Escape Artist shortens
+web-flavored Pull (see Wayfaring); the spider attacks only if the final legal
+destination is adjacent. Immovable still prevents Pull entirely. Non-web grasp
+retains its normal distance. Both abilities replace normal movement and allow no
+extra weapon-timing attacks or speed pursuit actions that turn. There is no
+cooldown or use limit; fleeing along a clear eligible line remains risky.
 
-Forced player movement refreshes visibility and camera position, grants no steps,
-swimming practice, or voluntary-movement quest progress, and does not collect
-items or trigger transitions. Forced water entry consumes water endurance and
-can immediately cause normal drowning damage. Combat and relocation resolve
-synchronously; animations never determine rules or RNG. Successful Pull visually
-throws the cave-web graphic toward the original player tile for **260 ms** (formerly 420 ms), then
-drags the player to the resolved destination over **360 ms**. Once the web lands,
-a large **1.35-tile** web graphic covers the player above the character sprite
-and surrounding canopies. It stays visible through combat and waits until the
-player actually changes tile or kills the Giant Spider responsible for the web;
-attacking, waiting, and using an item do not remove it. This overlay does not
-root or penalize the player. The source monster ID persists in saves and replay
-snapshots, so loading preserves the web and its death-based removal, while
-projectile/pull timing remains presentation-only. The melee lunge and
-damage text follow the drag. If Pull triggers after the player's own step,
-the web-and-drag presentation takes priority over the ordinary walking pan:
-the player remains visually at the web's target tile until it arrives, then
-slides toward the spider. The final position and damage are already resolved
-for the turn, regardless of animation timing. ASCII uses a moving `%` web glyph.
-Replay simulation skips the presentation, and no animation state is saved.
-Existing abilities and swimming state are saved and replayed normally, with
-no new persistent flag.
+Forced player movement refreshes visibility and camera position, grants no
+steps, swimming practice, or voluntary-movement quest progress, and does not
+collect items or trigger transitions. Forced water entry consumes water
+endurance and can immediately cause normal drowning damage. Combat and
+relocation resolve synchronously; animations never determine rules or RNG.
+Successful Pull visually throws the cave-web graphic toward the original player
+tile for **260 ms** (formerly 420 ms), then drags the player to the resolved
+destination over **360 ms**. Once the web lands, a large **1.35-tile** web
+graphic covers the player above the character sprite and surrounding canopies.
+It stays visible through combat and waits until the player actually changes tile
+or kills the Giant Spider responsible for the web; attacking, waiting, and using
+an item do not remove it. This overlay does not root or penalize the player. The
+source monster ID persists in saves and replay snapshots, so loading preserves
+the web and its death-based removal, while projectile/pull timing remains
+presentation-only. The melee lunge and damage text follow the drag. Escape
+Artist resistance feedback appears after the Web! impact popup has fully faded;
+the combat log and pull resolution remain immediate. If Pull triggers after the
+player's own step, the web-and-drag presentation takes priority over the
+ordinary walking pan: the player remains visually at the web's target tile until
+it arrives, then slides toward the spider. The final position and damage are
+already resolved for the turn, regardless of animation timing. ASCII uses a
+moving `%` web glyph. Replay simulation skips the presentation, and no animation
+state is saved. Existing abilities and swimming state are saved and replayed
+normally, with no new persistent flag.
 
 ## Summoning
 
-Templates with `summon` in `abilities` specify `summonSpecies` and `summonAmount`,
-and may specify `summonSpeciesOptions` to choose one species for the entire cast,
-with optional `summonStrength` (defaults to 1) and `summonMsg`. On each active
-aggro turn, the monster has one 10% seeded chance to summon instead of its
-normal attack, shot, or chase. It can succeed only once in its lifetime.
-Being out of melee range does not prevent a roll. Losing sight/concealment,
-invisibility, passive behavior, and sacred-ground or rare-beast fleeing use
-their normal non-combat paths without summon rolls. Extra attacks or pursuit
-actions do not create additional summon rolls that turn.
+Templates with `summon` in `abilities` specify `summonSpecies` and
+`summonAmount`, and may specify `summonSpeciesOptions` to choose one species for
+the entire cast, with optional `summonStrength` (defaults to 1) and `summonMsg`.
+On each active aggro turn, the monster has one 10% seeded chance to summon
+instead of its normal attack, shot, or chase. It can succeed only once in its
+lifetime. Being out of melee range does not prevent a roll. Losing
+sight/concealment, invisibility, passive behavior, and sacred-ground or
+rare-beast fleeing use their normal non-combat paths without summon rolls. Extra
+attacks or pursuit actions do not create additional summon rolls that turn.
 
 | Summoner | Summoned species | Count roll | HP/ATK/DEF multiplier |
 |---|---|---|---|
@@ -4944,34 +5026,34 @@ apply. Roll the count uniformly, then reduce it to available space. If no tile
 fits, the summoner keeps its ability and performs its normal action instead.
 Successful placement consumes the summon and the summoner's action.
 
-All summoned stats come directly from the named species template, independent
-of the summoner's prefix, gear, damage, or victory bonuses. Only HP, ATK, and DEF
+All summoned stats come directly from the named species template, independent of
+the summoner's prefix, gear, damage, or victory bonuses. Only HP, ATK, and DEF
 scale with `summonStrength`, rounded to the nearest integer; HP and ATK have a
 minimum of 1, DEF a minimum of 0. SPD and GRACE are unchanged. Summons have no
 gear or prefixes. They copy template abilities except `summon`, preventing
 recursive Wolf packs. Skeletons retain their normal shooter assignment chance.
-The Lich's chosen species is shared by the entire group; Ghouls use their
-normal template stats.
+The Lich's chosen species is shared by the entire group; Ghouls use their normal
+template stats.
 
 Summons inherit level, level kind, and cave identity. They become Alarmed
-immediately on creation, using the normal Alarmed lifetime and AGGRO bonus;
-this also prevents invisible opening-critical bonuses against them. They cannot attack in
-the creation turn, including through immediate retaliation or ranged attacks;
-they may act on the next enemy turn. Placement and rules resolve before visual
-effects. A floating Summoned! marker and a log show the actual spawned count. The
-marker uses a **1000 ms** animation rather than the ordinary **650 ms** combat-text
-lifetime so the label remains readable; this is presentation-only and does not
-delay the summon action or monster turns. Lich and Serpent Queen use the default
-hand-wave message; Wolf uses its custom
+immediately on creation, using the normal Alarmed lifetime and AGGRO bonus; this
+also prevents invisible opening-critical bonuses against them. They cannot
+attack in the creation turn, including through immediate retaliation or ranged
+attacks; they may act on the next enemy turn. Placement and rules resolve before
+visual effects. A floating Summoned! marker and a log show the actual spawned
+count. The marker uses a **1000 ms** animation rather than the ordinary **650
+ms** combat-text lifetime so the label remains readable; this is
+presentation-only and does not delay the summon action or monster turns. Lich
+and Serpent Queen use the default hand-wave message; Wolf uses its custom
 hungry-howl message. Messages support `<name>`, `<amount>`, and `<species>`.
 
 Summons use normal XP and species loot rules. With the existing stat-based XP
-formula, an unprefixed summoned Wolf yields **14 XP**, versus **16 XP**
-for a normal Wolf (up from **11 XP** at 0.3 strength). The summoner's
-`summonUsed` flag and each summoned creature's `summonedTurn` initialize explicitly,
-persist in current saves and replay initial states, and restore exactly.
-Re-entering levels and loading never reset the once-only summon. Saves also
-preserve an explicit GRACE value when present. Older save formats are rejected.
+formula, an unprefixed summoned Wolf yields **14 XP**, versus **16 XP** for a
+normal Wolf (up from **11 XP** at 0.3 strength). The summoner's `summonUsed`
+flag and each summoned creature's `summonedTurn` initialize explicitly, persist
+in current saves and replay initial states, and restore exactly. Re-entering
+levels and loading never reset the once-only summon. Saves also preserve an
+explicit GRACE value when present. Older save formats are rejected.
 
 Artifact **Soul Eater** uses the same summoning construction and occupancy
 rules but summons a hostile Ghost derived from a slain humanoid, not a loyal
@@ -5035,35 +5117,37 @@ not advance monster effects. Poison can kill monsters, awarding normal XP,
 kill credit and loot. The budget and tick damage are fixed at application,
 independently of subsequent maximum-HP changes.
 
-Scorpion, Manticore, Wyvern, Alacran and Xibal have the `poison` ability. Each melee hit
-dealing positive non-glancing damage has a 30% seeded chance to poison a surviving
-player, including extra attacks. Misses, glancing hits, zero-damage hits,
-and ranged attacks do not apply poison. No poison RNG is used for other enemies.
+Scorpion, Manticore, Wyvern, Alacran and Xibal have the `poison` ability. Each
+melee hit dealing positive non-glancing damage has a 30% seeded chance to poison
+a surviving player, including extra attacks. Misses, glancing hits, zero-damage
+hits, and ranged attacks do not apply poison. No poison RNG is used for other
+enemies.
 
 **Poison on the player** retains its separate duration formula, calculated
 at application from current effective maximum HP:
 
 `max(1, round(min(40, floor(maxHP × 0.20)) × (0.90 + RNG × 0.20)))`
 
-For 100 maximum HP this gives 18–22 turns; at 200+ HP it gives 36–44 turns.
-The variation applies after the base cap. A new application replaces the remaining
+For 100 maximum HP this gives 18–22 turns; at 200+ HP it gives 36–44 turns. The
+variation applies after the base cap. A new application replaces the remaining
 duration with a fresh roll, without stacking damage. Later max-HP changes do not
 recalculate existing poison.
 
 Poison deals 1 HP at the start of each subsequent enemy turn, before freezing
 and regeneration. It remains active while waiting, invisible, on temple ground,
-or after changing levels. Entering Temple ground cures it. It can kill; death is recorded as poison and clears
-the status without crediting a monster victory. The application itself causes
-no immediate poison damage.
+or after changing levels. Entering Temple ground cures it. It can kill; death is
+recorded as poison and clears the status without crediting a monster victory.
+The application itself causes no immediate poison damage.
 
 Healing Herb and Life Potion logs describe the consumed item and healing first,
 then confirm that poison leaves the body. Poison application and refresh logs
-omit duration; the active-status counter still shows remaining turns.
-Eating a Healing Herb or drinking a Life Potion clears poison before consuming
-the item's turn, including at full HP. Temple ground and Homecoming also cure poison; other healing does not.
-Enemies may poison the player again during that turn's response. Application,
-refresh, damage, cure, and natural expiry have message logs. The active-status
-strip shows Poisoned with turns remaining and explains its cure.
+omit duration; the active-status counter still shows remaining turns. Eating a
+Healing Herb or drinking a Life Potion clears poison before consuming the item's
+turn, including at full HP. Temple ground and Homecoming also cure poison; other
+healing does not. Enemies may poison the player again during that turn's
+response. Application, refresh, damage, cure, and natural expiry have message
+logs. The active-status strip shows Poisoned with turns remaining and explains
+its cure.
 
 The player's remaining poison turns and each monster's remaining damage
 budget, per-turn damage, derived turn counter and application turn persist in
@@ -5073,76 +5157,80 @@ timing.
 
 ## Humanoid
 
-Humanoid enemies wear randomly assigned gear (weapon/armor/shield) which they drop on death.
-All enemies have natural GRACE and can take part in grace checks while unarmed;
-an equipped enemy weapon overrides natural GRACE. A non-Buckler shield or an armor with `gracePenalty: 1`
-lowers an equipped enemy's natural GRACE by 1 for combat timing (minimum 1).
-This makes armed and unarmed combat more varied, allowing the more graceful combatant to strike twice.
-The player must still wield a weapon to take part in grace checks.
+Humanoid enemies wear randomly assigned gear (weapon/armor/shield) which they
+drop on death. All enemies have natural GRACE and can take part in grace checks
+while unarmed; an equipped enemy weapon overrides natural GRACE. A non-Buckler
+shield or an armor with `gracePenalty: 1` lowers an equipped enemy's natural
+GRACE by 1 for combat timing (minimum 1). This makes armed and unarmed combat
+more varied, allowing the more graceful combatant to strike twice. The player
+must still wield a weapon to take part in grace checks.
 
 ## Ranged shooter variants
 
-Selected species can roll a ranged combat role when the enemy instance is created.
-The role is instance state, not a separate species and not an inherent attack used by
-every member of that template. Eligible templates declare either `shooterStones` or
-`shooterArrows` in their `abilities` array; the shared chance and projectile tuning
-live in `content/enemy_config.json`.
+Selected species can roll a ranged combat role when the enemy instance is
+created. The role is instance state, not a separate species and not an inherent
+attack used by every member of that template. Eligible templates declare either
+`shooterStones` or `shooterArrows` in their `abilities` array; the shared chance
+and projectile tuning live in `content/enemy_config.json`.
 
 | Eligible species | Projectile | Projectile ATK |
 |---|---|---:|
 | Monkey, Goblin | Stone | 3 |
 | Kobold, Lizard Man, Nymph, Centaur, Skeleton | Arrow | 5 |
 
-Each eligible spawn has a **50%** seeded-RNG chance to become a shooter and starts
-with **10 shots**. Shooter role and exact remaining ammunition persist with the
-enemy. A shooter must spend one enemy action switching between its projectile
-weapon and melee weapon, announcing the ordinary weapon type without revealing
-equipment modifiers. The current mode is saved and restored; merely switching
-does not spend ammunition or attack. A fired projectile always consumes one
-shot, including dodges and glancing hits. A blocked line consumes no
-ammunition. At zero shots the bow indicator
-disappears and the enemy immediately uses its ordinary species AI on later turns.
-On death, an enemy assigned `shooterArrows` drops exactly its remaining
-arrows, logging the amount when positive. It also has a **25%** seeded chance
-to drop a Short Bow; stone throwers cannot drop bows or arrows through this
-rule. Adjacent kills grant this loot directly, while distant kills leave it on
-the enemy's tile for collection (see §43).
+Each eligible spawn has a **50%** seeded-RNG chance to become a shooter and
+starts with **10 shots**. Shooter role and exact remaining ammunition persist
+with the enemy. A shooter must spend one enemy action switching between its
+projectile weapon and melee weapon, announcing the ordinary weapon type without
+revealing equipment modifiers. The current mode is saved and restored; merely
+switching does not spend ammunition or attack. A fired projectile always
+consumes one shot, including dodges and glancing hits. A blocked line consumes
+no ammunition. At zero shots the bow indicator disappears and the enemy
+immediately uses its ordinary species AI on later turns. On death, an enemy
+assigned `shooterArrows` drops exactly its remaining arrows, logging the amount
+when positive. It also has a **25%** seeded chance to drop a Short Bow; stone
+throwers cannot drop bows or arrows through this rule. Adjacent kills grant this
+loot directly, while distant kills leave it on the enemy's tile for collection
+(see §43).
 
-Ranged attacks ignore the monster's ordinary/equipment/prefix-modified ATK and use
-only projectile ATK. GRACE does not participate. DEF mitigation, monster critical
-chance/multiplier and armor glancing use the normal combat rules. Ranged dodge is:
+Ranged attacks ignore the monster's ordinary/equipment/prefix-modified ATK and
+use only projectile ATK. GRACE does not participate. DEF mitigation, monster
+critical chance/multiplier and armor glancing use the normal combat rules.
+Ranged dodge is:
 
 ```text
 min(100%, normal melee dodge chance × 2)
 ```
 
-A genuine non-glancing ranged hit deals at least 1 damage after ordinary mitigation;
-a glancing hit may remain at 0. Critical and glancing outcomes are mutually exclusive.
-Shooter prefixes still modify their normal stats and melee behavior, but do not change
-the fixed projectile ATK. While ammunition remains, desktop/mobile inspection marks
-the equipped attack mode (`🏹` for ranged, `⚔` for melee); the marker disappears
-at zero shots.
+A genuine non-glancing ranged hit deals at least 1 damage after ordinary
+mitigation; a glancing hit may remain at 0. Critical and glancing outcomes are
+mutually exclusive. Shooter prefixes still modify their normal stats and melee
+behavior, but do not change the fixed projectile ATK. While ammunition remains,
+desktop/mobile inspection marks the equipped attack mode (`🏹` for ranged, `⚔`
+for melee); the marker disappears at zero shots.
 
 Multiple ordinary shooters attacking during one enemy turn present their
-projectiles as a simultaneous volley. Melee strikes and spells interrupt a volley
-and keep their ordinary presentation order. All ranged hits, dodges, ammunition,
-fatal outcomes, logging and RNG still resolve sequentially and deterministically
-before animation; a lethal shot prevents later attackers from acting. A shared
-volley of dodged shots uses one visible recoil rather than stacking displacements.
-The projectile-dodge recoil lasts **108 ms**, beginning at most **84 ms** before
-impact, without changing the probability of a dodge.
+projectiles as a simultaneous volley. Melee strikes and spells interrupt a
+volley and keep their ordinary presentation order. All ranged hits, dodges,
+ammunition, fatal outcomes, logging and RNG still resolve sequentially and
+deterministically before animation; a lethal shot prevents later attackers from
+acting. A shared volley of dodged shots uses one visible recoil rather than
+stacking displacements. The projectile-dodge recoil lasts **108 ms**, beginning
+at most **84 ms** before impact, without changing the probability of a dodge.
 
 ## Deadly
 
-The Deadly enemy prefix raises critical-hit chance to 15%. Critical hits double damage.
+The Deadly enemy prefix raises critical-hit chance to 15%. Critical hits double
+damage.
 
 ## Carrion Instinct and sleeping Wyverns
 
 Vulture, Hyena, Jackal and Chupacabra have `carrionInstinct`. While the living
 player is strictly below 20% of current maximum HP, they gain +1 effective AGGRO
 and multiply ATK by 1.25, after gang power and enrage. At exactly 20% the effect
-is inactive. These derived effects never mutate saved base stats. Enemy tooltips display Carrion Instinct **only while the threshold is met**;
-otherwise the ability is hidden, including its inactive description.
+is inactive. These derived effects never mutate saved base stats. Enemy tooltips
+display Carrion Instinct **only while the threshold is met**; otherwise the
+ability is hidden, including its inactive description.
 
 Wyverns spawn asleep with 25% probability on walkable dry ground, never water,
 river or lava. Sleeping Wyverns are grounded, stationary, marked `zzz`, and use
@@ -5216,16 +5304,16 @@ Current prefixes:
 - Rabid
 - Champion
 
-On the game canvas, a prefixed enemy keeps its original tier-colored letter.
-The letter comes from the final word of `baseName` (or the display name for
-legacy enemies without one), so multiword monster names retain the right
-initial after a prefix (for example, Tough Giant Rat uses `r`).
-`content/rendering.json` supplies a distinct translucent color for each prefix
-in a one-tile radius (3×3 square), with a two-tile radius (5×5 square) for
-gold Champions. The outer Champion tiles are fainter. The tile-mode circular
-backing uses the same prefix color; unprefixed monsters retain a neutral backing.
-The overlay is drawn below all enemy glyphs, moves tile by tile with its owner, 
-and does not reveal undiscovered underground tiles or change stats, terrain, or save data.
+On the game canvas, a prefixed enemy keeps its original tier-colored letter. The
+letter comes from the final word of `baseName` (or the display name for legacy
+enemies without one), so multiword monster names retain the right initial after
+a prefix (for example, Tough Giant Rat uses `r`). `content/rendering.json`
+supplies a distinct translucent color for each prefix in a one-tile radius (3×3
+square), with a two-tile radius (5×5 square) for gold Champions. The outer
+Champion tiles are fainter. The tile-mode circular backing uses the same prefix
+color; unprefixed monsters retain a neutral backing. The overlay is drawn below
+all enemy glyphs, moves tile by tile with its owner, and does not reveal
+undiscovered underground tiles or change stats, terrain, or save data.
 
 Examples:
 
@@ -5381,24 +5469,35 @@ pathfinding as mining investigation. Walls do not attenuate sound but still
 block movement. It creates no enemies and reveals no hidden listeners.
 Refueling, cooking and resting do not repeat the ignition noise.
 
-**Mining noise.** The atmospheric message about blows echoing through the
-shafts is shown only underground, never when clearing surface boulders. The
-underlying sound, hearing and investigation mechanics still apply on the surface.
-Each confirmed Pickaxe strike can be heard by non-passive
-monsters within **25 Euclidean tiles** on the same floor. Walls do not attenuate
-the sound. For distance `d`, base hearing chance is
-`max(0.03, 0.90 × (1 − d / 25)²)` up to the 25-tile limit; Blind monsters
-receive a 25% relative bonus, capped at 90%. Hearing causes Alarmed status.
-Independently, 40% of successful listeners investigate the **strike location**
-for a seeded random **2–6 ordinary movement turns**, one tile per normal
-turn and only along legal paths. Repeated sounds may replace that destination
-but do not accumulate unlimited investigation steps. Sight and ordinary combat
-take precedence; sound alone does not grant knowledge of the player's location
-or trigger Collective Mind. A monster trapped behind a sealed pocket wall may
-respond to the sound but cannot cross the wall. Noise-induced pursuit is visible
-when it actually enters view, without revealing offscreen listeners in the log.
+**Mining noise.** The atmospheric message about blows echoing through the shafts
+is shown only underground, never when clearing surface boulders. The underlying
+sound, hearing and investigation mechanics still apply on the surface. Each
+confirmed Pickaxe strike can be heard by non-passive monsters within **25
+Euclidean tiles** on the same floor. Walls do not attenuate the sound. For
+distance `d`, base hearing chance is `max(0.03, 0.90 × (1 − d / 25)²)` up to the
+25-tile limit; Blind monsters receive a 25% relative bonus, capped at 90%.
+Hearing causes Alarmed status. Independently, 40% of successful listeners
+investigate the **strike location** for a seeded random **2–6 ordinary movement
+turns**, one tile per normal turn and only along legal paths. Repeated sounds
+may replace that destination but do not accumulate unlimited investigation
+steps. Sight and ordinary combat take precedence; sound alone does not grant
+knowledge of the player's location or trigger Collective Mind. A monster trapped
+behind a sealed pocket wall may respond to the sound but cannot cross the wall.
+Noise-induced pursuit is visible when it actually enters view, without revealing
+offscreen listeners in the log.
 
-On the surface, standing in an enemy's aggro range triggers pursuit. Underground, a new target still needs a clear line of sight through walls, unless the monster is already Alarmed by noise or combat. Once a monster has seen the player or become Alarmed, it keeps pathfinding around walls and corners for as long as the player stays within its current effective AGGRO range, even without line of sight. Alarmed monsters do not randomly abandon pursuit at the outer range boundary, but can be outpaced through the SPD disengagement rule below. Losing range ends active pursuit; the existing Alarmed status otherwise expires under its 20-tile/level-change rules. Invisibility, Halfling forest concealment, sanctuary, and the ordinary projectile line-of-sight rules still apply. Merely hearing an alarm through a wall does not produce a false spotting message.
+On the surface, standing in an enemy's aggro range triggers pursuit.
+Underground, a new target still needs a clear line of sight through walls,
+unless the monster is already Alarmed by noise or combat. Once a monster has
+seen the player or become Alarmed, it keeps pathfinding around walls and corners
+for as long as the player stays within its current effective AGGRO range, even
+without line of sight. Alarmed monsters do not randomly abandon pursuit at the
+outer range boundary, but can be outpaced through the SPD disengagement rule
+below. Losing range ends active pursuit; the existing Alarmed status otherwise
+expires under its 20-tile/level-change rules. Invisibility, Halfling forest
+concealment, sanctuary, and the ordinary projectile line-of-sight rules still
+apply. Merely hearing an alarm through a wall does not produce a false spotting
+message.
 
 ### Reactions to player bow shots
 
@@ -5421,22 +5520,22 @@ reach the player also seeks escape. Fear spells, sanctuary, wounded flight,
 and rare-creature abilities retain their separate rules.
 
 Retreat is allowed only when the monster can reach safety **on its very next
-step**. The chosen adjacent tile must block the player's projectile line of
-fire (for example, terrain behind a wall or tree) or be **outside the equipped
-bow's firing range**. It must be traversable immediately, without first opening
-a door, and the monster does not step closer to the player to escape. Distant
+step**. The chosen adjacent tile must block the player's projectile line of fire
+(for example, terrain behind a wall or tree) or be **outside the equipped bow's
+firing range**. It must be traversable immediately, without first opening a
+door, and the monster does not step closer to the player to escape. Distant
 cover and out-of-range tiles **do not count** when reaching them would require
-even one exposed movement turn: the archer could keep firing while it fled.
-The monster prefers immediate terrain cover over stepping outside bow range.
-Prison bars never count as projectile cover. If no immediately safe retreat is
-available, the humanoid normally fights or pursues when an approach route exists.
-Two bounded desperation behaviors are exceptions, **not safe escapes**:
+even one exposed movement turn: the archer could keep firing while it fled. The
+monster prefers immediate terrain cover over stepping outside bow range. Prison
+bars never count as projectile cover. If no immediately safe retreat is
+available, the humanoid normally fights or pursues when an approach route
+exists. Two bounded desperation behaviors are exceptions, **not safe escapes**:
 
-- An **unarmed or out-of-ammunition humanoid trapped without a melee route**
-  can spend ordinary turns moving away, even if the intermediate squares are
+- An **unarmed or out-of-ammunition humanoid trapped without a melee route** can
+  spend ordinary turns moving away, even if the intermediate squares are
   exposed. It follows a short reachable path toward bow range's edge, stopping
-  at the farthest available position if its enclosure prevents full escape.
-  It does not pace back toward the player or flee indefinitely across open ground.
+  at the farthest available position if its enclosure prevents full escape. It
+  does not pace back toward the player or flee indefinitely across open ground.
 - A **cornered thief** can risk a short sideways detour to get around a wall
   or the archer. It commits to that route instead of alternating a forward and
   backward step. If the detour fails or its limited moves are spent, it fights.
@@ -5446,10 +5545,11 @@ Both detours require legal walkable tiles and are abandoned when blocked;
 they use no extra actions or unseeded decisions. If the creature has no firing
 lane, approach route or useful retreat, it remains trapped.
 
-A monster may use one immediate step beyond bow range to escape a shot, but cannot chain repeated
-out-of-range moves when the player follows: it then seeks actual terrain cover
-or turns to pursue, including a pursuit step outside its ordinary AGGRO range.
-This avoids unproductive open-field chases without a random fleeing timeout.
+A monster may use one immediate step beyond bow range to escape a shot, but
+cannot chain repeated out-of-range moves when the player follows: it then seeks
+actual terrain cover or turns to pursue, including a pursuit step outside its
+ordinary AGGRO range. This avoids unproductive open-field chases without a
+random fleeing timeout.
 
 A monster that reaches safety holds that position while the Short Bow stays
 equipped; moving the player to regain a shot makes it seek another immediately
@@ -5469,13 +5569,13 @@ does not establish a persistent chase outside it. Only the shot target reacts
 this way, without additional RNG; the same steps occur in replay.
 
 Movement occupancy is scoped to the currently active map (current z level),
-including NPCs only on the surface. Creatures on different floors may share x/y coordinates without
-blocking each other's paths; same-floor creatures still block movement.
-The active occupancy set is rebuilt after world generation, floor changes,
-save/replay restoration, and before each enemy response. This clears any stale
-blocked coordinates after deaths, burrows or forced movement, so an aware
-monster cannot remain stranded by a creature that is no longer there. These
-reconciliations consume no RNG and need no persistent status.
+including NPCs only on the surface. Creatures on different floors may share x/y
+coordinates without blocking each other's paths; same-floor creatures still
+block movement. The active occupancy set is rebuilt after world generation,
+floor changes, save/replay restoration, and before each enemy response. This
+clears any stale blocked coordinates after deaths, burrows or forced movement,
+so an aware monster cannot remain stranded by a creature that is no longer
+there. These reconciliations consume no RNG and need no persistent status.
 
 Any enemy that attacks the player becomes aggroed (shown as a red border
 around the enemy) in the same turn, even if the enemy's aggro range is very
@@ -5487,11 +5587,11 @@ reduces effective enemy detection range by 1.
 
 ### Shooter combat decisions
 
-Shooting is part of the normal awareness/chase lifecycle rather than a separate AI
-mode. Special/forced behavior (passive monsters, invisibility handling, Temple
-fleeing, etc.) remains higher priority. Once normal pursuit is valid, a shooter with
-ammunition uses this order with the monster's **current effective AGGRO**, including
-Alarmed and racial/world modifiers:
+Shooting is part of the normal awareness/chase lifecycle rather than a separate
+AI mode. Special/forced behavior (passive monsters, invisibility handling,
+Temple fleeing, etc.) remains higher priority. Once normal pursuit is valid, a
+shooter with ammunition uses this order with the monster's **current effective
+AGGRO**, including Alarmed and racial/world modifiers:
 
 ```text
 adjacent -> normal melee
@@ -5501,126 +5601,160 @@ inside range but blocked/no shooter FOV -> normal chase
 zero ammunition -> completely normal monster behavior
 ```
 
-A shooter without `trueSight` never fires at an invisible player and never kites/backpedals.
-The outer-boundary chase restriction applies to ordinary shooter turns; immediate
-return fire after a valid player bow shot remains a separate, higher-priority reaction. Existing
-extra pursuit behavior may still produce the same move-then-attack style sequence the
-normal AI already permits, but a ranged attack itself does not grant another action.
+A shooter without `trueSight` never fires at an invisible player and never
+kites/backpedals. The outer-boundary chase restriction applies to ordinary
+shooter turns; immediate return fire after a valid player bow shot remains a
+separate, higher-priority reaction. Existing extra pursuit behavior may still
+produce the same move-then-attack style sequence the normal AI already permits,
+but a ranged attack itself does not grant another action.
 
-Shooter visibility uses the deterministic sight-line geometry in `src/fov.js`; normal
-AGGRO still supplies the distance boundary. A clear projectile line is an additional,
-separate requirement. The same deterministic tile line is used for collision and the
-visual projectile. Intermediate projectile blockers include forest/ancient forest/
-taiga, grassland trees, hills (unless the shooter stands on a hill), walls, mountains,
-boulders, columns/statues, closed dwarven doors and other solid structures. Open doors
-do not block shots. The attacker's own tile and the
-player's target tile are not rejected merely for being forest/hill. Living ground
-monsters and NPCs between attacker and target block the shot; flying creatures do not.
-Blocked shots cause ordinary chase/pathfinding, with no friendly fire and no ammunition
-loss.
+Shooter visibility uses the deterministic sight-line geometry in `src/fov.js`;
+normal AGGRO still supplies the distance boundary. A clear projectile line is an
+additional, separate requirement. The same deterministic tile line is used for
+collision and the visual projectile. Intermediate projectile blockers include
+forest/ancient forest/ taiga, grassland trees, hills (unless the shooter stands
+on a hill), walls, mountains, boulders, columns/statues, closed dwarven doors
+and other solid structures. Open doors do not block shots. The attacker's own
+tile and the player's target tile are not rejected merely for being forest/hill.
+Living ground monsters and NPCs between attacker and target block the shot;
+flying creatures do not. Blocked shots cause ordinary chase/pathfinding, with no
+friendly fire and no ammunition loss.
 
 ### Forest concealment
 
-On the surface, standing on unforaged ordinary or ancient forest gives the player a
-chance to avoid an unaware, unalarmed enemy's first spotting attempt within its normal
-AGGRO range. The chance is `min(100%, 33% + 5% × distance in tiles)`, using
-Chebyshev distance (so 43% at distance 2 and 53% at distance 4). The roll
-uses seeded game RNG. A successful check logs `The trees conceal you from the
-<enemy>.` only if that enemy is visible in the main view.
+On the surface, standing on unforaged ordinary or ancient forest gives the
+player a chance to avoid an unaware, unalarmed enemy's first spotting attempt
+within its normal AGGRO range. The chance is
+`min(100%, 33% + 5% × distance in tiles)`, using Chebyshev distance (so 43% at
+distance 2 and 53% at distance 4). The roll uses seeded game RNG. A successful
+check logs `The trees conceal you from the
+<enemy>.` only if that enemy is
+visible in the main view.
 
-Halflings gain another 20 percentage points (63% at distance 2; 73% 
-at distance 4) and may roll against Alarmed enemies
-that have not yet spotted them. For other races, becoming Alarmed cancels a
-successful concealment immediately. An enemy already aware of the player
-cannot be concealed from, even for a Halfling.
+Halflings gain another 20 percentage points (63% at distance 2; 73% at distance
+4) and may roll against Alarmed enemies that have not yet spotted them. For
+other races, becoming Alarmed cancels a successful concealment immediately. An
+enemy already aware of the player cannot be concealed from, even for a Halfling.
 
-A successful check protects the player's current tile from that enemy's
-further spotting checks, including after the enemy wanders or moves closer.
-Moving the player to another forest tile permits a new check; waiting or an
-enemy's movement does not. Moving out of the forest or foraging the tile ends this concealment immediately.
-An enemy leaving and returning to range cannot force another roll while the
-player stays on the same tile.
-At adjacent distance, the enemy spots or attacks normally. Newly spawned
-forest ambushers begin aware, so neither race can conceal from them. Forest
-concealment does not shorten AGGRO range. Successful per-enemy
-concealment coordinates are saved and restored in replay starting states so
-loading does not reroll a stationary player's cover. The character tooltip reports actual
-per-enemy successful concealment and the hide probability against the nearest visible
-hostile monster. Probability is for a new check, not a reroll of cached cover.
-Tooltip rendering never consumes RNG.
-An active **Forest Cover** badge appears in the status strip while standing
-on unforaged forest. The same badge reads **Concealed** when at least one
-visible hostile enemy currently has a successful concealment check against
-the player, with details identifying those enemies. Standing in forest alone
-does not imply successful concealment; when no visible hostile remains
-concealed, the badge returns to **Forest Cover**. Neither display triggers a
-new spotting roll.
+A successful check protects the player's current tile from that enemy's further
+spotting checks, including after the enemy wanders or moves closer. Moving the
+player to another forest tile permits a new check; waiting or an enemy's
+movement does not. Moving out of the forest or foraging the tile ends this
+concealment immediately. An enemy leaving and returning to range cannot force
+another roll while the player stays on the same tile. At adjacent distance, the
+enemy spots or attacks normally. Newly spawned forest ambushers begin aware, so
+neither race can conceal from them. Forest concealment does not shorten AGGRO
+range. Successful per-enemy concealment coordinates are saved and restored in
+replay starting states so loading does not reroll a stationary player's cover.
+The character tooltip reports actual per-enemy successful concealment and the
+hide probability against the nearest visible hostile monster. Probability is for
+a new check, not a reroll of cached cover. Tooltip rendering never consumes RNG.
+An active **Forest Cover** badge appears in the status strip while standing on
+unforaged forest. The same badge reads **Concealed** when at least one visible
+hostile enemy currently has a successful concealment check against the player,
+with details identifying those enemies. Standing in forest alone does not imply
+successful concealment; when no visible hostile remains concealed, the badge
+returns to **Forest Cover**. Neither display triggers a new spotting roll.
+
+**Forestwalker** adds 10 percentage points to the ordinary forest spotting
+chance and preserves successful per-enemy cover across one consecutive open
+tile (no fresh forest roll on open terrain). A second open tile, firelight,
+removal of the trinket or a map transition ends that extension. Halflings and
+races immune to forest ambushes can prepare a guaranteed dodge on a successful
+forest concealment check, with a shared 30-turn cooldown. It survives the first
+open tile, is consumed by the next direct melee or projectile attack and uses
+the ordinary dodge reward hooks (including Windwalker). The cooldown is not
+reset by dropping the trinket or by expending the dodge.
+
+**Unseen** activates before enemy responses after a stationary, noncombat turn
+in or adjacent to cover (unforaged woodland, a tree, a wall or large rock).
+It works above and below ground. While active, movement along cover or up to
+two consecutive tiles away from cover preserves the same per-observer result,
+including failed checks. Cover renews the open-tile allowance; a third open
+tile, combat, firelight, removal or a map transition ends the episode. Halfling
+and distance bonuses and the ordinary awareness/adjacency restrictions apply.
+If both powers are active, the initial forest check includes Forestwalker's
+bonus, but losing Forestwalker cover does not discard Unseen. True Sight and
+Blind bypass artifact concealment. The observer cache and remaining cover and
+dodge state are serialized; UI reads them without making spotting rolls.
+
+**One with the Wild** stops ordinary living non-humanoid enemies (including
+prefixed and champion beasts) from pursuing or attacking a player standing in
+forest or ancient forest, even when the beast is outside the woods. The truce
+clears awareness, alarms and pending attacks; beasts can still wander, flee
+or retreat from sacred ground. Ultra-rare and adaptive encounters, and beasts
+agitated by the Forest Spirit, are exempt. Attacking any living beast while
+either party is in forest breaks the truce for 1,000 world turns, even on a miss
+or an immune hit. Melee, ranged, Fireball and secondary artifact damage share
+the same aggression hook. Re-equipping does not reset the character cooldown.
 
 ### Alarmed
 
 When the player lands a hit on a monster, the struck monster becomes Alarmed
 silently, along with each *other* living, nonpassive monster on the same map
-within 5 tiles of the struck monster.
-This uses Chebyshev distance (diagonal squares count as one), measured from
-the monster that was hit, not from the player. A miss or evade does not trigger
-the status. Sound needs no line of sight; a glancing hit, including zero damage,
-still counts as a hit. Monsters also become Alarmed silently the first time
-they spot the player, including when they wander into detection range or first
-attack from an adjacent tile. Passive AGGRO 0 enemies remain unaffected.
+within 5 tiles of the struck monster. This uses Chebyshev distance (diagonal
+squares count as one), measured from the monster that was hit, not from the
+player. A miss or evade does not trigger the status. Sound needs no line of
+sight; a glancing hit, including zero damage, still counts as a hit. Monsters
+also become Alarmed silently the first time they spot the player, including when
+they wander into detection range or first attack from an adjacent tile. Passive
+AGGRO 0 enemies remain unaffected.
 
 Alarmed temporarily adds 2 to the monster's effective AGGRO range without
 changing its saved base AGGRO. Alarmed monsters may pursue around sight-blocking
 corners while in range, but they still respect invisibility, concealment,
-sanctuary, and terrain/pathfinding rules. A bystander newly Alarmed by the
-sound of a hit logs `<name> is alarmed by the sounds of the battle.` only when
-visible in the main view at activation. The struck monster and a monster that
-first spots the player do not log a separate Alarmed message. Monsters obscured
-by underground field of view or outside the viewport still become Alarmed silently; revealing
-them later does not produce a delayed message. More hits do not stack the bonus
-or repeat the line during the same activation. The tooltip shows a red
-`Alarmed (AGGRO +2)` label and the glyph has a white `!` in its top right corner. If a
-monster also has a victory skull, the `!` shifts left so both remain visible.
+sanctuary, and terrain/pathfinding rules. A bystander newly Alarmed by the sound
+of a hit logs `<name> is alarmed by the sounds of the battle.` only when visible
+in the main view at activation. The struck monster and a monster that first
+spots the player do not log a separate Alarmed message. Monsters obscured by
+underground field of view or outside the viewport still become Alarmed silently;
+revealing them later does not produce a delayed message. More hits do not stack
+the bonus or repeat the line during the same activation. The tooltip shows a red
+`Alarmed (AGGRO +2)` label and the glyph has a white `!` in its top right
+corner. If a monster also has a victory skull, the `!` shifts left so both
+remain visible.
 
 Alarmed ends when the player changes z level or map identity, or when the
 monster is more than 20 tiles from the player (Chebyshev distance). It can
-activate again after ending. The hit radius and clear distance are configured
-as `combat.alarmTriggerRange` (5) and `combat.alarmClearRange` (20) in
+activate again after ending. The hit radius and clear distance are configured as
+`combat.alarmTriggerRange` (5) and `combat.alarmClearRange` (20) in
 `content/enemy_config.json`. Save version 16 introduced each enemy's temporary
 Alarmed state and its originating level; older schema versions are rejected.
 Both alarm ranges have explicit runtime bindings initialized by `loadContent()`
-before gameplay starts; a missing binding prevents content loading in strict mode.
+before gameplay starts; a missing binding prevents content loading in strict
+mode.
 
-An already-aware **non-Alarmed** enemy standing on the outermost tile of its effective aggro
-range has a 30% chance per turn to give up the chase. That outer ring is drawn
-with a more transparent red than the rest of the aggro overlay.
+An already-aware **non-Alarmed** enemy standing on the outermost tile of its
+effective aggro range has a 30% chance per turn to give up the chase. That outer
+ring is drawn with a more transparent red than the rest of the aggro overlay.
 
-Already-aware enemies, **including those Alarmed by ordinary pursuit**, can
-lose interest in a chase when the player has higher effective SPD, provided
-they are **more than one tile away**. The chance is 5 percentage points per
-SPD advantage, capped at 50%. A successful roll ends that pursuit action and
-clears its ordinary awareness and Alarmed status; if the player stays nearby
-and visible, the creature may spot them again on a later turn. Permanent
-Collective Mind alerts are an exception: speed can delay their next chase step
-but cannot erase the shared alert.
-A successful dodge immediately before that roll changes only the log text,
-not the chance or normal turn behavior. Other losses of interest retain
-`The <enemy> loses interest in the chase.` The separate 30% outer-AGGRO
-check above remains unchanged and is evaluated first.
+Already-aware enemies, **including those Alarmed by ordinary pursuit**, can lose
+interest in a chase when the player has higher effective SPD, provided they are
+**more than one tile away**. The chance is 5 percentage points per SPD
+advantage, capped at 50%. A successful roll ends that pursuit action and clears
+its ordinary awareness and Alarmed status; if the player stays nearby and
+visible, the creature may spot them again on a later turn. Permanent Collective
+Mind alerts are an exception: speed can delay their next chase step but cannot
+erase the shared alert. A successful dodge immediately before that roll changes
+only the log text, not the chance or normal turn behavior. Other losses of
+interest retain `The <enemy> loses interest in the chase.` The separate 30%
+outer-AGGRO check above remains unchanged and is evaluated first.
 
 The target of a valid player bow shot cannot lose interest through either
 disengagement roll on that shot's response turn, including when the arrow
 misses. Other enemies and subsequent non-shooting turns retain normal chase
 rules. This uses the existing recorded shot target and consumes no extra RNG.
 
-Enemy pathfinding uses breadth-first search and can route around obstacles and other enemies within a detour limit. Synchronous searches index
-stove blockers once rather than rescanning every ground item for every tile.
-The index is discarded after the search; terrain, doors and actor occupancy
-remain live. This preserves route tie-breaking, monster counts, turn order and
-seeded RNG, and adds no saved state. During a surface turn, equivalent movement
-profiles share terrain passability results. Flying, swimming, ethereal movement,
-sleeping and door-opening capabilities remain distinct; sanctuary restrictions,
-stove positions and actor occupancy are still checked for the current search.
-These derived results are discarded after the turn, including interrupted turns.
+Enemy pathfinding uses breadth-first search and can route around obstacles and
+other enemies within a detour limit. Synchronous searches index stove blockers
+once rather than rescanning every ground item for every tile. The index is
+discarded after the search; terrain, doors and actor occupancy remain live. This
+preserves route tie-breaking, monster counts, turn order and seeded RNG, and
+adds no saved state. During a surface turn, equivalent movement profiles share
+terrain passability results. Flying, swimming, ethereal movement, sleeping and
+door-opening capabilities remain distinct; sanctuary restrictions, stove
+positions and actor occupancy are still checked for the current search. These
+derived results are discarded after the turn, including interrupted turns.
 
 Both chase modifiers use effective SPD (including terrain, equipment, potions,
 status effects and monster speed bonuses) and the same formula:
@@ -5670,22 +5804,24 @@ rule only; it does not affect trap damage or consume additional RNG.
 A template value overrides the old global setting. Enemies without an explicit
 `wander` property retain the old global behavior as a compatibility fallback:
 `wandering.enabled: false` means no wandering; otherwise `wandering.leash:
-true` resolves to `"homeReanchored"` and `false` resolves to `"roam"`.
-Legacy saves/templates containing `"home"` are treated as `"homeReanchored"`.
-When a monster with `"far"` is spawned underground, its instance uses `"roam"`
-instead; the surface template remains unchanged. Loading a current-schema
-underground `"far"` instance also converts it to `"roam"` through the shared
-`enemyWanderForLevel()` helper in the Enemy AI wandering section. A surface traveler's
-previous tile is saved so its random branch cannot immediately reverse after
-loading; destination coordinates and the remaining cached route are saved too.
-The route is gameplay state: rebuilding it after a load can choose a different
-path around other creatures, changing future movement and track creation even
-when RNG consumption initially matches. Save/load and replay restore the exact
-remaining route; normal blocked-step checks still rebuild it when required.
+true`
+resolves to `"homeReanchored"` and `false` resolves to `"roam"`. Legacy
+saves/templates containing `"home"` are treated as `"homeReanchored"`. When a
+monster with `"far"` is spawned underground, its instance uses `"roam"` instead;
+the surface template remains unchanged. Loading a current-schema underground
+`"far"` instance also converts it to `"roam"` through the shared
+`enemyWanderForLevel()` helper in the Enemy AI wandering section. A surface
+traveler's previous tile is saved so its random branch cannot immediately
+reverse after loading; destination coordinates and the remaining cached route
+are saved too. The route is gameplay state: rebuilding it after a load can
+choose a different path around other creatures, changing future movement and
+track creation even when RNG consumption initially matches. Save/load and replay
+restore the exact remaining route; normal blocked-step checks still rebuild it
+when required.
 
-Home-style enemies may also define `homeRadius` per template or per spawned enemy.
-If omitted, the global `wandering.radius` is used, currently **1 tile**. This
-override applies to both `"homeReanchored"` and `"homeReturn"`.
+Home-style enemies may also define `homeRadius` per template or per spawned
+enemy. If omitted, the global `wandering.radius` is used, currently **1 tile**.
+This override applies to both `"homeReanchored"` and `"homeReturn"`.
 
 Enemy template wandering properties are resolved from the loaded
 `content/enemy_templates.json` registry when an enemy instance is created, so
@@ -5699,10 +5835,10 @@ radius**. They use their own floor's terrain, occupancy, abilities and home
 leashes, but cannot acquire, pursue or attack the player across floors.
 Wandering outcomes use seeded gameplay RNG and persist through normal enemy
 positions; the surface creatures already simulated beneath the tower are not
-given a duplicate wandering opportunity. Occupancy is built once per
-visited floor during this pass and updated after each actor moves. Shared tiles
-retain their other occupants, and NPCs continue to block surface movement.
-These indexes are temporary and do not change trap avoidance, actor order or RNG.
+given a duplicate wandering opportunity. Occupancy is built once per visited
+floor during this pass and updated after each actor moves. Shared tiles retain
+their other occupants, and NPCs continue to block surface movement. These
+indexes are temporary and do not change trap avoidance, actor order or RNG.
 
 On returning to the surface, living `"homeReanchored"` surface monsters whose
 positions lie beyond their individual home radius reset their anchor to their
@@ -5715,29 +5851,28 @@ anchors and behavior. The refreshed anchors use the existing save fields.
 Surface monsters with `"far"` wandering remain active while the player explores
 underground or the tower. The game saves the global turn count on leaving the
 surface and, on returning, advances those travelers through **every elapsed
-gameplay turn** using their normal **40% stay / 20% random step / 40% destination
-step** decisions, terrain and occupancy restrictions, and seeded RNG. Their
-positions and routes therefore continue to change even during long expeditions;
-they do not also receive ordinary nearby off-floor wandering turns. Tracks
-left on the surface during catch-up already have the appropriate elapsed age,
-and expired tracks are discarded. Other monsters retain their existing limited
-adjacent-level behavior; the catch-up does not simulate their combat or aggro.
-The departure turn is saved and restored so saving inside a dungeon and
-returning later has the same deterministic result.
-Catch-up reuses terrain-compatible destination lists for beasts with matching
-movement abilities and sanctuary restrictions. Each request filters current
-occupancy and the traveler's position while preserving candidate order and RNG.
-Humanoids retain live scans because they can open doors. These caches exist only
-for one catch-up operation; no elapsed turns are skipped or capped.
-Long returns to the surface display synchronization progress and let the browser
-paint between batches of travelers. Movement and other input remain blocked
-until all missed turns finish, including returns by Homecoming or resurrection.
-The inspection action returns that completion to its caller and closes its replay
-RNG scope only after synchronization finishes.
-Batch timing only controls presentation: traveler order, RNG, tracks and final
-positions match uninterrupted simulation. Replay resolves the same work within
-the returning action. Pathfinding reuses temporary search storage without
-adding saved state.
+gameplay turn** using their normal **40% stay / 20% random step / 40%
+destination step** decisions, terrain and occupancy restrictions, and seeded
+RNG. Their positions and routes therefore continue to change even during long
+expeditions; they do not also receive ordinary nearby off-floor wandering turns.
+Tracks left on the surface during catch-up already have the appropriate elapsed
+age, and expired tracks are discarded. Other monsters retain their existing
+limited adjacent-level behavior; the catch-up does not simulate their combat or
+aggro. The departure turn is saved and restored so saving inside a dungeon and
+returning later has the same deterministic result. Catch-up reuses
+terrain-compatible destination lists for beasts with matching movement abilities
+and sanctuary restrictions. Each request filters current occupancy and the
+traveler's position while preserving candidate order and RNG. Humanoids retain
+live scans because they can open doors. These caches exist only for one catch-up
+operation; no elapsed turns are skipped or capped. Long returns to the surface
+display synchronization progress and let the browser paint between batches of
+travelers. Movement and other input remain blocked until all missed turns
+finish, including returns by Homecoming or resurrection. The inspection action
+returns that completion to its caller and closes its replay RNG scope only after
+synchronization finishes. Batch timing only controls presentation: traveler
+order, RNG, tracks and final positions match uninterrupted simulation. Replay
+resolves the same work within the returning action. Pathfinding reuses temporary
+search storage without adding saved state.
 
 Invisibility prevents ordinary detection, pursuit, and attacks. A surviving
 enemy hit by an invisible player reacts once instead of wandering on that turn
@@ -5759,29 +5894,30 @@ Active range for home/roam: 20 tiles from the player (Chebyshev distance)
 NPC wandering uses the existing global settings, but runs only while the
 player is on the surface.
 
-`"homeReanchored"`, `"homeReturn"`, and `"roam"` wandering are limited to enemies/NPCs within the active
-range of the player, not to what the camera viewport happens to be showing.
-`"far"` is the deliberate exception and remains active anywhere on the current
-map. This remains replay-safe because eligibility depends only on game state,
-never viewport dimensions. Far-wander target selection and pathing use the
-seeded game RNG; the chosen target coordinates are persisted in saves/replay
-snapshots so loading does not silently choose a different destination. The village-avoidance
-radius is configured by `content/enemy_config.json -> wandering.farVillageAvoidRadius`;
-it defaults to 20 if omitted.
+`"homeReanchored"`, `"homeReturn"`, and `"roam"` wandering are limited to
+enemies/NPCs within the active range of the player, not to what the camera
+viewport happens to be showing. `"far"` is the deliberate exception and remains
+active anywhere on the current map. This remains replay-safe because eligibility
+depends only on game state, never viewport dimensions. Far-wander target
+selection and pathing use the seeded game RNG; the chosen target coordinates are
+persisted in saves/replay snapshots so loading does not silently choose a
+different destination. The village-avoidance radius is configured by
+`content/enemy_config.json -> wandering.farVillageAvoidRadius`; it defaults to
+20 if omitted.
 
 Far-path BFS reuses typed scratch buffers and a numeric occupancy snapshot.
-Traversal results are cached only within one synchronous search/target selection,
-so terrain changes and earlier creatures' moves are reflected in the next search.
-After an unreachable candidate exhausts the search, the same predecessor tree
-answers the remaining unoccupied candidates. Candidate sampling, RNG consumption,
-eight-direction visitation order and shortest-path tie breaks remain unchanged;
-scratch data is never saved.
-When catching up surface travelers after an absence, destination steps use a
-deterministic, goal-directed shortest-path search to avoid repeated full-world
-scans. It applies the same terrain, occupancy, player-tile and village-avoidance
-rules, though equally short paths can differ from ordinary live wandering.
-This shortcut consumes no additional RNG and does not change the 40/20/40
-movement probabilities.
+Traversal results are cached only within one synchronous search/target
+selection, so terrain changes and earlier creatures' moves are reflected in the
+next search. After an unreachable candidate exhausts the search, the same
+predecessor tree answers the remaining unoccupied candidates. Candidate
+sampling, RNG consumption, eight-direction visitation order and shortest-path
+tie breaks remain unchanged; scratch data is never saved. When catching up
+surface travelers after an absence, destination steps use a deterministic,
+goal-directed shortest-path search to avoid repeated full-world scans. It
+applies the same terrain, occupancy, player-tile and village-avoidance rules,
+though equally short paths can differ from ordinary live wandering. This
+shortcut consumes no additional RNG and does not change the 40/20/40 movement
+probabilities.
 
 The fixed 20-tile radius replaced the old "is this enemy on screen" check,
 which depended on the live canvas viewport (window size, sidebar
@@ -5850,28 +5986,28 @@ Combat includes:
 - player and enemy critical hits
 - possible extra attacks (weapon vs weapon grace checks)
 
-Monster ranged attacks reuse the same mitigation, glancing and critical systems, with
-the shooter-specific fixed projectile ATK and doubled dodge chance documented in
-§20. They do not run melee GRACE timing or melee lunge/contact behavior. Projectile
-animation is presentation-only: dodge, critical/glancing, damage, HP and ammunition are
-resolved first from deterministic gameplay state, then the visual effect is queued. Monster
-melee lunges, arrows and magical projectiles (including Lich Death Bolt) play
-**in attack order**, without visual overlap between attacks. Player and monster
-melee lunges last **132 ms** (40% faster than the former 220 ms); this is only
-presentation timing. A dodged ranged
-attack starts pushing the player's sprite backward shortly **before the
-projectile arrives**, then returns it to its
-unchanged tile. Movement and turn-taking input wait for the ordered attacks
-and dodge recoil to finish; visual delays never affect RNG, combat, replay or
-saved positions. The clear-shot check still uses the deterministic tile trace,
-but the queued projectile is drawn
-along the direct straight line from shooter center to target center rather than visibly
-stepping through each traced grid cell. Visual frame timing is clamped to the projectile
-effect lifetime, so a late-queued effect cannot interrupt input or combat resolution. The
-projectile uses a readable glyph in both tile-image and ASCII rendering modes.
-Floating combat labels remain visible for **850 ms** and are separated by their
-actual screen positions, including when two nearby monsters stand on different rows.
-Their visual placement consumes no gameplay RNG and does not delay combat resolution.
+Monster ranged attacks reuse the same mitigation, glancing and critical systems,
+with the shooter-specific fixed projectile ATK and doubled dodge chance
+documented in §20. They do not run melee GRACE timing or melee lunge/contact
+behavior. Projectile animation is presentation-only: dodge, critical/glancing,
+damage, HP and ammunition are resolved first from deterministic gameplay state,
+then the visual effect is queued. Monster melee lunges, arrows and magical
+projectiles (including Lich Death Bolt) play **in attack order**, without visual
+overlap between attacks. Player and monster melee lunges last **132 ms** (40%
+faster than the former 220 ms); this is only presentation timing. A dodged
+ranged attack starts pushing the player's sprite backward shortly **before the
+projectile arrives**, then returns it to its unchanged tile. Movement and
+turn-taking input wait for the ordered attacks and dodge recoil to finish;
+visual delays never affect RNG, combat, replay or saved positions. The
+clear-shot check still uses the deterministic tile trace, but the queued
+projectile is drawn along the direct straight line from shooter center to target
+center rather than visibly stepping through each traced grid cell. Visual frame
+timing is clamped to the projectile effect lifetime, so a late-queued effect
+cannot interrupt input or combat resolution. The projectile uses a readable
+glyph in both tile-image and ASCII rendering modes. Floating combat labels
+remain visible for **850 ms** and are separated by their actual screen
+positions, including when two nearby monsters stand on different rows. Their
+visual placement consumes no gameplay RNG and does not delay combat resolution.
 
 ---
 
@@ -6000,11 +6136,11 @@ This example isolates the damage formula. Actual spawned enemies can differ
 from template stats because enemy stats receive spawn variance and humanoids
 can also gain equipment bonuses.
 
-When player wearing a brass armor is hit:
-An enemy with 4 ATK has a mitigated ATK of 2 against brass armor.
-Damage then applies the triangular -1/+2 spread, so 4 ATK can deal 1–4 damage,
-with 2 damage occurring about 54.17% of the time. With 10 DEF, an enemy needs
-5 ATK or more to guarantee at least 2 ordinary damage before glancing effects.
+When player wearing a brass armor is hit: An enemy with 4 ATK has a mitigated
+ATK of 2 against brass armor. Damage then applies the triangular -1/+2 spread,
+so 4 ATK can deal 1–4 damage, with 2 damage occurring about 54.17% of the time.
+With 10 DEF, an enemy needs 5 ATK or more to guarantee at least 2 ordinary
+damage before glancing effects.
 
 ---
 
@@ -6018,8 +6154,8 @@ Glancing damage:
 floor(damage / 3)
 ```
 
-This applies to attacks against armored enemies and attacks against an armored player,
-including any equipped armor artifact.
+This applies to attacks against armored enemies and attacks against an armored
+player, including any equipped armor artifact.
 
 ---
 
@@ -6040,10 +6176,10 @@ Deadly monster: 15%
 `baseCriticalHitChance`, `fierceCriticalHitChance`, and `criticalHitChance`
 (the last remains the Deadly-specialist chance).
 
-The invisibility bonus is **+20 percentage points**, assessed before the hit alarms
-the target. Enemies with `trueSight` or `blind` are immune. After Alarmed resets, an invisible
-attacker can gain the bonus again. Misses and glancing blows retain their usual
-rules; successful criticals use the existing feedback.
+The invisibility bonus is **+20 percentage points**, assessed before the hit
+alarms the target. Enemies with `trueSight` or `blind` are immune. After Alarmed
+resets, an invisible attacker can gain the bonus again. Misses and glancing
+blows retain their usual rules; successful criticals use the existing feedback.
 
 Critical damage:
 
@@ -6073,9 +6209,12 @@ Base combat delay:
 6 / GRACE
 ```
 
-Higher weapon or natural GRACE means lower base combat delay. Reciprocal scaling gives high GRACE diminishing returns without making any GRACE point useless.
+Higher weapon or natural GRACE means lower base combat delay. Reciprocal scaling
+gives high GRACE diminishing returns without making any GRACE point useless.
 
-Player bonus GRACE acts as an affinity for graceful weapons rather than being added directly to weapon GRACE. The bonus is the sum of racial GRACE and level GRACE:
+Player bonus GRACE acts as an affinity for graceful weapons rather than being
+added directly to weapon GRACE. The bonus is the sum of racial GRACE and level
+GRACE:
 
 ```text
 level GRACE = floor(level / 5)
@@ -6106,10 +6245,10 @@ about **1.53**, versus an unarmed Skeleton's GRACE 3 and delay 2.
 
 Combat timing floors effective GRACE at 1, so heavy gear does not disable an
 armed player's extra-attack checks. Bucklers and armors without `gracePenalty`
-leave GRACE unchanged. Humanoid enemies with a non-Buckler shield or selected armor also
-lose 1 from natural GRACE in combat timing (floored at 1); enemy weapons still
-override natural GRACE and have no gear penalty because an enemy carries one
-equipment item.
+leave GRACE unchanged. Humanoid enemies with a non-Buckler shield or selected
+armor also lose 1 from natural GRACE in combat timing (floored at 1); enemy
+weapons still override natural GRACE and have no gear penalty because an enemy
+carries one equipment item.
 
 For an Elf with **+2 racial GRACE**, no level GRACE and no penalties:
 
@@ -6121,9 +6260,12 @@ For an Elf with **+2 racial GRACE**, no level GRACE and no penalties:
 | 4 | 1.50 | 5.28 | 1.14 | 32% |
 | 5 | 1.20 | 7.00 | 0.86 | 40% |
 
-The player must wield a weapon to take part in a grace check. Every enemy has natural GRACE and can take part while unarmed; if the enemy wields a weapon, the weapon's GRACE overrides its natural GRACE.
+The player must wield a weapon to take part in a grace check. Every enemy has
+natural GRACE and can take part while unarmed; if the enemy wields a weapon, the
+weapon's GRACE overrides its natural GRACE.
 
-If both combatants have a valid combat delay and the attacker has lower delay, an extra attack can occur.
+If both combatants have a valid combat delay and the attacker has lower delay,
+an extra attack can occur.
 
 Chance:
 
@@ -6164,40 +6306,41 @@ Bodies are rendered on the map with a skull glyph and remain on the level where
 the death occurred (surface or underground). Walking onto a body does not loot
 it; the forage/loot action retrieves its contents. Its tooltip reads only
 `dead <race>` when inspected on the map, while standing on it displays the
-memorial inscription and `Pay respects or retrieve what is left.`
-After looting, the corpse skull is rendered gray.
-The body can be looted once for 10% of the dead character’s carried gold and
-one randomly selected item from the highest-tier equipped weapon, shield, or
-armor. The corpse's selected item is excluded from the killer's loot. If the
-killer is a humanoid and an equipped weapon remains, it takes that weapon when
-unarmed, or replaces its equipment only when the weapon has a strictly higher
-weighted inventory score (`equipmentSortValues().sum`). Equal scores keep the
-existing equipment regardless of tier; replaced equipment is discarded, not
-dropped. Nonhumanoids take nothing. Bodies are saved as world
-ground objects, so this state survives save/load.
+memorial inscription and `Pay respects or retrieve what is left.` After looting,
+the corpse skull is rendered gray. The body can be looted once for 10% of the
+dead character’s carried gold and one randomly selected item from the
+highest-tier equipped weapon, shield, or armor. The corpse's selected item is
+excluded from the killer's loot. If the killer is a humanoid and an equipped
+weapon remains, it takes that weapon when unarmed, or replaces its equipment
+only when the weapon has a strictly higher weighted inventory score
+(`equipmentSortValues().sum`). Equal scores keep the existing equipment
+regardless of tier; replaced equipment is discarded, not dropped. Nonhumanoids
+take nothing. Bodies are saved as world ground objects, so this state survives
+save/load.
 
 ## Permadeath corpse loot
 
-**Killer equipment selection and ties.** Monsters have one equipment slot,
-not separate weapon, shield, and armor slots. The killer considers only the
-dead player's equipped weapon (bows require an assigned arrow-shooter role): it does not compare matching armor slots or
-randomly choose among the player's three equipment types. Corpse selection
-happens first. If the weapon was reserved for the corpse, the killer takes
-nothing; otherwise, the weapon is compared with whatever the killer currently
-has, including armor or a shield. A winning weapon replaces that item entirely.
+**Killer equipment selection and ties.** Monsters have one equipment slot, not
+separate weapon, shield, and armor slots. The killer considers only the dead
+player's equipped weapon (bows require an assigned arrow-shooter role): it does
+not compare matching armor slots or randomly choose among the player's three
+equipment types. Corpse selection happens first. If the weapon was reserved for
+the corpse, the killer takes nothing; otherwise, the weapon is compared with
+whatever the killer currently has, including armor or a shield. A winning weapon
+replaces that item entirely.
 
 A **tie** means equal weighted scores, even if names, tiers, or individual
 bonuses differ. The killer keeps its existing item on a tie. This comparison
 uses only `equipmentSortValues().sum`, not the inventory sort's subsequent
 tier and primary-stat tiebreakers.
 
-The score is **3 times the primary stat, plus weighted secondary bonuses**.
-For monster equipment comparison, the primary stat is melee ATK for weapons
-and DEF for armor/shields, including a modifier to that primary stat. Player
-bow scoring is separate; monsters retain their existing gear and fixed projectile rules. Weapons also count their built-in GRACE.
-A secondary modifier contributes its amount, except HP contributes one third,
-XP contributes `Math.round(xpBonus / 3)`, and GRACE modifiers count only for
-weapons.
+The score is **3 times the primary stat, plus weighted secondary bonuses**. For
+monster equipment comparison, the primary stat is melee ATK for weapons and DEF
+for armor/shields, including a modifier to that primary stat. Player bow scoring
+is separate; monsters retain their existing gear and fixed projectile rules.
+Weapons also count their built-in GRACE. A secondary modifier contributes its
+amount, except HP contributes one third, XP contributes
+`Math.round(xpBonus / 3)`, and GRACE modifiers count only for weapons.
 
 These illustrative stat combinations assume the player's weapon was **not**
 reserved for the corpse. Unlisted bonuses, including weapon GRACE, are zero.
@@ -6223,7 +6366,8 @@ When HP reaches zero in normal mode:
   remains appear only after the Temple teleport
 - a distinct `playerremains` ground object holds that item and uses the
   skeletal-remains glyph without becoming a `skeleton` or permadeath `deadbody`
-- the forage/loot action restores the item and removes `playerremains` from the world
+- the forage/loot action restores the item and removes `playerremains` from the
+  world
 - each outstanding `playerremains` is marked by a small, semi-transparent 💀 on
   the corresponding floor of the full world map and the nearby side minimap.
   Multiple deaths may leave multiple markers; each disappears as soon as its
@@ -6235,15 +6379,15 @@ When HP reaches zero in normal mode:
 - death animation occurs
 - temporary effects (regeneration, invisibility, speed, freezing and curse
   penalties) end on death; an ordinary living Temple return preserves them
-- player returns to Temple at full current maximum HP, including equipment bonuses,
-  after the permanent maximum-HP loss has been applied
+- player returns to Temple at full current maximum HP, including equipment
+  bonuses, after the permanent maximum-HP loss has been applied
 - death recovery records earned XP, so later Temple blessings require new XP
   from level 2 onward; level 1 remains exempt
 - player returns to the surface
 - position becomes the Temple spawn point
 - the killer, if still alive, gains a persistent red skull and a victory level;
-  each victory adds 3 maximum HP and +1 each to ATK and DEF, leaves SPD unchanged,
-  then heals 10% of its new maximum HP (rounded, at least 1)
+  each victory adds 3 maximum HP and +1 each to ATK and DEF, leaves SPD
+  unchanged, then heals 10% of its new maximum HP (rounded, at least 1)
 - the XP penalty is calculated as 10% of all XP earned across levels (rounded
   up), with a minimum of 20 XP and a maximum of 200 XP. It is subtracted from
   the current level's unspent XP, without reducing the level. At level 1, the
@@ -6303,12 +6447,13 @@ if it is one-handed, the strongest available shield. **2** selects the strongest
 ranged weapon. Both shortcuts consider backpack gear and what is already
 equipped; they leave a matching or equally strong equipped item alone. Melee
 selection uses the inventory's existing equipment score (primary combat stat,
-GRACE and secondary bonuses). Player inventory scoring uses ranged ATK as
-a bow's primary stat instead of melee ATK. Ranged selection prioritizes
-effective ranged ATK (including Mighty), then range, then that equipment
-score. Inventory items with unidentified artifact properties are not auto-selected; an already-equipped unidentified artifact is
-left in place when it belongs to the requested weapon category. The shield is
-automatically put away when a two-handed weapon is selected.
+GRACE and secondary bonuses). Player inventory scoring uses ranged ATK as a
+bow's primary stat instead of melee ATK. Ranged selection prioritizes effective
+ranged ATK (including Mighty), then range, then that equipment score. Inventory
+items with unidentified artifact properties are not auto-selected; an
+already-equipped unidentified artifact is left in place when it belongs to the
+requested weapon category. The shield is automatically put away when a
+two-handed weapon is selected.
 
 These are convenience shortcuts, **not free combat swaps**: equipping a weapon
 costs one ordinary turn, and equipping or upgrading its shield costs another.
@@ -6331,81 +6476,80 @@ flag and equipped item effects persist across saves and replay.
 
 Inventory and merchant gear icons are 24×24 transparent SVGs in `img/icons/`.
 Weapons, shields, and armor prefer a file named exactly after their base item
-(e.g. `Dagger.svg`, `Round Shield.svg`, `Plate Mail.svg`). Magic prefixes do
-not affect the icon lookup because generated gear retains its unmodified
-`base` name. A missing or unknown specific SVG falls back to the existing
-`weapon.svg`, `shield.svg`, or `armor.svg`; other item kinds keep their own
-kind-based icons. Failed gear-specific icon paths are remembered for the current
-session, so repeated inventory/trade redraws use the generic fallback immediately
-instead of repeatedly retrying a missing SVG and visibly blinking. In the inventory
-paper doll, the icon immediately before each `WEAPON`, `SHIELD`, or `ARMOR`
-category label uses the same lookup: equipped gear shows its specific base-item
-icon when available, while an empty slot shows the corresponding generic
-`weapon.svg`, `shield.svg`, or `armor.svg`. The item-value row itself is text-only;
-gear icons are shown only before the category label, so the same icon is never
-displayed twice. The paper-doll equipment lookup uses optional/null-safe access
-for every slot so inventory rendering still works if the equipment object is
-absent or incomplete. Its weapon/shield/armor definitions are stored in an
-explicit local slot list before iteration; this avoids a leading-array expression
-after `setSlotLabel()` being parsed as property access through automatic semicolon
-insertion. The listed base gear icons are preloaded for offline use. This changes
-only presentation, not gear stats or loot odds.
+(e.g. `Dagger.svg`, `Round Shield.svg`, `Plate Mail.svg`). Magic prefixes do not
+affect the icon lookup because generated gear retains its unmodified `base`
+name. A missing or unknown specific SVG falls back to the existing `weapon.svg`,
+`shield.svg`, or `armor.svg`; other item kinds keep their own kind-based icons.
+Failed gear-specific icon paths are remembered for the current session, so
+repeated inventory/trade redraws use the generic fallback immediately instead of
+repeatedly retrying a missing SVG and visibly blinking. In the inventory paper
+doll, the icon immediately before each `WEAPON`, `SHIELD`, or `ARMOR` category
+label uses the same lookup: equipped gear shows its specific base-item icon when
+available, while an empty slot shows the corresponding generic `weapon.svg`,
+`shield.svg`, or `armor.svg`. The item-value row itself is text-only; gear icons
+are shown only before the category label, so the same icon is never displayed
+twice. The paper-doll equipment lookup uses optional/null-safe access for every
+slot so inventory rendering still works if the equipment object is absent or
+incomplete. Its weapon/shield/armor definitions are stored in an explicit local
+slot list before iteration; this avoids a leading-array expression after
+`setSlotLabel()` being parsed as property access through automatic semicolon
+insertion. The listed base gear icons are preloaded for offline use. This
+changes only presentation, not gear stats or loot odds.
 
-Inventory tabs include All, Weapons, Shields, Armors, Supplies, and Other.
-On mobile, category tabs use their corresponding equipment symbols and an
-apple for Supplies instead of text labels.
-Supplies lists consumable food, herbs, mushrooms, potions, scrolls, and arrows,
-including raw and cooked potatoes. Flint and brushwood appear in Other. Other excludes equipment and supplies; All keeps its
-existing consumables-first ordering. Tabs only filter displayed inventory.
-In windows at most 720px wide, inventory, map, treasure map, trade,
+Inventory tabs include All, Weapons, Shields, Armors, Supplies, and Other. On
+mobile, category tabs use their corresponding equipment symbols and an apple for
+Supplies instead of text labels. Supplies lists consumable food, herbs,
+mushrooms, potions, scrolls, and arrows, including raw and cooked potatoes.
+Flint and brushwood appear in Other. Other excludes equipment and supplies; All
+keeps its existing consumables-first ordering. Tabs only filter displayed
+inventory. In windows at most 720px wide, inventory, map, treasure map, trade,
 and character-creation dialogs are positioned against the browser viewport.
-Their width is independent of the canvas, which may be narrow while the
-sidebars are open. This applies even when the browser reports no pointer.
-Inventory actions remain reachable without horizontal scrolling.
-Each row’s action group is **aligned to the right edge** of the inventory.
-Drop is the **leftmost action button** within that group. Buttons have even
-spacing; portable crystals use the same ordering.
-On touch screens, **Merchant trading** fills the available height below the
-HUD and covers the bottom message log for more inventory space. Both item lists
-scroll independently, with no desktop 280px cap. The Close control stays fixed
-at the bottom of the viewport (above the device's safe-area inset). Closing
-trade reveals the unchanged message log. The Herbalist and Fisherman Hermit
-**Services** use a shorter panel ending above the message log, which remains
-visible while using their services; their Close control stays immediately above
-that log. These layouts do not alter the trade or service rules.
-Merchant trading keeps the **For Sale** and **Your Items** columns visible side by
-side at every screen size. On desktop (widths above 720px), each column has its
-own independent category filters: All, Weapons, Shields, Armors, Supplies and
-Other. Equipment categories include artifacts by their equipment slot; Supplies
-includes consumables, while Other contains non-equipment and non-consumables.
-The icon filters reuse inventory's weapon, shield and armor symbols and the
-Supplies apple. Changing one column's filter leaves the other unchanged; buying
-and selling redraw the visible lists without changing the selected categories.
-The filters reset to All when trading opens and do not spend a turn or affect RNG,
-saves or replays. On desktop, the trade dialog is anchored immediately below the
-HUD rather than vertically centered. It fills the remaining desktop viewport
-height below the HUD, including on taller screens; each column's inventory list
-scrolls independently within that space while the title, category tabs and Close
-button remain visible. Category changes do not move or resize the trade panel. Its desktop positioning
-is fixed to the viewport, so focusing a category cannot scroll the clipped game
-stage and shift the dialog.
-Touch-screen Merchant trading occupies the available space below the HUD and
-covers the log; service panels instead preserve the log below them. Only one tab
-per trade column can be highlighted at once;
-merchant and player filters never change each other's selection or the normal
-inventory tab selection. A category without stock displays an empty-state message.
-The Herbalist/Fisherman service views retain their two columns without category
-filters. Items previously sold by the character appear as
-**↩️** buyback entries in the merchant's For sale list, including items with ordinary
-stock of the same kind. Player-sold stacks are kept separate from ordinary
-stock to identify only the actual buyback inventory. Existing buyback stock
-consolidates by kind/name. The label is stored with each merchant-stock item
-and survives saves and replay, then is removed after repurchase; it does not
-change buy/sell prices. Buyback stacks carry stable IDs derived from the sold
-inventory item, so subsequent purchases resolve the correct stock in replay.
-The trade panel shows item/service prices but not a separate player-gold total;
-current gold remains visible in the HUD for merchants and service providers.
-Touch devices retain the existing full-screen layout for the other dialogs.
+Their width is independent of the canvas, which may be narrow while the sidebars
+are open. This applies even when the browser reports no pointer. Inventory
+actions remain reachable without horizontal scrolling. Each row’s action group
+is **aligned to the right edge** of the inventory. Drop is the **leftmost action
+button** within that group. Buttons have even spacing; portable crystals use the
+same ordering. On touch screens, **Merchant trading** fills the available height
+below the HUD and covers the bottom message log for more inventory space. Both
+item lists scroll independently, with no desktop 280px cap. The Close control
+stays fixed at the bottom of the viewport (above the device's safe-area inset).
+Closing trade reveals the unchanged message log. The Herbalist and Fisherman
+Hermit **Services** use a shorter panel ending above the message log, which
+remains visible while using their services; their Close control stays
+immediately above that log. These layouts do not alter the trade or service
+rules. Merchant trading keeps the **For Sale** and **Your Items** columns
+visible side by side at every screen size. On desktop (widths above 720px), each
+column has its own independent category filters: All, Weapons, Shields, Armors,
+Supplies and Other. Equipment categories include artifacts by their equipment
+slot; Supplies includes consumables, while Other contains non-equipment and
+non-consumables. The icon filters reuse inventory's weapon, shield and armor
+symbols and the Supplies apple. Changing one column's filter leaves the other
+unchanged; buying and selling redraw the visible lists without changing the
+selected categories. The filters reset to All when trading opens and do not
+spend a turn or affect RNG, saves or replays. On desktop, the trade dialog is
+anchored immediately below the HUD rather than vertically centered. It fills the
+remaining desktop viewport height below the HUD, including on taller screens;
+each column's inventory list scrolls independently within that space while the
+title, category tabs and Close button remain visible. Category changes do not
+move or resize the trade panel. Its desktop positioning is fixed to the
+viewport, so focusing a category cannot scroll the clipped game stage and shift
+the dialog. Touch-screen Merchant trading occupies the available space below the
+HUD and covers the log; service panels instead preserve the log below them. Only
+one tab per trade column can be highlighted at once; merchant and player filters
+never change each other's selection or the normal inventory tab selection. A
+category without stock displays an empty-state message. The Herbalist/Fisherman
+service views retain their two columns without category filters. Items
+previously sold by the character appear as **↩️** buyback entries in the
+merchant's For sale list, including items with ordinary stock of the same kind.
+Player-sold stacks are kept separate from ordinary stock to identify only the
+actual buyback inventory. Existing buyback stock consolidates by kind/name. The
+label is stored with each merchant-stock item and survives saves and replay,
+then is removed after repurchase; it does not change buy/sell prices. Buyback
+stacks carry stable IDs derived from the sold inventory item, so subsequent
+purchases resolve the correct stock in replay. The trade panel shows
+item/service prices but not a separate player-gold total; current gold remains
+visible in the HUD for merchants and service providers. Touch devices retain the
+existing full-screen layout for the other dialogs.
 
 ## Non-gear item catalog
 
@@ -6420,16 +6564,23 @@ Each definition contains a default `name`, inventory `category` (`supplies` or
 `description`, `effect`, `carryStats`, and `icon` fields describe inspection
 text, behavior parameters, carrying modifiers, and an inventory-icon override.
 The optional `droppable` flag defaults to true. The Brass Bell and Wheelbarrow
-set it to false; the same restriction can be applied to an individual item.
-An explicit `icon: null` suppresses the item image. Beast materials and meat use matching SVG files in `img/icons/` (for example, `shedSkin.svg` and `meat.svg`). Without an override the icon is `img/icons/<kind>.svg`. Explicit item-icon overrides may use either `.svg` or `.png` and may point to local `img/icons/` or `img/tiles/` assets. The Dwarven Key deliberately reuses its ground tile (`img/tiles/dwarven-key.png`) in inventory so ground and inventory visuals stay consistent.
+set it to false; the same restriction can be applied to an individual item. An
+explicit `icon: null` suppresses the item image. Beast materials and meat use
+matching SVG files in `img/icons/` (for example, `shedSkin.svg` and `meat.svg`).
+Without an override the icon is `img/icons/<kind>.svg`. Explicit item-icon
+overrides may use either `.svg` or `.png` and may point to local `img/icons/` or
+`img/tiles/` assets. The Dwarven Key deliberately reuses its ground tile
+(`img/tiles/dwarven-key.png`) in inventory so ground and inventory visuals stay
+consistent.
 
 Actions name approved JavaScript handlers; JSON contains no executable rules.
 Inventory buttons and replay item-use actions share that handler registry.
 Handlers retain turn costs, swimming restrictions, quest consequences, and
 replay recording. An empty actions list means no special inventory action beyond
-Drop: raw potatoes are cooking ingredients in Supplies, valuables are Other, and Identification
-scrolls are used through an artifact's identification button. The Black Key remains in inventory
-when equipped and uses its special Equip/Unequip action.
+Drop: raw potatoes are cooking ingredients in Supplies, valuables are Other, and
+Identification scrolls are used through an artifact's identification button. The
+Black Key remains in inventory when equipped and uses its special Equip/Unequip
+action.
 
 Item creation uses the catalog's defaults. Instances retain their counts,
 replay IDs, and unique data such as generated tombstone inscriptions; actions
@@ -6444,16 +6595,15 @@ of a stack on the player's current dry, walkable tile, consumes one turn and
 does not consume RNG. An occupied tile refuses the drop, except that matching
 stackable player-dropped items merge. The floor keeps complete item data,
 including unidentified enchantments and quest identifiers, through saves and
-replay. Dropped equipment and ordinary supplies use their inventory icons on
-the floor; the **forage key (F)** collects the dropped item or stack in one
-turn. It does not auto-pick up on movement. A dropped worn Black Key is
-automatically unequipped. Crystals retain their existing mineral floor art,
-light emission and collection rules.
-Ground-item labels and hover tooltips show an item's base type only, not its
-unidentified artifact status or generated modifier prefix. Ground tile icons
-and ASCII symbols likewise disguise artifacts as their ordinary equipment
-types, or as neutral objects for trinkets. Picking an item up
-reveals ordinary gear prefixes, while artifact identity follows the existing
+replay. Dropped equipment and ordinary supplies use their inventory icons on the
+floor; the **forage key (F)** collects the dropped item or stack in one turn. It
+does not auto-pick up on movement. A dropped worn Black Key is automatically
+unequipped. Crystals retain their existing mineral floor art, light emission and
+collection rules. Ground-item labels and hover tooltips show an item's base type
+only, not its unidentified artifact status or generated modifier prefix. Ground
+tile icons and ASCII symbols likewise disguise artifacts as their ordinary
+equipment types, or as neutral objects for trinkets. Picking an item up reveals
+ordinary gear prefixes, while artifact identity follows the existing
 identification rules. Environmental ground objects are identified by their
 specific Inspect descriptions.
 
@@ -6461,15 +6611,19 @@ Drop locations and probabilities stay in `loot_tables.json` and world-generation
 configuration. Merchant quantities and purchase prices stay in
 `merchant_stock.json`, which references item kinds without duplicating names.
 World-dependent mushroom poison chance stays in world-generation configuration.
-Chests, corpses, campfires, stoves, and other environmental objects are outside this
-inventory catalog.
+Chests, corpses, campfires, stoves, and other environmental objects are outside
+this inventory catalog.
 
 
 A two-handed weapon prevents shield use.
 
-Equipping a two-handed weapon automatically removes the equipped shield and returns it to inventory.
-Equipment stat changes in equip/unequip logs use green for increases and red for decreases, including GRACE.
-Equipment swap messages name the previously equipped item before the new item in one log line; equipping a two-handed weapon also names the shield it removes. Every named item uses its tier colour, including automatic equips, unequips, and monster gear pickups. Identically named items retain their own colours.
+Equipping a two-handed weapon automatically removes the equipped shield and
+returns it to inventory. Equipment stat changes in equip/unequip logs use green
+for increases and red for decreases, including GRACE. Equipment swap messages
+name the previously equipped item before the new item in one log line; equipping
+a two-handed weapon also names the shield it removes. Every named item uses its
+tier colour, including automatic equips, unequips, and monster gear pickups.
+Identically named items retain their own colours.
 
 If the player has no weapon, looted weapons are automatically equipped.
 
@@ -6544,48 +6698,48 @@ mouse movement; a still-valid target with ammunition restores the red arrow.
 
 Each valid shot consumes **one arrow and one turn**, including misses, and
 alerts its target even if it misses. Arrows stack as ordinary inventory items;
-without ammunition, firing is refused with a message and costs no turn.
-Shots require visible targets and the same deterministic FOV and unobstructed
+without ammunition, firing is refused with a message and costs no turn. Shots
+require visible targets and the same deterministic FOV and unobstructed
 projectile path as monster arrows: walls, trees, solid structures, ground
 monsters and NPCs block intervening shots. Out-of-range or blocked attempts
-consume neither arrows nor turns. Shooting cannot bypass Temple sanctuary,
-enemy immunity, or rare-monster flight protection. Ranged attacks use double
-the normal SPD-based miss chance, ordinary critical and armor-glancing rules,
+consume neither arrows nor turns. Shooting cannot bypass Temple sanctuary, enemy
+immunity, or rare-monster flight protection. Ranged attacks use double the
+normal SPD-based miss chance, ordinary critical and armor-glancing rules,
 reduced linearly to **1.5×** by maximum Marksmanship proficiency. Successful
 damaging bow hits train Marksmanship but not Two-Handed. Shots have no melee
-GRACE timing or extra attacks. Base melee ATK and ATK bonuses on other equipment do not increase projectile
-damage. Mighty on the equipped bow adds its full modifier to ranged ATK
-instead of melee ATK. For example, a Mighty +3 Short Bow has 8 ranged ATK
-and 1 melee weapon ATK; a Mighty +3 Hunting Bow has 10 ranged ATK and 2
-melee weapon ATK. This applies to every ranged bow, including restored items. Enemy turns, XP,
-quests, and stealth reactions resolve with ordinary combat rules; projectile
-flight is visual-only and cannot affect the deterministic result. A lethal
-arrow starts the monster's falling-and-fading death effect at visual impact,
-after the projectile completes its flight. Tile mode animates the dying
-monster's pixel-art sprite; ASCII mode animates its glyph. The enemy is
-held visually in place until impact, even though the actual combat turn has
-already removed it, awarded XP, and resolved loot. The falling effect and
-damage/miss cues appear at impact; replay timing cannot change combat outcomes.
+GRACE timing or extra attacks. Base melee ATK and ATK bonuses on other equipment
+do not increase projectile damage. Mighty on the equipped bow adds its full
+modifier to ranged ATK instead of melee ATK. For example, a Mighty +3 Short Bow
+has 8 ranged ATK and 1 melee weapon ATK; a Mighty +3 Hunting Bow has 10 ranged
+ATK and 2 melee weapon ATK. This applies to every ranged bow, including restored
+items. Enemy turns, XP, quests, and stealth reactions resolve with ordinary
+combat rules; projectile flight is visual-only and cannot affect the
+deterministic result. A lethal arrow starts the monster's falling-and-fading
+death effect at visual impact, after the projectile completes its flight. Tile
+mode animates the dying monster's pixel-art sprite; ASCII mode animates its
+glyph. The enemy is held visually in place until impact, even though the actual
+combat turn has already removed it, awarded XP, and resolved loot. The falling
+effect and damage/miss cues appear at impact; replay timing cannot change combat
+outcomes.
 
 Ordinary Short Bows come from the Merchant, arrow-shooting monsters, or rare
-ordinary chests (§54, §20, §45),
-not the ordinary random weapon pool. Hunting Bows can appear in tier-3+
-ordinary weapon rewards and in **25% of successful bow drops** from tier-3+
-arrow-shooting monsters. Their base value is 600g, versus 300g for Short Bows.
-**Bow artifacts** can be generated from the normal artifact pool, inheriting
-each bow's fixed ranged power, two-handed restriction, and six-tile range. Enchantments and curses
-behave as on other equipped artifacts, but neither melee ATK bonuses nor
-artifact enchantments raise the fixed projectile damage. Unidentified bow
-artifacts retain their hidden names while equipped and firing. Like ordinary
-bows, they use the existing equipment, ammunition, and save rules. Replays
-record shots by enemy ID and tile. Monster-dropped and chest Short Bows can
-roll normal weapon prefixes, while the Merchant's basic bow is unmodified.
-Mighty increases the bow's ranged ATK, while other prefixes retain their
-ordinary effects; the aiming cursor refreshes immediately after an attack;
-failed attempts do not mutate gameplay. Valid shots may also provoke one
-response step beyond a monster's normal AGGRO;
-the rules are in Enemy AI (§22). The bow's hover cursor uses the same glowing
-red pixel-art style as the melee sword cursor.
+ordinary chests (§54, §20, §45), not the ordinary random weapon pool. Hunting
+Bows can appear in tier-3+ ordinary weapon rewards and in **25% of successful
+bow drops** from tier-3+ arrow-shooting monsters. Their base value is 600g,
+versus 300g for Short Bows. **Bow artifacts** can be generated from the normal
+artifact pool, inheriting each bow's fixed ranged power, two-handed restriction,
+and six-tile range. Enchantments and curses behave as on other equipped
+artifacts, but neither melee ATK bonuses nor artifact enchantments raise the
+fixed projectile damage. Unidentified bow artifacts retain their hidden names
+while equipped and firing. Like ordinary bows, they use the existing equipment,
+ammunition, and save rules. Replays record shots by enemy ID and tile.
+Monster-dropped and chest Short Bows can roll normal weapon prefixes, while the
+Merchant's basic bow is unmodified. Mighty increases the bow's ranged ATK, while
+other prefixes retain their ordinary effects; the aiming cursor refreshes
+immediately after an attack; failed attempts do not mutate gameplay. Valid shots
+may also provoke one response step beyond a monster's normal AGGRO; the rules
+are in Enemy AI (§22). The bow's hover cursor uses the same glowing red
+pixel-art style as the melee sword cursor.
 
 Prolonged Hammer has a Lucerne-style silhouette: a thin long handle, compact
 pronged hammer face, small rear peen and a long spike above the head.
@@ -6598,23 +6752,22 @@ loot. Its handle and peen are visual features: melee range and door-breaching
 rules remain those of an ordinary two-handed weapon. The transparent 24×24 SVG
 is `img/icons/Prolonged Hammer.svg`; magic variants retain the same base icon.
 
-Crescent Blades represent a matched pair equipped as one two-handed weapon:
-they occupy both hands and prevent shield use under the existing equipment rules.
+Crescent Blades represent a matched pair equipped as one two-handed weapon: they
+occupy both hands and prevent shield use under the existing equipment rules.
 They do not add a separate dual-wield attack; extra attacks use the normal GRACE
-checks. Sabre is one-handed; Katana and Kanabo Club are two-handed.
-These four weapons use the existing tier-based gear selection and modifier rules.
-Their icons are named exactly after their base names in `img/icons/`, with
-the existing generic weapon icon fallback. No special weapon abilities are added.
+checks. Sabre is one-handed; Katana and Kanabo Club are two-handed. These four
+weapons use the existing tier-based gear selection and modifier rules. Their
+icons are named exactly after their base names in `img/icons/`, with the
+existing generic weapon icon fallback. No special weapon abilities are added.
 
-Bone Cleaver (one-handed) and Titan Warpick (two-handed) extend tier 5's
-heavy weapon choices. War Sickle is a two-handed tier-4 finesse weapon;
-Chain Whip is a one-handed tier-4 alternative. Chain-sickle represents a
-kusarigama wielded with both hands and is deliberately a weaker novelty
-in the tier-5 pool (9 ATK, 3 GRACE).
-All five use ordinary ATK/GRACE combat and existing tier-based selection.
-Their silhouettes and themes do not grant armour piercing, parry bypass,
-additional hits, reach, or new damage types. Higher GRACE only affects the
-existing combat timing and extra-attack rules. Each has a matching 24×24
+Bone Cleaver (one-handed) and Titan Warpick (two-handed) extend tier 5's heavy
+weapon choices. War Sickle is a two-handed tier-4 finesse weapon; Chain Whip is
+a one-handed tier-4 alternative. Chain-sickle represents a kusarigama wielded
+with both hands and is deliberately a weaker novelty in the tier-5 pool (9 ATK,
+3 GRACE). All five use ordinary ATK/GRACE combat and existing tier-based
+selection. Their silhouettes and themes do not grant armour piercing, parry
+bypass, additional hits, reach, or new damage types. Higher GRACE only affects
+the existing combat timing and extra-attack rules. Each has a matching 24×24
 transparent SVG named exactly after its base name in `img/icons/`.
 
 ---
@@ -6644,9 +6797,9 @@ Other shields: -2
 
 Every shield except the Buckler also applies **−1 GRACE** while equipped.
 Inventory and trade item stat lines omit built-in shield and armor GRACE
-penalties to keep gear rows compact. The shield penalty still stacks with an armor GRACE
-penalty and reduces the player's extra-attack timing through effective weapon
-GRACE; it does not change the shield's DEF or SPD penalty.
+penalties to keep gear rows compact. The shield penalty still stacks with an
+armor GRACE penalty and reduces the player's extra-attack timing through
+effective weapon GRACE; it does not change the shield's DEF or SPD penalty.
 
 Shielding proficiency can convert an otherwise landed, non-glancing **melee**
 hit into a shield block, with a chance rising from 0% to 20%. It reduces the
@@ -6690,10 +6843,11 @@ Current armor:
 
 Armor subtracts only its stored `speedPenalty`; there is no additional flat SPD
 penalty. Robe and Jacket have no stored penalty; the other ordinary armor bases
-have the penalties above. Armor artifacts inherit the exact SPD and GRACE penalties of their normal base,
-not a universal −1 SPD cost. The same seven ordinary armor bases retain `gracePenalty: 1`; this is
-independent of their new total SPD penalties. Built-in GRACE penalties are
-omitted from inventory and trade stat lines.
+have the penalties above. Armor artifacts inherit the exact SPD and GRACE
+penalties of their normal base, not a universal −1 SPD cost. The same seven
+ordinary armor bases retain `gracePenalty: 1`; this is independent of their new
+total SPD penalties. Built-in GRACE penalties are omitted from inventory and
+trade stat lines.
 
 ---
 
@@ -6701,10 +6855,11 @@ omitted from inventory and trade stat lines.
 
 Ordinary generated weapons, shields and armor can receive **one** prefix. Under
 normal world rules its chance is `min(90%, 40% + 2% × generation MF)`. The six
-prefixes are equally likely once a modifier is selected. The Merchant's guaranteed
-enchanted weapon always has a prefix. Its purchase price is the greater of the
-normal configured price and its selling price plus 1g, preventing immediate
-buy/sell profit when an exceptional modifier promotes a cheap base to tier 5. Base item tier does not limit the bonus.
+prefixes are equally likely once a modifier is selected. The Merchant's
+guaranteed enchanted weapon always has a prefix. Its purchase price is the
+greater of the normal configured price and its selling price plus 1g, preventing
+immediate buy/sell profit when an exceptional modifier promotes a cheap base to
+tier 5. Base item tier does not limit the bonus.
 
 | Prefix | Equipped effect | Ordinary range at MF 0, without monster quality | Exceptional range |
 |---|---|---:|---:|
@@ -6751,17 +6906,18 @@ promotes the item to tier 5; promotion does not require the exceptional gate.
 
 Ordinary Profound uses `5 + min(10, floor(min(1, U + boost / 100) × 11))`.
 Without monster quality, every whole value from +5% to +15% is equally likely.
-MF does not raise XP strength. Equipped XP percentages add before award rounding:
-+10% on a weapon and +15% on armor produce +25%, so 100 base XP becomes 125
-without a racial XP bonus. Profound retains a separate ordinary numeric pricing
-roll; its actual XP percentage determines promotion, not that pricing amount.
+MF does not raise XP strength. Equipped XP percentages add before award
+rounding: +10% on a weapon and +15% on armor produce +25%, so 100 base XP
+becomes 125 without a racial XP bonus. Profound retains a separate ordinary
+numeric pricing roll; its actual XP percentage determines promotion, not that
+pricing amount.
 
 ## Exceptional bonuses and tier-5 promotion
 
 Each selected prefix first tests an exceptional gate. Without a monster source,
 or for a tier-1 monster, this is **0.10%**. Each additional monster tier adds
-**0.02 percentage points**, reaching **0.18%** at tier 5. MF never increases this
-gate; it can still increase the chance to receive a prefix at all.
+**0.02 percentage points**, reaching **0.18%** at tier 5. MF never increases
+this gate; it can still increase the chance to receive a prefix at all.
 
 A tier-1 or tier-2 base item from a tier-4 or tier-5 monster instead has a
 **triple exceptional gate**: **0.48%** for tier 4 or **0.54%** for tier 5.
@@ -6788,8 +6944,9 @@ Any final bonus above its old ceiling (**+10 ATK/DEF/SPD/MF, +59 HP, +15% XP**)
 sets the finished item's tier to **5**. Existing tier coloring makes its name
 red in inventory, equipment, trade and item logs. Base ATK/DEF, GRACE, speed
 penalties, hand requirements, base purchase value and base-icon lookup remain
-unchanged. Tier-based selling uses the promoted tier. A base stat above a ceiling
-alone does not promote an item; the comparison is against its prefix bonus.
+unchanged. Tier-based selling uses the promoted tier. A base stat above a
+ceiling alone does not promote an item; the comparison is against its prefix
+bonus.
 
 The rolled bonus and tier are ordinary item fields preserved through saves,
 replay starting snapshots, equipment swaps, theft and drops. No additional
@@ -6804,8 +6961,8 @@ separate through normal AI movement after generation.
 
 ## Monster quality
 
-The source monster's original tier improves ordinary quality slightly, independently
-of player MF. It also sets the exceptional chance:
+The source monster's original tier improves ordinary quality slightly,
+independently of player MF. It also sets the exceptional chance:
 
 | Monster tier | Ordinary quality boost | Exceptional gate per selected prefix |
 |---|---:|---:|
@@ -6816,9 +6973,9 @@ of player MF. It also sets the exceptional chance:
 | 5 | +4 | 0.18%, or 0.54% on tier-1/2 base gear |
 
 For flat stats, boost is added to the 1–100 roll; HP and XP use its normalized
-value before their amount formulas. Worn humanoid equipment is rolled once
-using monster tier and generation MF 0. Better gear also strengthens its wearer
-under the normal partial equipment-effectiveness rule. The exact same item drops;
+value before their amount formulas. Worn humanoid equipment is rolled once using
+monster tier and generation MF 0. Better gear also strengthens its wearer under
+the normal partial equipment-effectiveness rule. The exact same item drops;
 killing a monster does not reroll or improve it. Chest gear uses player MF,
 without a monster-source boost. Guaranteed Merchant gear has no monster boost.
 
@@ -6827,8 +6984,9 @@ without a monster-source boost. Guaranteed Merchant gear has no monster boost.
 The following chances include the chance of getting a modifier, selecting that
 prefix, and rolling the exact bonus. They assume the stated base item has
 **already been selected**, generation MF 0 and no monster-source boost, except
-the explicitly marked MF-10 row. They are not chances per kill and do not include
-the chance of selecting that particular weapon/armor/shield from the base pool.
+the explicitly marked MF-10 row. They are not chances per kill and do not
+include the chance of selecting that particular weapon/armor/shield from the
+base pool.
 
 | Selected base item | Prefix | Equipped result | Chance of this prefix and exact bonus | Approximately 1 in |
 |---|---|---|---:|---:|
@@ -6849,9 +7007,10 @@ a +20 flat-stat bonus is not a reward to expect in a typical run.
 
 At player MF 0, with normal world traits and ordinary humanoid equipment rules,
 the two equipment-generation attempts give `1 - (1 - p)^2` chance of wearing
-gear, where `p = 45% + 3% × monster tier`. Worn equipment drops as the same item.
-The following probabilities count **any base item and any of the six prefixes**,
-but require the exceptional branch (+11–20 flat stats, +60–100 HP, or +16–30% XP):
+gear, where `p = 45% + 3% × monster tier`. Worn equipment drops as the same
+item. The following probabilities count **any base item and any of the six
+prefixes**, but require the exceptional branch (+11–20 flat stats, +60–100 HP,
+or +16–30% XP):
 
 | Monster tier | Chance of wearing/dropping gear | Exceptional chance per selected prefix | Exceptional gear per kill | Approximately 1 in kills |
 |---|---:|---:|---:|---:|
@@ -6863,8 +7022,9 @@ but require the exceptional branch (+11–20 flat stats, +60–100 HP, or +16–
 
 For a tier-5 humanoid at MF 0, a **Mighty +20 on any base item** has probability
 approximately **0.0003097%**, or **one in 322,924 kills**, including the extra
-exceptional opportunities on low-tier bases. Requiring a specific base weapon reduces that chance
-further according to the weapon-type and weighted base-item selection rules.
+exceptional opportunities on low-tier bases. Requiring a specific base weapon
+reduces that chance further according to the weapon-type and weighted base-item
+selection rules.
 
 These are generation probabilities, not a reroll on death. An enemy's equipment
 is stored when it is created. Already-worn gear, replacements and stolen items
@@ -6902,7 +7062,8 @@ is re-equipped.
 
 Artifact generation uses separate content pools for:
 
-- standalone non-gear nouns (gear artifact nouns come directly from the three normal gear catalogs)
+- standalone non-gear nouns (gear artifact nouns come directly from the three
+  normal gear catalogs)
 - prefixes
 - epithets
 - dwarven names
@@ -6914,7 +7075,7 @@ Artifact generation uses separate content pools for:
 Current content includes approximately:
 
 ```text
-99 standalone artifact nouns, plus eligible gear names drawn from the weapon, shield, and armor catalogs
+99 standalone artifact nouns (only those with an enabled power are currently generated), plus eligible gear names drawn from the weapon, shield, and armor catalogs
 17 artifact prefixes
 20 epithets
 792 Dwarf names
@@ -6925,27 +7086,32 @@ Current content includes approximately:
 
 Natural artifact sources may select unrestricted, gear-only or standalone
 non-gear-only generation. The category filter is applied directly to the noun
-pool; it does not change effect tiers, quality, or curses.
-All generated artifacts start unidentified, including Merchant stock, buried
-finds and the Tower labyrinth reward. Identification reveals their powers and
-potential curses; generation never identifies them automatically.
+pool; it does not change effect tiers or quality. Mixed sources retain their
+original gear versus trinket selection odds: an ineligible trinket noun is
+replaced by a uniformly selected eligible trinket noun. All generated artifacts
+start unidentified, including Merchant stock, buried finds and the Tower
+labyrinth reward. Identification reveals their powers and potential curses;
+generation never identifies them automatically.
 
-Naturally generated artifact gear bases are selected only if their ordinary gear tier is no higher
-than the rolled artifact effect tier. A selected gear noun retains its **full
-ordinary base properties**, including weapon ATK/GRACE and two-handed status,
-shield DEF and shield SPD/GRACE penalties, or armor DEF and its exact SPD/GRACE
-penalties. The rolled artifact effect then adds its own independent bonuses (including
-SPD, which affects the player's movement) and curse; it never replaces the
-base statistics. For example, a Brigandine artifact
-starts with **12 DEF and −2 SPD** and adds any enchanted DEF on top. Shield, armor
-and weapon artifacts retain normal physical gear behavior (including weapon
-attacks on doors/crates). Trinkets have no inherent equipment stats and remain
-passive in inventory. An identified gear artifact appears in its corresponding
-inventory tab and compares with normal gear for upgrade suggestions. Gear-based
-artifacts use their base weapon, shield or armor SVG icon rather than the
-generic artifact icon; trinkets retain the generic icon, and missing gear
-SVGs fall back to the generic icon. Artifact combat messages use names without
-a leading `The`, including for already-named equipped artifact weapons.
+Naturally generated artifact gear bases are selected only if their ordinary gear
+tier is no higher than the rolled artifact effect tier. A selected gear noun
+retains its **full ordinary base properties**, including weapon ATK/GRACE and
+two-handed status, shield DEF and shield SPD/GRACE penalties, or armor DEF and
+its exact SPD/GRACE penalties. The rolled artifact effect then adds its own
+independent bonuses (including SPD, which affects the player's movement) and
+curse; it never replaces the base statistics. For example, a Brigandine artifact
+starts with **12 DEF and −2 SPD** and adds any enchanted DEF on top. Shield,
+armor and weapon artifacts retain normal physical gear behavior (including
+weapon attacks on doors/crates). New trinkets retain the rolled effect tier and
+base price, but receive one eligible power instead of random numeric bonuses or
+maximum-HP effects. Existing trinkets retain all saved bonuses, tier and prices.
+Trinkets remain passive in inventory. An identified gear artifact appears in its
+corresponding inventory tab and compares with normal gear for upgrade
+suggestions. Gear-based artifacts use their base weapon, shield or armor SVG
+icon rather than the generic artifact icon; trinkets retain the generic icon,
+and missing gear SVGs fall back to the generic icon. Artifact combat messages
+use names without a leading `The`, including for already-named equipped artifact
+weapons.
 
 **Converted equipment.** Existing weapons, shields and armor can also be
 augmented with an artifact power without rolling a new base or natural effect.
@@ -6960,10 +7126,10 @@ identification reveals the retained modifier through its numeric stat bonus,
 alongside the item tier, power and curse. Ability-specific bonuses or penalties
 still apply normally.
 
-These natural-effect percentages apply only after a source has already rolled an artifact
-drop. They do not describe the chance of getting an artifact in the first
-place. Once the drop happens, the effect tier is selected uniformly from the
-effects available to that enemy tier. The current pool has 4 tier-3 effects,
+These natural-effect percentages apply only after a source has already rolled an
+artifact drop. They do not describe the chance of getting an artifact in the
+first place. Once the drop happens, the effect tier is selected uniformly from
+the effects available to that enemy tier. The current pool has 4 tier-3 effects,
 6 tier-4 effects, and 4 tier-5 effects:
 
 | Source enemy tier | Tier 3 effect | Tier 4 effect | Tier 5 effect |
@@ -7008,9 +7174,8 @@ The <Cursed Prefix> <noun>    (non-gear artifacts)
 
 For example, a cursed non-gear artifact might be named `The Forgotten Amulet`,
 while gear artifacts omit the leading `The` so attack logs never say
-`your The Flail of ...`. If no cursed
-prefix is available, the naming code falls back to the normal epithet pattern
-(`<noun> of <Epithet>`) or simply `<noun>`.
+`your The Flail of ...`. If no cursed prefix is available, the naming code falls
+back to the normal epithet pattern (`<noun> of <Epithet>`) or simply `<noun>`.
 
 Unidentified artifacts display:
 
@@ -7029,9 +7194,9 @@ their ordinary tier and color.
 
 # 40. Artifact Identification
 
-Artifacts begin unidentified.
-Equipping unidentified artifact gear is allowed and applies its real effects,
-but neither equips nor ordinary stat changes identify it.
+Artifacts begin unidentified. Equipping unidentified artifact gear is allowed
+and applies its real effects, but neither equips nor ordinary stat changes
+identify it.
 
 Before identification, their stats are hidden as:
 
@@ -7075,8 +7240,10 @@ Each generated **equipment artifact** also grants exactly **one power** in
 addition to its ordinary item properties, artifact bonuses and possible curse.
 The assignment is made when the item is generated and persists as its own
 `abilityId`. It never rerolls upon identification, equipping, dropping, saving
-or loading. Adaptive artifact rewards follow the same rule. Passive trinkets
-have no eligible powers until they receive configured domains.
+or loading. Adaptive artifact rewards follow the same rule. Newly generated
+passive trinkets also receive one power from their enabled domains, but no
+random base stat bonuses. Their effects apply while carried, regardless of
+identification; their names and details remain hidden until identified.
 
 The domain catalog lives in `content/artifact_abilities.json`:
 
@@ -7086,33 +7253,187 @@ The domain catalog lives in `content/artifact_abilities.json`:
 | Bow | `archery` (never `martial`) |
 | Armor | `bulwark`, `armors` |
 | Shield | `bulwark`, `shields` |
+| Feather, Girdle, Tippet, Scarf, Anklet, Flint, Sextant, Shoehorn, Adze, Amphora, Jug, Rope, Bridle, Saddle | `wayfaring` |
 
 Specific item bases can add more domains. The eligible pool is the **union of
 all enabled, unique ability IDs** in the item's domains: every power in that
-union has equal probability, regardless of its domain's size. A power listed
-in several domains is included only once. Only fully implemented powers are
+union has equal probability, regardless of its domain's size. A power listed in
+several domains is included only once. Only fully implemented powers are
 eligible to roll. Adding a future trinket or other equipment domain uses the
-same assignment and selection system. `bulwark` powers are shared between
-armor and shields; `armors` and `shields` contain their respective slot-exclusive
+same assignment and selection system. `bulwark` powers are shared between armor
+and shields; `armors` and `shields` contain their respective slot-exclusive
 powers. Slot eligibility follows domain membership, not individual slot checks.
 For weapon-class-specific powers, a further one-handed/two-handed melee filter
 is applied before uniform selection. Membership in multiple domains never adds
 extra copies or increases selection weight.
 
-An artifact ability is active while its weapon, armor or shield is equipped.
-Identical abilities on several equipped artifacts **do not stack**; different
+An artifact ability is active while its weapon, armor or shield is equipped, or
+its passive trinket is carried. Identical abilities on several active artifacts
+**do not stack**, except for Drifter's per-instance MF rolls; different
 abilities can interact. An unidentified artifact conceals the power's name and
 description, even when equipped, but its power still works. An identified
-artifact shows the power's name alongside its other inventory statistics.
-Base stats and additive modifiers are displayed together (e.g. `DEF 9+3`);
-innate armor/shield SPD and GRACE penalties are omitted from the item stat
-line, but still apply under the normal equipment rules. Fleetfoot cancels
-equipment SPD penalties while equipped, but does not cancel GRACE penalties.
-Identifying or inspecting it displays the power's description in the message
-log. Inspecting does not reroll anything. Activated powers use the existing
-message log and floating combat-text animation. An unidentified power uses a
-generic popup without disclosing its hidden identity; animations never decide
-combat outcomes or consume game RNG.
+artifact shows the power's name alongside its other inventory statistics. Base
+stats and additive modifiers are displayed together (e.g. `DEF 9+3`); innate
+armor/shield SPD and GRACE penalties are omitted from the item stat line, but
+still apply under the normal equipment rules. Fleetfoot cancels equipment SPD
+penalties while equipped, but does not cancel GRACE penalties. Identifying or
+inspecting it displays the power's description in the message log. Inspecting
+does not reroll anything. Activated powers use the existing message log and
+floating combat-text animation. An unidentified power uses a generic popup
+without disclosing its hidden identity. Never Look Back reports both phase
+modifiers only in the message log, with no floating text even when unidentified.
+Animations never decide combat outcomes or consume game RNG.
+
+### Wayfaring — terrain, survival and wandering
+
+Only trinket nouns assigned to enabled domains can be generated naturally. The
+rolled tier and base value follow the ordinary artifact effect pool, and do not
+restrict Wayfaring powers. The same uniform, deduplicated domain selection and
+identification-dependent prices apply to gear and trinkets.
+
+| Power | Effect while carried | Price bonus |
+|---|---|---:|
+| Highlander | Hills remove the ordinary SPD penalty. Replace their +1 DEF with `min(5, 2 + floor(pre-terrain DEF / 10))`. If a player on a hill knocks an enemy from a hill onto lower terrain, extend knockback one tile, applying normal collision and entry hazards at each step. | 360g |
+| Adrenaline | `+2 + round(0.1 × permanent SPD)` SPD strictly below 25% of current maximum HP. | 250g |
+| Permafrost | Immune to environmental freezing. +3 DEF on cold terrain (snow, taiga, lake ice, frozen river and snow-underlaid water/river); −3 DEF on sand. Warmth does not remove the terrain bonus. | 270g |
+| Exile | Gain ATK and DEF with distance from the Temple: `floor(10 × clamp((d - 50)/(max(51, 0.8 × farthest) - 50), 0, 1))`. Here `d` is Chebyshev distance from the Temple plus `50 × abs(Z)`, and `farthest` is the maximum surface distance from the Temple. Blocks Temple HP healing and Scroll of Homecoming, but not Temple poison cleansing or revival. | 500g |
+| Drifter | Each instance permanently rolls +8–15 MF at creation; copies stack. Carrying any Drifter blocks Scroll of Homecoming without consuming the scroll, a turn or RNG. | 450g |
+| Troglodyte | `n = clamp(-4 - Z, -8, 8)`; ATK and DEF change by `n`, maximum HP by `5 × n` percent (additive with other artifact HP percentages). Current HP is capped on reductions, never increased by changing depth or carrying/removing this power. | 400g |
+| Pilgrim | Temple healing cap becomes `min(max HP, 100 + floor(0.1 × max HP))`, subject to the usual XP requirement and Exile restriction. Every 700 personally discovered tiles grant 10% max HP (rounded down, minimum 1) and `30 × level` base XP. | 450g |
+| Trailblazer | Every five newly discovered tiles reduce all active cooldowns of Wayfaring artifacts by one turn; one additional shared reduction roll uses the sum of XP bonus percentages (capped at 100%). No running cooldown means no reduction or RNG roll. Existing gear cooldowns are unaffected. | 350g |
+| Expedition | First actual visit to a previously unvisited global underground Z grants 25% max HP (rounded down, minimum 1) and 100 base XP. Even visits without this trinket mark the depth visited; skipped floors do not count. The legacy Crypt and shared map at the same Z share this reward. | 300g |
+| Prospector | First entry to each mine floor while carrying the power grants +25 effective Mining, capped at 100, for 100 world turns. A new qualifying floor refreshes the bonus, not its magnitude. The bonus affects detection, mining strikes and strain; training always uses the permanent skill. Removing the artifact suspends the bonus without resetting its expiry. | 250g |
+| Firekeeper | Rest without food restores 1 HP every two consecutive rest turns instead of four. Food-based rest retains its ordinary rate. | 150g |
+| Endurance | Every 20 consecutive ordinary steps without HP loss restore 1% max HP (rounded down, minimum 1), plus an additional racial regeneration pulse and, if food recovery remains, one extra food pulse consuming its normal recovery time. Troll racial recovery adds 1 HP. Turns without an ordinary step, level transitions or HP loss break the streak; failed movement without a turn does not. | 400g |
+| Nomad’s Curse | Racial and food regeneration (including accelerated camp recovery and the extra Endurance pulses) heal twice as much if the preceding completed world turn discovered new terrain, otherwise heal nothing. The food timer continues normally. Direct healing, weak food-free rest and Endurance's base heal are unaffected. | 350g |
+| Longstrider | After each randomly selected interval of 5–10 successful ordinary steps, omit one enemy phase and roll the next interval. Failed moves, attacks, interactions, free steps and forced moves do not count; putting the power down pauses its progress. | 500g |
+| Never Look Back | If the preceding completed world turn discovered new terrain, 50% chance to omit one enemy phase; otherwise 25% chance to add one. The current turn's discovery is only used on the next turn. | 450g |
+| Windwalker | Actual melee misses, projectile dodges and prepared Evasion dodges have 40% chance to prepare one manually directed free step. This can coexist with Elusive. Uses normal entry rules; no additional enemy response or terrain-speed movement cost. | 400g |
+| Skirmisher | A step or martial Evasion relocation that breaks adjacency to a living hostile enemy prepares +20 critical-chance percentage points on the next bow shot, even if it misses. Equipping the bow does not spend the charge. | 300g |
+| Tidefang | Leaving actual swimming for dry land adjacent to a living hostile enemy prepares +20 critical-chance percentage points on the next melee strike. A miss spends the charge; stepping off ice or into a shallow river does not qualify. | 200g |
+| Water Walking | Walk on deep water for eight completed world turns, regardless of the number of steps per turn. While protected, ordinary item use, archery and dry-land movement speed apply; no swimming practice or swimming-triggered powers. A non-deep-water tile restores the reserve. Exhaustion begins normal swimming immediately, with normal swimming endurance charged on the next swim action. | 350g |
+| Frostwalker | Freezes water and rivers underfoot into temporary ice bridges, with a shared cracking and melting deadline. Forced displacement can break cracked tiles; see Magical ice under Snow / Cold. | 450g |
+| Emberwalker | Allows entry onto lava. Every entered lava tile costs 5% maximum HP (rounded to nearest integer, minimum 1); a stationary turn on lava pays once. Multiple Rush steps pay separately. Ashen Wanderer overrides the damage. | 250g |
+| Ashen Wanderer | Lava is harmless; each completed world turn spent actually swimming costs 2% maximum HP (rounded to nearest integer, minimum 1), including Merlings. Walking on water or ice is not swimming. Intrinsic curse, occupying the ordinary curse slot. | 400g |
+| Castaway | Once per Temple visit, fatal damage during actual swimming sends the player to a reachable unoccupied safe shore on the same map and Z, before Death Shield is considered. Health becomes 1 + floor(max HP × min(10%, 1% × floor(Swimming / 10))); Merlings count as Swimming 100. If no valid shore exists, the rescue is not spent and normal fatal damage rules apply. Exile does not prevent recharging. | 450g |
+| Escape Artist | Prevents Rooted, including clearing any existing root when the artifact is acquired. Web pull distance becomes `max(0, round(normal pull distance × random integer 25–75 / 100) - floor(max(0, player ATK - source ATK) / 5))`. Generic non-web grasp is unaffected; the spider attacks only if the resolved position is adjacent. | 300g |
+| Rush | Choose up to four successive legal steps with normal directions, including turns. Each entry resolves immediately; the sprint consumes one world turn total. Trap triggers, ice collapse, involuntary displacement and Rooted interrupt it. The first successful step commits a 500-turn cooldown; cancelling before moving is free. | 450g |
+| Backtrack | Return to the exact position at the end of the world turn three turns earlier, including stationary turns. Destination must be free and walkable on the same Z and map identity; does not restore HP, items, statuses or time. 500-turn cooldown. | 400g |
+| Blink | Randomly choose a free tile reachable within 12 ordinary dry walking steps without opening doors or interacting with terrain. Unknown tiles are eligible. Same Z and map identity only; God Mode does not bypass these restrictions. 500-turn cooldown. | 500g |
+| Phantom Trail | Create a stationary translucent double on the player’s current tile for eight world turns, including the activation turn. It is hidden and cannot be targeted while the player occupies that tile. When an enemy attempts a direct attack against the player, it has a 50% chance to target the double instead if it is a legal target within its attack range. Pursuing enemies can also spend their pursuit action attacking the double when they cannot directly attack the player. True Sight and blind creatures ignore it. The double survives attacks. Each fooled enemy grants one surprise opening: +10 critical chance percentage points for the next direct strike against it, also +25% melee damage with Shadow Strike. These half-strength bonuses do not stack with the corresponding full invisible-strike bonuses. 500-turn cooldown. | 450g |
+| Forestwalker | +10 concealment percentage points, retain successful cover across one open tile, multiply forest ambush chance by 0.25; woodland-adapted races can prepare a guaranteed dodge (30-turn cooldown). | 350g |
+| Unseen | Hide beside cover after a stationary noncombat turn; retain each observer's result along cover and across two open tiles. | 450g |
+| One with the Wild | Ordinary beasts respect a forest truce; attacking beasts in the forest disables it for 1,000 turns. | 400g |
+| Farsight | Reveal a wholly undiscovered square on the current map, side `min(6, 4 + floor(max(0, MF)/5))`. Underground it must overlap the connected cavern and cannot include floor belonging to another complex. See scouting below. 1,000-turn cooldown. | 400g |
+| Spelunker | At natural cave entrances, sense the size of the connected cave on the destination level, whether it has a deeper passage and another exit. | 200g |
+
+Pilgrim and Expedition announce their reward before the XP gain and any
+resulting level-up messages.
+
+Farsight uses seeded RNG to choose uniformly among valid squares on the surface
+or, underground, among valid squares where at least half the area is normally
+walkable terrain (rounded up). If no underground square reaches that density, it
+chooses uniformly among the valid squares with the greatest number of walkable
+tiles, so narrow tunnels remain eligible. Doors, deep water and other
+non-walkable obstacles count toward connectivity but not walkable density;
+temporary actors and player movement powers do not influence the density score.
+Underground survey connectivity ignores doors, water, lava, obstacles and
+actors, but not solid separating walls or void; diagonal contact across two
+solid corners does not connect caverns. The square can include rock but not
+traversable terrain in a disconnected complex. Revealed terrain stays
+discovered; it never adds exploration rewards. On the activation turn’s
+completion, a read-only remote scene opens using the regular tile or ASCII world
+renderer. Fog of war and player-centered darkness do not obscure cells inside
+the vision square; the surrounding world is not shown. Underground living
+creatures in the square are shown at their current positions until the next
+completed world turn. Closing the view is free and returns to the player’s
+ordinary camera; the player can also switch to the world map centered on the
+revealed location. The vision never extends combat sight or targeting
+permission, and never changes the player’s position. Vision bounds and expiry
+are saved; replay resolves the same reveal without opening the UI. No valid
+square means no turn or cooldown.
+
+Spelunker surveys the actual matching natural cave entrance on the destination
+global level, without changing position, consuming time, or marking terrain
+discovered. It counts connected non-wall cells (including water and obstacles),
+classified as Tiny (under 100), Small (100–249), Medium (250–499), Large
+(500–999) and Vast (1,000 or more). It reports only the presence of a matching
+deeper cave stair or fort shaft and other matching upward exits, never their
+locations or hidden mechanisms. The entrance's inspection log and arrival
+description both expose this information; unrelated complexes and the legacy
+Crypt are excluded.
+
+Active powers require identification and are activated from the carried item's
+Use action. An invalid or unavailable destination costs neither time nor
+cooldown. Ordinary item-use restrictions apply; Rooted blocks Rush but not Blink
+or Backtrack. Active powers consume their own shared character cooldown,
+continue recovering even when absent, and qualify for Trailblazer reductions.
+Forestwalker’s dodge cooldown and the broken-truce cooldown also use this
+registry and qualify for Trailblazer.
+
+Rush uses the regular movement keys, mobile D-pad, and adjacent tile clicks or
+taps. The active status displays the remaining steps. Press T, Enter or Escape,
+or tap the character to finish early. Faraway path requests and unrelated
+actions are blocked during the sprint, so they cannot interleave with its
+unfinished turn. Every step resolves entry effects, including a separate natural
+ice entry check; the final checked ice tile is not checked again during the
+single world turn. World timers and scheduled enemy phases still resolve only
+once (subject to the ordinary phase modifiers). Rush does not count as ordinary
+movement for Endurance or Longstrider; it can prepare Skirmisher and Tidefang
+through real movement. Teleports resolve landing effects and discovery, but do
+not count as ordinary steps or prepare those movement-based attacks. The
+position history, pending sprint, double location and expiry, and unique fooled
+enemy IDs are retained across saves and replay. The double does not occupy a
+collision tile, trigger traps, move, or change floors; targeted melee,
+projectile and direct hostile spell attacks may be diverted, but area damage and
+self-targeted enemy spells are not. The opening is spent on the next attack
+attempt against that enemy, including a miss, and is removed on the enemy's
+death or player death.
+
+Exile, Drifter, Troglodyte, Nomad’s Curse and Never Look Back are intrinsic
+curses: they use the cursed naming and resale rules and cannot additionally roll
+a periodic curse. Their restrictions apply even unidentified. Other powers,
+including Permafrost, can roll a normal curse. Positional and low-health bonuses
+are excluded from permanent ATK/DEF/SPD statistics; Drifter's stored MF is
+included in ordinary MF.
+
+Discovery rewards use genuine first-time map discovery, not camera movement,
+quest map hints or magical map reveals. The surface uses a fixed circular radius
+of eight tiles centered on the player, independent of viewport and tile size;
+enclosed tower rooms obey dungeon line of sight. Underground discovery retains
+existing sight geometry, including the mine radius and open tower summit.
+Distant light alone does not mark terrain explored. Discovery is applied by
+simulation actions, not FOV queries, rendering or UI. Starting sight establishes
+the baseline without granting exploration rewards. No-turn movement and normal
+floor transitions contribute to the next completed turn's discovery result; God
+Mode's visual reveal and no-turn debug floor travel do not grant rewards. Actual
+exploration while using God Mode still counts. Pilgrim and Trailblazer retain
+partial discovery progress while the relevant power is absent. XP rewards apply
+the normal character XP multiplier. Pilgrim reports the actual HP restored in
+its exploration reward message when healing occurs. Cooldowns belong to the
+character, use absolute expiry turns, and continue ticking when an artifact is
+put down; Trailblazer can reduce a running Wayfaring cooldown even if that other
+artifact is temporarily absent. All counters, visited depths, temporary Mining
+expiry, regeneration history and cooldowns are saved and reproduced by replay.
+Copies of a power do not stack except Drifter.
+
+Enemy phase modifiers are additive: start with one phase, subtract each skip and
+add each extra phase, then clamp to zero. Poison, regeneration, ice, potions,
+cooldowns, fear duration and other world-turn clocks still tick once. Immediate
+reactions tied directly to an action (such as mimic ambushes and surprise
+retaliation) remain distinct from the scheduled enemy phase. The second phase
+uses ordinary AI, not the original targeted bow retaliation, and cannot resolve
+a telegraph prepared during the same world turn. NPCs act once. Enemy flight
+movement budgets count enemy action opportunities. Windwalker and Elusive can
+each hold one step; Windwalker is used first, allowing two successive free
+movements. Another turn-consuming action forfeits unused steps. Neither can turn
+movement into a free attack, open a door, interact with furniture, or enter a
+hidden mimic tile; tile-entry hazards still apply. Skirmisher and Tidefang
+sample the same-Z movement and swimming state; forced displacement is not a
+qualifying step. These unique charges, Longstrider's count and threshold, and
+free steps are stored on the character and replayed deterministically. Removing
+the granting trinket clears prepared crit/free-step charges; death clears
+prepared combat charges.
 
 ### Enabled powers
 
@@ -7135,7 +7456,7 @@ combat outcomes or consume game RNG.
 | Brace | bulwark | After the player has remained stationary since the preceding player action, grants **+20% DEF**, minimum **+2**. Any actual relocation, including forced movement, teleportation or a Z change, cancels the standing condition. |
 | Bravery (bulwark) | bulwark | Taking damage from a stronger enemy prepares **+25% damage** on the next successful melee hit. Misses do not consume it; the charge is unique, saved, and never duplicated by gear swaps. |
 | Death Veil | bulwark | Killing an enemy with a direct melee strike while already invisible adds **5 turns** to the remaining invisibility. It does not grant invisibility when none was active. |
-| Elusive | bulwark | When an enemy's melee attack misses, the next player action may be a **free one-tile move** chosen with normal movement controls. The move does not advance world time, but runs normal tile-entry effects. Attacking or choosing another action forfeits the opportunity; free steps cannot stack. |
+| Elusive | bulwark | When an enemy's melee attack misses, the next player action may be a **free one-tile move** chosen with normal movement controls. The move does not advance world time, but runs normal tile-entry effects. Attacking or choosing another turn-consuming action forfeits the opportunity; Elusive cannot stack with itself, but can coexist with Windwalker. |
 | Evasion (bulwark) | bulwark | Each attack action prepares a **30% chance** to dodge the next landed melee or projectile hit. A dodge test consumes the preparation regardless of its result. Not used against poison ticks or environmental damage. |
 | Executioner's Aura | bulwark | Killing an uninjured monster with a single direct melee hit has **50%** chance to scare other monsters within **3 tiles** for **3 turns**, subject to fear immunities. |
 | Fear Aura | bulwark | Fleeing from fear may frighten adjacent monsters for **3 turns** with **20%** probability per monster per player turn. Fear caused exclusively by this aura does not spread further. Standard fear immunities remain. |
@@ -7198,9 +7519,9 @@ ordinary stairs/lifts rules, without separate maps.
 
 Both variants belong to the **armors** domain. Armor rolls from the shared
 `bulwark` and armor-exclusive `armors` powers together, selecting one ability
-from their deduplicated union. Both use one shared
-calculation for nominal healing **after** the existing consumable/racial
-modifiers and **before** clipping to missing normal HP:
+from their deduplicated union. Both use one shared calculation for nominal
+healing **after** the existing consumable/racial modifiers and **before**
+clipping to missing normal HP:
 
 ```text
 normal healing = min(missing normal HP, nominal healing)
@@ -7225,13 +7546,13 @@ Explicit HP expenditures, including Blood Pact and mining strain, bypass it.
 Only actual loss of normal HP triggers HP-loss-based artifact abilities. This
 buffer never lasts for a timed number of turns.
 
-**Guard** converts
-`floor(min(excess healing, maximum HP × 0.5) / 5)` into DEF. It protects against
-the reaction immediately following drinking/eating and the next **four** consumed
-world turns. A greater grant replaces strength and restarts the duration;
-smaller or equal grants leave both unchanged. Free actions, UI and animations
-do not advance its clock. It is a flat derived DEF bonus and does not multiply
-any percentage-based DEF effects or protect against damage which ignores DEF.
+**Guard** converts `floor(min(excess healing, maximum HP × 0.5) / 5)` into DEF.
+It protects against the reaction immediately following drinking/eating and the
+next **four** consumed world turns. A greater grant replaces strength and
+restarts the duration; smaller or equal grants leave both unchanged. Free
+actions, UI and animations do not advance its clock. It is a flat derived DEF
+bonus and does not multiply any percentage-based DEF effects or protect against
+damage which ignores DEF.
 
 Both resources clear on armor removal/replacement or death, and can never be
 restored by re-equipping the same piece. When maximum HP decreases, stored
@@ -7287,8 +7608,8 @@ Reserve and source-target ID survive save/replay and clear on weapon removal
 or player death. The same rules cover unidentified artifacts without
 revealing the hidden ability in status displays or activation popups.
 
-For damaging melee powers, the regular
-critical/glancing calculations occur before the added damage multipliers.
+For damaging melee powers, the regular critical/glancing calculations occur
+before the added damage multipliers.
 
 Enrage and martial Bravery modify the melee attack input before DEF mitigation;
 Shadow Strike and Flurry apply after hit/critical/glancing resolution. When more
@@ -7324,24 +7645,23 @@ Direct melee strikes resolve independently of animation timing. A qualifying
 Executioner threshold crossing yields one extra strike, without inheriting the
 GRACE-only Flurry modifier. Cleave and Soulburst deal secondary damage with the
 existing enemy DEF and death-resolution paths but are not themselves weapon
-hits; their victims cannot set off additional Cleave or Soulburst effects.
-A single attack action can grant at most one post-attack martial Evasion step.
+hits; their victims cannot set off additional Cleave or Soulburst effects. A
+single attack action can grant at most one post-attack martial Evasion step.
 Both Evasion steps and Elusive free movement use ordinary tile entry rules,
-including traps and movement-state changes; Elusive does not spend a turn.
-Binding is tied to enemies, and every genuine player position change clears all
-bindings, including forced relocation and level transitions. Effects never
-propagate from one Z level to another.
-Petrification skips one actual opportunity for that enemy to act; silence only
-blocks the existing spell dispatch, while confusion reuses the ordinary movement,
-attack and death rules. The fear origins and per-target propagation attempts are
-stored on enemies; fear never crosses Z levels or recurses. Disarm checks actual
-equipment first, then a modeled archer bow when present; enemies currently equip
-one physical item, not separate physical weapon and shield slots. A removed physical item
-is the exact original equipment object, not newly rolled loot; only the virtual
-archer bow is materialized as a new item. When the item is
-dropped, its stat modifications are reversed using the same gear logic as
-ordinary unequipping. Disarm and the separate loss of a modeled bow both survive
-save, load and replay.
+including traps and movement-state changes; Elusive and Windwalker do not spend
+a turn. Binding is tied to enemies, and every genuine player position change
+clears all bindings, including forced relocation and level transitions. Effects
+never propagate from one Z level to another. Petrification skips one actual
+opportunity for that enemy to act; silence only blocks the existing spell
+dispatch, while confusion reuses the ordinary movement, attack and death rules.
+The fear origins and per-target propagation attempts are stored on enemies; fear
+never crosses Z levels or recurses. Disarm checks actual equipment first, then a
+modeled archer bow when present; enemies currently equip one physical item, not
+separate physical weapon and shield slots. A removed physical item is the exact
+original equipment object, not newly rolled loot; only the virtual archer bow is
+materialized as a new item. When the item is dropped, its stat modifications are
+reversed using the same gear logic as ordinary unequipping. Disarm and the
+separate loss of a modeled bow both survive save, load and replay.
 
 Soul Eater reuses the ordinary summoning constructor, spawn validation, occupied
 cells, enemy turn lockout and Ghost species template; no special level or
@@ -7384,9 +7704,9 @@ neither post-attack movement nor free movement depends on animation progress.
 
 # 42. Artifact Curse System
 
-Approximately **10% of artifacts** roll as cursed.
-
-Cursed artifacts have:
+Ordinary artifacts have a base **10% chance** to roll a periodic curse (reduced
+by MF). An intrinsic curse instead occupies the entire curse slot and always
+applies its own power-specific drawback. Periodically cursed artifacts have:
 
 - curse interval
 - one or more curse events
@@ -7468,13 +7788,12 @@ probabilities must total at most 1; the remainder is the chance of no drop
 from that group. All units of a stack are awarded by one roll. These drops
 are separate from artifact and equipment rewards.
 
-**Nymph** has a **20%**
-chance to drop one Healing Herb, independently of its healing magic or
-ordinary humanoid gear. **Wyrdhag** has a **19.8%**
-total chance to drop a Life Potion, Healing Herb or Mushroom, each with an
-absolute **6.6%** chance and the same exclusive `healing` group. This loot chance
-does not increase with Magic Find. Using its own healing item in combat does
-not alter the separate death-drop roll.
+**Nymph** has a **20%** chance to drop one Healing Herb, independently of its
+healing magic or ordinary humanoid gear. **Wyrdhag** has a **19.8%** total
+chance to drop a Life Potion, Healing Herb or Mushroom, each with an absolute
+**6.6%** chance and the same exclusive `healing` group. This loot chance does
+not increase with Magic Find. Using its own healing item in combat does not
+alter the separate death-drop roll.
 
 The following **32 non-humanoid species** always drop raw meat on death
 (except deaths that suppress ordinary loot), with fixed quantities:
@@ -7486,10 +7805,9 @@ The following **32 non-humanoid species** always drop raw meat on death
 | **3** | Owlbear, Wyvern |
 
 Other non-humanoid species provide **one tradeable material per successful
-roll**, except Tholosum, which drops a
-stack of **two Chitin**. Each chance is independent of other loot and Magic
-Find; a failed roll provides no material. These are alternative drops, not
-extra meat:
+roll**, except Tholosum, which drops a stack of **two Chitin**. Each chance is
+independent of other loot and Magic Find; a failed roll provides no material.
+These are alternative drops, not extra meat:
 
 | Material | Species and drop chance | Sell value per item |
 | --- | --- | ---: |
@@ -7501,25 +7819,24 @@ extra meat:
 | Amethyst | Vrakeber **40%** | 16g |
 | Rare Trophy | NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN **100%** each | 60g |
 
-Wyvern, Manticore and Alacran additionally have an independent **55%** chance to drop
-one Venom Gland alongside their guaranteed meat. Either drop can be collected
-separately when the creature is killed from a distance.
+Wyvern, Manticore and Alacran additionally have an independent **55%** chance to
+drop one Venom Gland alongside their guaranteed meat. Either drop can be
+collected separately when the creature is killed from a distance.
 
-Materials are stackable and may be sold or dropped. Venom Glands can also
-be consumed to prepare a poisoned weapon or arrow (see the Poison rules in
-§20); the other materials have no crafting or consumption effects. The
-six materials have dedicated inventory artwork; the
-existing Amethyst item retains its current mineral appearance and interactions.
-Fungus continues to drop **1–3 Mushrooms** with certainty through its separate
-mushroom rule. Material drop configuration lives in
-`content/enemy_templates.json`, while item properties live in
+Materials are stackable and may be sold or dropped. Venom Glands can also be
+consumed to prepare a poisoned weapon or arrow (see the Poison rules in §20);
+the other materials have no crafting or consumption effects. The six materials
+have dedicated inventory artwork; the existing Amethyst item retains its current
+mineral appearance and interactions. Fungus continues to drop **1–3 Mushrooms**
+with certainty through its separate mushroom rule. Material drop configuration
+lives in `content/enemy_templates.json`, while item properties live in
 `content/items.json`.
 
-All other species, including unlisted non-humanoids, have **no meat drop**.
-Meat is a stackable supply worth **2 gold per cut** when sold. It cannot
-be eaten raw, but can be roasted at a lit fireplace. Its inventory icon is `img/icons/meat.svg`;
-it is represented by the standard supplies glyph in ASCII mode.
-The quantities, chance and chosen species are configured in
+All other species, including unlisted non-humanoids, have **no meat drop**. Meat
+is a stackable supply worth **2 gold per cut** when sold. It cannot be eaten
+raw, but can be roasted at a lit fireplace. Its inventory icon is
+`img/icons/meat.svg`; it is represented by the standard supplies glyph in ASCII
+mode. The quantities, chance and chosen species are configured in
 `content/enemy_templates.json`; meat's item data is in `content/items.json`.
 
 When the player kills a monster from more than one Chebyshev tile away, its
@@ -7534,16 +7851,17 @@ drop chances, quest credit or combat timing.
 Each generated Dwarven Fort/Ruins floor from **z:-3 through the deepest Ruins
 floor** contains **1–2 loose Life Potions**, selected from reachable, safe,
 unoccupied marble outside the Ruins stair halls. Both arriving and departing
-stair rooms remain empty transit spaces, including during supply placement.
-The count is configured under
-`dwarvenRuins.loot.lifePotionsPerFortFloor`; the separate Dwarven Mines are not
-included. These supplies are ordinary ground items, not refillable containers.
+stair rooms remain empty transit spaces, including during supply placement. The
+count is configured under `dwarvenRuins.loot.lifePotionsPerFortFloor`; the
+separate Dwarven Mines are not included. These supplies are ordinary ground
+items, not refillable containers.
 
-Each ordinary **Library** room in the Ruins has a **30%** chance to contain
-one loose rare scroll on its floor, chosen with equal weight from Fear, Chaos,
-Fireball and Death Shield. Rooms get independent rolls; a successful room receives at
-most one additional scroll on an accessible unoccupied floor tile. Both chance
-and item kinds are configurable in `dwarvenRuins.loot.libraryScrolls`.
+Each ordinary **Library** room in the Ruins has a **30%** chance to contain one
+loose rare scroll on its floor, chosen with equal weight from Fear, Chaos,
+Fireball and Death Shield. Rooms get independent rolls; a successful room
+receives at most one additional scroll on an accessible unoccupied floor tile.
+Both chance and item kinds are configurable in
+`dwarvenRuins.loot.libraryScrolls`.
 
 ## Enemy artifact drops
 
@@ -7554,20 +7872,22 @@ this path. Non-player deaths keep their ordinary loot eligibility, but cannot
 trigger equipment conversion. A humanoid may drop both a trinket and converted
 gear during the same death.
 
-The permanent, rounded strength `S` is captured before death processing (including
-equipment removal), using the same HP-inclusive score as the strongest-kill record.
-`W` is the active enemy artifact drop-rate multiplier divided by its configured
-neutral value: normally 1, or 1.875 in Relic World (0.75 / 0.40).
+The permanent, rounded strength `S` is captured before death processing
+(including equipment removal), using the same HP-inclusive score as the
+strongest-kill record. `W` is the active enemy artifact drop-rate multiplier
+divided by its configured neutral value: normally 1, or 1.875 in Relic World
+(0.75 / 0.40).
 
 ```text
 trinket chance = min(4.8% × W, S × 0.00025 × (1 + MF × 0.05) × W)
 ```
 
 The normal cap is 4.8%; Relic World has a 9% cap. Natural trinket generation
-retains its source-tier effect pool, MF quality and curse rules. This roll never
-creates a new weapon, shield or armor. Converted equipment uses the separate
-rule in §44. Other artifact sources (including guaranteed adaptive rewards and
-special chests) are independent and retain their own generation rules.
+retains its source-tier and MF quality rules, but uses only eligible powered
+trinkets and their intrinsic or ordinary curse rules. This roll never creates a
+new weapon, shield or armor. Converted equipment uses the separate rule in §44.
+Other artifact sources (including guaranteed adaptive rewards and special
+chests) are independent and retain their own generation rules.
 
 ---
 
@@ -7596,11 +7916,12 @@ The multiplier and applied bonuses persist in current saves and replay states.
 
 ## Equipment is generated on spawn
 
-Humanoid equipment is determined once at spawn, before the player encounters
-it. All ordinary humanoid populations (surface, caves, Fort, Ruins, Tower,
-Labyrinth and Mines) use the same equipment generator. Scripted encounters and
-summons with dedicated equipment rules retain those rules. There is no separate
-underground roll or second attempt on floor entry, loading or replay restoration.
+Humanoid equipment is determined once at spawn, before the player encounters it.
+All ordinary humanoid populations (surface, caves, Fort, Ruins, Tower, Labyrinth
+and Mines) use the same equipment generator. Scripted encounters and summons
+with dedicated equipment rules retain those rules. There is no separate
+underground roll or second attempt on floor entry, loading or replay
+restoration.
 
 Preparation is recorded for each ordinary humanoid before rolling. Even if both
 rolls fail, another preparation call cannot reroll equipment or reapply humanoid
@@ -7616,12 +7937,12 @@ P(equipment) = 1 - (1 - firstRoll) × (1 - fallbackRoll)
 ```
 
 The fallback runs only if the first roll fails. The existing world-trait
-adjustment to the first roll's base probability and category weights is retained.
-The prefix multiplier is 1 by default; individual ordinary prefixes can be
-configured to increase both rolls through `enemyEquipmentPrefixMultipliers`.
-No additional prefix bonus is enabled by default. The actual selected prefix
-is known before the ordinary equipment rolls, even when its stat effects are
-applied afterward.
+adjustment to the first roll's base probability and category weights is
+retained. The prefix multiplier is 1 by default; individual ordinary prefixes
+can be configured to increase both rolls through
+`enemyEquipmentPrefixMultipliers`. No additional prefix bonus is enabled by
+default. The actual selected prefix is known before the ordinary equipment
+rolls, even when its stat effects are applied afterward.
 
 The depth multiplier is `min(1.10, 1 + max(0, -z) × 0.02)`, applied to each
 roll before its existing 90% cap. It uses the monster's spawn Z, not the
@@ -7672,37 +7993,37 @@ into the item generator. Therefore MF does **not**:
 The generation tier is an upper limit on base equipment, not a guarantee of
 matching equipment. Within that eligible base-item pool, each item has weight
 **2** when matching the source monster's tier, **1.5** when one tier below, and
-**1** when further below. Items remain individually weighted, so tier probabilities
-also depend on the number of eligible catalog entries. The fallback roll may
-lower the upper limit by one, but the original monster tier still determines
-quality and weights. Chest and Merchant base selections retain uniform weighting.
+**1** when further below. Items remain individually weighted, so tier
+probabilities also depend on the number of eligible catalog entries. The
+fallback roll may lower the upper limit by one, but the original monster tier
+still determines quality and weights. Chest and Merchant base selections retain
+uniform weighting.
 
 Monster tier additionally improves prefix strength and the exceptional gate as
 specified in section 36. Player MF still does not improve worn-item modifier
 quality. An exceptional roll may promote a weak base item above the source tier;
 that is an intentional tier-5 quality classification, not a new base item.
 
-Only enemies actually assigned the **arrow-shooter role** may wear a Hunting Bow.
-Having a species capable of ranged attacks is insufficient: a non-shooting Kobold,
-a stone thrower or a non-shooting humanoid uses the melee-only weapon pool.
-The shooter role is decided before rolling equipment. Monsters that cannot
-shoot arrows cannot equip bows stolen from the player or taken from a corpse.
-If such gear is found equipped in a restored game, its combat bonuses are
-removed with the invalid equipment. A bow-capable archer remains eligible
-even after running out of ammunition.
+Only enemies actually assigned the **arrow-shooter role** may wear a Hunting
+Bow. Having a species capable of ranged attacks is insufficient: a non-shooting
+Kobold, a stone thrower or a non-shooting humanoid uses the melee-only weapon
+pool. The shooter role is decided before rolling equipment. Monsters that cannot
+shoot arrows cannot equip bows stolen from the player or taken from a corpse. If
+such gear is found equipped in a restored game, its combat bonuses are removed
+with the invalid equipment. A bow-capable archer remains eligible even after
+running out of ammunition.
 
-The worn item is already stored on the enemy as `e.equipment`.
-Combat glancing-hit messages and enemy tooltips (both hover inspection and
-pinned combat tooltips) show only the equipment's base name, so they do not
-reveal a modifier prefix before the item drops. Distant
-ground-drop messages likewise show only the base item name. A collected
-ordinary gear item reveals its full modifier prefix, while an unidentified
-artifact keeps its hidden identity. Every enemy item-drop message omits the
-indefinite article before the item name (for example, a nearby collected
-"Mighty Crescent Blades" or a distant "Short Bow"). Stackable rewards still
-display quantities when appropriate. This
-wording applies to regular gear, ammunition, special enemy drops, and
-biological materials without changing reward probabilities or inventory items.
+The worn item is already stored on the enemy as `e.equipment`. Combat
+glancing-hit messages and enemy tooltips (both hover inspection and pinned
+combat tooltips) show only the equipment's base name, so they do not reveal a
+modifier prefix before the item drops. Distant ground-drop messages likewise
+show only the base item name. A collected ordinary gear item reveals its full
+modifier prefix, while an unidentified artifact keeps its hidden identity. Every
+enemy item-drop message omits the indefinite article before the item name (for
+example, a nearby collected "Mighty Crescent Blades" or a distant "Short Bow").
+Stackable rewards still display quantities when appropriate. This wording
+applies to regular gear, ammunition, special enemy drops, and biological
+materials without changing reward probabilities or inventory items.
 
 The item type is selected independently:
 
@@ -7743,8 +8064,8 @@ conversion chance = min(0.325, 0.0035 × S × sqrt(S / 35) × (1 + MF × 0.05) �
 These are normal-world probabilities conditional on eligibility, not per kill.
 The hard 32.5% cap applies in all worlds. Prefix identity does not independently
 modify the probability; unprefixed tier-3+ humanoids use the same formula.
-Higher strength does not upgrade the original item's
-tier or modifier. See §38 for preserved properties and ability-only generation.
+Higher strength does not upgrade the original item's tier or modifier. See §38
+for preserved properties and ability-only generation.
 
 A humanoid currently has one physical equipment slot. A valid conversion roll
 consumes the enemy's sole attempt whether it succeeds or fails. Ineligible
@@ -7760,44 +8081,45 @@ placement, automatic collection, hidden identification and rare-drop feedback
 follow the existing loot rules. Each equipment instance is delivered at most
 once, including stolen gear recovered after Disarm.
 
-The level-11 target of 3–5 additional gear artifacts is a balance estimate,
-not a guaranteed outcome. The calibration script (`tests/enemy-artifact-balance.cjs`)
-samples 75 humanoid kills (30/25/15/5 at tiers 1/2/3/4; MF 0/5/10 over
-consecutive groups of 25). Other kills and guaranteed rewards are excluded.
-Its fast `--fixture` mode evaluates the saved population unchanged. An absent
-item does not reveal whether preparation was skipped or its rolls failed, so
-this mode never regenerates equipment or adjusts monster stats. It compares
-current conversion eligibility with a prefixed-only counterfactual on the same
-population; neither result measures the equipment-generation fix. Relic World
-figures in this mode apply only the artifact probability multiplier, not a new
-world's population or traits. Fresh generation is required to measure current
-spawn rules. Neither mode simulates XP progression to level 11 or acquisition
-from all sources. Actual exploration routes and generated populations vary;
-conversions are gross rewards, not net gain over random artifact loot.
+The level-11 target of 3–5 additional gear artifacts is a balance estimate, not
+a guaranteed outcome. The calibration script
+(`tests/enemy-artifact-balance.cjs`) samples 75 humanoid kills (30/25/15/5 at
+tiers 1/2/3/4; MF 0/5/10 over consecutive groups of 25). Other kills and
+guaranteed rewards are excluded. Its fast `--fixture` mode evaluates the saved
+population unchanged. An absent item does not reveal whether preparation was
+skipped or its rolls failed, so this mode never regenerates equipment or adjusts
+monster stats. It compares current conversion eligibility with a prefixed-only
+counterfactual on the same population; neither result measures the
+equipment-generation fix. Relic World figures in this mode apply only the
+artifact probability multiplier, not a new world's population or traits. Fresh
+generation is required to measure current spawn rules. Neither mode simulates XP
+progression to level 11 or acquisition from all sources. Actual exploration
+routes and generated populations vary; conversions are gross rewards, not net
+gain over random artifact loot.
 
 ---
 
 # 45. Chests
 
-The surface and underground areas contain chests. Generated chests, potions
-and scrolls cannot occupy the same tile on the same level/map. Every newly
-opened chest also has an independent **0.5%** chance to contain a Flint Stone,
+The surface and underground areas contain chests. Generated chests, potions and
+scrolls cannot occupy the same tile on the same level/map. Every newly opened
+chest also has an independent **0.5%** chance to contain a Flint Stone,
 including guaranteed equipment/artifact chests. This extra roll leaves the
-ordinary chest reward probabilities unchanged. Surface loose
-supplies sample legal, unoccupied ground-item positions without replacement,
-preserving configured counts while enough valid positions exist. Cave loot
-already reserves each selected position. Runtime drops are unaffected.
-Loose scrolls of Identification, Invisibility, Fear, Chaos, Fireball and Homecoming are
-collected when the player steps onto them, just like other loose consumables;
-their inventory stacks and save/replay behavior follow the ordinary item rules.
-The surface starts with up to four remote tier-3 chests guarded by tier-3+
-monsters, ordinary chests at roughly one per **720 eligible walkable tiles**,
-and up to twelve additional edge chests. The ordinary chest density
-(`spawning.surfaceTilesPerChest` in `content/map_config.json`) preserves
-the former 45 chests per ~32,370 eligible tiles of a 260 × 180 world.
-Up to five of the edge chests are placed along the northern edge first; remaining
-ones can appear on any edge. Each edge chest is on walkable ground within a
-tier-3+ monster's aggro range, with tier matching that monster.
+ordinary chest reward probabilities unchanged. Surface loose supplies sample
+legal, unoccupied ground-item positions without replacement, preserving
+configured counts while enough valid positions exist. Cave loot already reserves
+each selected position. Runtime drops are unaffected. Loose scrolls of
+Identification, Invisibility, Fear, Chaos, Fireball and Homecoming are collected
+when the player steps onto them, just like other loose consumables; their
+inventory stacks and save/replay behavior follow the ordinary item rules. The
+surface starts with up to four remote tier-3 chests guarded by tier-3+ monsters,
+ordinary chests at roughly one per **720 eligible walkable tiles**, and up to
+twelve additional edge chests. The ordinary chest density
+(`spawning.surfaceTilesPerChest` in `content/map_config.json`) preserves the
+former 45 chests per ~32,370 eligible tiles of a 260 × 180 world. Up to five of
+the edge chests are placed along the northern edge first; remaining ones can
+appear on any edge. Each edge chest is on walkable ground within a tier-3+
+monster's aggro range, with tier matching that monster.
 
 Submerged treasure adds **15–30 ordinary surface chests** per generated world,
 controlled by `surfaceLoot.submergedChests` in `content/world_generation.json`.
@@ -7882,13 +8204,13 @@ consumed player turn checks Mimics **only on the active level**. Being in FOV
 resets the unseen counter and cancels an unrolled episode. After **three
 consecutive unseen turns**, each out-of-view episode receives precisely one
 **65% chance** to move by one of its eight neighboring squares. Failing the
-roll, or finding no safe destination, means it does not move again until a
-new episode; re-entering a level starts a fresh unseen episode. A destination
-must be safe, unseen, nonhazardous and unoccupied, and must not be stairs,
-doors, traps or loot. The hidden chest is a traversable ground item, not a
-wall: movement into a one-tile passage does not change walkable terrain or
-sever connectivity. A failed shift requires a blocked, unsafe, occupied or
-visible destination; only successful shifts change the position. No animation, detection
+roll, or finding no safe destination, means it does not move again until a new
+episode; re-entering a level starts a fresh unseen episode. A destination must
+be safe, unseen, nonhazardous and unoccupied, and must not be stairs, doors,
+traps or loot. The hidden chest is a traversable ground item, not a wall:
+movement into a one-tile passage does not change walkable terrain or sever
+connectivity. A failed shift requires a blocked, unsafe, occupied or visible
+destination; only successful shifts change the position. No animation, detection
 message, tooltip, or new map-memory marker exposes the movement. The terrain
 remains explored, but its former chest sprite is not remembered there.
 
@@ -7941,10 +8263,11 @@ loaded from `content/loot_tables.json`. The first entry whose `upTo` threshold
 exceeds the roll determines the result. If no entry matches, the configured
 `elseResult` is used.
 
-The roll is at least 0 and strictly below 100. Thresholds are cumulative:
-each result's percentage chance is its upper threshold minus the previous
-threshold (starting at 0). `elseResult` gets the remaining percentage above
-the last threshold. The table uses the configured percentages directly, conditional on artifact failure.
+The roll is at least 0 and strictly below 100. Thresholds are cumulative: each
+result's percentage chance is its upper threshold minus the previous threshold
+(starting at 0). `elseResult` gets the remaining percentage above the last
+threshold. The table uses the configured percentages directly, conditional on
+artifact failure.
 
 | Result | Cumulative upper threshold (rounded) | Chance (rounded) |
 |---|---:|---:|
@@ -7964,25 +8287,26 @@ the last threshold. The table uses the configured percentages directly, conditio
 | Scroll of Death Shield | 95 | 0.5% |
 | Scroll of Identification (`elseResult`) | 100 | 5% |
 
-For example, a roll of 79 gives an Invisibility scroll, 86 gives Stone Skin,
-31 gives Fireball, and 96 reaches the Identification-scroll fallback. All new supplies use their
-catalog item IDs in chest outcomes, ground pickups, inventory actions and replay.
+For example, a roll of 79 gives an Invisibility scroll, 86 gives Stone Skin, 31
+gives Fireball, and 96 reaches the Identification-scroll fallback. All new
+supplies use their catalog item IDs in chest outcomes, ground pickups, inventory
+actions and replay.
 
-An ordinary chest's gold result is a uniform **15–30 gold per chest tier**
-(tier 1: 15–30, tier 2: 30–60, tier 3: 45–90, tier 4: 60–120,
-tier 5: 75–150). Magic Find adds **2 gold per point** before the world's
-chest-gold multiplier and rounding. This changes the payout, not the gold
-result's **30.5%** conditional chance or any of the other conditional loot probabilities; scripted
-and guaranteed-artifact rewards have separate tables.
+An ordinary chest's gold result is a uniform **15–30 gold per chest tier** (tier
+1: 15–30, tier 2: 30–60, tier 3: 45–90, tier 4: 60–120, tier 5: 75–150). Magic
+Find adds **2 gold per point** before the world's chest-gold multiplier and
+rounding. This changes the payout, not the gold result's **30.5%** conditional
+chance or any of the other conditional loot probabilities; scripted and
+guaranteed-artifact rewards have separate tables.
 
 The **100-point roll chooses the result category**. If the result is gear, a
 second roll chooses weapon/armor/shield according to that chest entry's
-configured chances.
-Arrows and Chitin use seeded uniform stack counts and merge with existing
-inventory stacks. Short Bows may have ordinary weapon prefixes and use the normal
-auto-equip rule. The nine percentage points assigned to these three outcomes
-come entirely from gold; every other ordinary chest outcome retains its conditional chance.
-Guaranteed artifact and royal treasury chests retain their separate rewards.
+configured chances. Arrows and Chitin use seeded uniform stack counts and merge
+with existing inventory stacks. Short Bows may have ordinary weapon prefixes and
+use the normal auto-equip rule. The nine percentage points assigned to these
+three outcomes come entirely from gold; every other ordinary chest outcome
+retains its conditional chance. Guaranteed artifact and royal treasury chests
+retain their separate rewards.
 
 Gear generated from a chest uses the chest tier (capped by the entry's
 `gearMaxTier`) and passes the player's Magic Find into the item generator.
@@ -8049,24 +8373,23 @@ Wyrdling increases the duration by 25%: 20 turns become 25 turns. Reading
 the scroll consumes the first turn, leaving 19 or 24 subsequent turns,
 respectively.
 
-While invisible, enemies without `trueSight` or `blind` never acquire or chase the player and continue to
-wander normally. The following hit reactions apply to those enemies; Oculus and
-blind monsters use ordinary combat. A hit on a surviving enemy, even a zero-damage glancing hit,
-provokes exactly one immediate reaction instead of that enemy's wander action
-for the turn. A miss causes no reaction; evasive enemies cannot use their
-special dodge against an invisible attacker. An enemy killed by the attack
-cannot react. A single roll gives
-10% confusion (no action), then a flee chance of
+While invisible, enemies without `trueSight` or `blind` never acquire or chase
+the player and continue to wander normally. The following hit reactions apply to
+those enemies; Oculus and blind monsters use ordinary combat. A hit on a
+surviving enemy, even a zero-damage glancing hit, provokes exactly one immediate
+reaction instead of that enemy's wander action for the turn. A miss causes no
+reaction; evasive enemies cannot use their special dodge against an invisible
+attacker. An enemy killed by the attack cannot react. A single roll gives 10%
+confusion (no action), then a flee chance of
 `clamp(30% - 2% × enemy tier - 1% × enemy AGGRO + 0.5% × damage received, 5%, 90%)`.
 On a flee result, the enemy moves one tile to an open walkable neighbor,
 preferring maximum distance from the player; if no tile is available, it stays
-put and reports being cornered. The remaining probability is a wild lash-out:
-if still adjacent, the enemy makes one ordinary attack with one tenth of its
-normal hit chance (including normal damage, armor, and critical-hit rules).
-No reaction grants lasting awareness or subsequent pursuit. God mode
-invisibility uses the same hit reaction; with its invisibility toggled off,
-ordinary visible combat applies. Invisibility is therefore not guaranteed
-protection when attacking.
+put and reports being cornered. The remaining probability is a wild lash-out: if
+still adjacent, the enemy makes one ordinary attack with one tenth of its normal
+hit chance (including normal damage, armor, and critical-hit rules). No reaction
+grants lasting awareness or subsequent pursuit. God mode invisibility uses the
+same hit reaction; with its invisibility toggled off, ordinary visible combat
+applies. Invisibility is therefore not guaranteed protection when attacking.
 
 The merchant stocks three Scrolls of Invisibility at 200g each, configured
 under `scrolls.invisibilityScroll` in `content/merchant_stock.json`. The
@@ -8077,11 +8400,18 @@ load; selling a scroll back to the merchant makes it available again.
 
 Returns the player to the Temple. Temple healing follows the same level 1
 exception, XP rule from level 2 onward, and 70-HP cap. Its canonical item kind
-and replay action are `homecomingscroll`, and
-its icon is `img/icons/homecomingscroll.svg`. Its merchant price is 70g, with
-nine in stock at world creation. This stock is finite and never automatically
-replenished after purchases, save/load, or replay restoration. Selling a scroll
-back adds exactly one scroll to the available stock. The stock config key is `scrolls.homecomingScroll`.
+and replay action are `homecomingscroll`, and its icon is
+`img/icons/homecomingscroll.svg`. Its merchant price is 70g, with nine in stock
+at world creation. This stock is finite and never automatically replenished
+after purchases, save/load, or replay restoration. Selling a scroll back adds
+exactly one scroll to the available stock. The stock config key is
+`scrolls.homecomingScroll`.
+
+Carrying Exile or Drifter prevents reading Homecoming, even if unidentified. A
+blocked attempt consumes no scroll, turn or RNG (including berserk frenzy) and
+does not create or replace the bound Scroll of Wayfaring. The log names a known
+blocking power, or uses a generic message if none is identified. The restriction
+does not block reading an existing Scroll of Wayfaring.
 
 ## Scroll of Wayfaring
 
@@ -8130,11 +8460,11 @@ after the 25% bonus is rounded, for 19 turns.
 
 ## Tactical consumables
 
-All six items are stackable Supplies in `content/items.json`. Reading or drinking
-uses one ordinary turn, with the same swimming restrictions as existing supplies.
-Each has a unique transparent image shared between inventory and ground rendering,
-a colored ASCII glyph (`?` for scrolls, `!` for potions), and an inspection action
-that describes its rules without consuming it.
+All six items are stackable Supplies in `content/items.json`. Reading or
+drinking uses one ordinary turn, with the same swimming restrictions as existing
+supplies. Each has a unique transparent image shared between inventory and
+ground rendering, a colored ASCII glyph (`?` for scrolls, `!` for potions), and
+an inspection action that describes its rules without consuming it.
 
 | Item | Effect | Duration | Base value / sell value |
 |---|---|---|---|
@@ -8145,29 +8475,29 @@ that describes its rules without consuming it.
 | Potion of Stone Skin | `+6 + floor(DEF / 6)` DEF; −3 GRACE | 15 turns | 60g / 30g |
 | Potion of Berserk | `+4 + floor(ATK / 6)` ATK; −3 DEF; −2 GRACE | 15 turns | 60g / 30g |
 
-Fear excludes undead regardless of tier; constructs and other non-humanoid species remain eligible.
-A disguised Mimic within Fear radius reveals before target selection, so its tier-3
-construct is frightened by the same cast (unless protected by an existing immunity).
-Radii use Chebyshev distance (eight-direction tile distance) on the current map
-and level. Wyrdling extends Fear to 13 turns and the two potions to 19 turns.
-Chaos can teleport creatures from one side of iron prison bars or a closed
-barred prison door to the other, but cannot land on an impassable bar or pass
-through opaque walls and ordinary shut doors. Safe landing, terrain, and
-occupancy rules remain unchanged.
-It also multiplies each combat potion's entire positive stat bonus by 1.25,
-rounded to the nearest integer after adding the flat and scaling portions:
+Fear excludes undead regardless of tier; constructs and other non-humanoid
+species remain eligible. A disguised Mimic within Fear radius reveals before
+target selection, so its tier-3 construct is frightened by the same cast (unless
+protected by an existing immunity). Radii use Chebyshev distance
+(eight-direction tile distance) on the current map and level. Wyrdling extends
+Fear to 13 turns and the two potions to 19 turns. Chaos can teleport creatures
+from one side of iron prison bars or a closed barred prison door to the other,
+but cannot land on an impassable bar or pass through opaque walls and ordinary
+shut doors. Safe landing, terrain, and occupancy rules remain unchanged. It also
+multiplies each combat potion's entire positive stat bonus by 1.25, rounded to
+the nearest integer after adding the flat and scaling portions:
 
 ```text
 Stone Skin DEF bonus = round((6 + floor(DEF / 6)) × 1.25)
 Berserk ATK bonus = round((4 + floor(ATK / 6)) × 1.25)
 ```
 
-At 18 DEF, Stone Skin gives +11 instead of +9 DEF; at 18 ATK, Berserk gives
-+9 instead of +7 ATK. Their GRACE/DEF penalties are unchanged. Fear's radius and
-tier restriction, Chaos's radii and Death Shield's single charge are unchanged. As with Speed and
-Invisibility, the activation action consumes the first duration turn. Fear
-resolves one retreat action on that turn; its remaining timer then reads 9
-(or 12 for Wyrdling). Potion counters read 14 (or 18).
+At 18 DEF, Stone Skin gives +11 instead of +9 DEF; at 18 ATK, Berserk gives +9
+instead of +7 ATK. Their GRACE/DEF penalties are unchanged. Fear's radius and
+tier restriction, Chaos's radii and Death Shield's single charge are unchanged.
+As with Speed and Invisibility, the activation action consumes the first
+duration turn. Fear resolves one retreat action on that turn; its remaining
+timer then reads 9 (or 12 for Wyrdling). Potion counters read 14 (or 18).
 
 **Berserk frenzy:** while Berserk is active and at least one living enemy
 is adjacent, each attempted movement, wait, or ordinary consumable use has a
@@ -8181,97 +8511,105 @@ interfere with movement. This drawback does not alter the potion's stat bonuses
 or duration. RNG rolls and target choice happen at action resolution, before
 animations, and are attributed to the attempted action in replay recordings.
 
-**Fear:** every eligible monster in range is affected, including unseen or sleeping
-monsters. It retreats even from an invisible player and cannot shoot, summon,
-charge or pull while afraid. A monster with no retreat destination may use ordinary
-adjacent melee if it can see the player; it otherwise stays put. Any positive damage,
-including trap damage, ends that monster's fear immediately, even before its
-action later in the same turn; misses and zero damage do not. Fear takes priority
-over the immediate reaction to a non-damaging invisible hit.
-Repeated casts refresh to at least the new full duration, never add durations.
-Fear timers expire on elapsed world turns even if the player changes maps. A violet
-face marker and a Frightened tooltip counter distinguish it from wounded fleeing.
-Ordinary Ruins warnings from moving fleeing monsters still apply.
+**Fear:** every eligible monster in range is affected, including unseen or
+sleeping monsters. It retreats even from an invisible player and cannot shoot,
+summon, charge or pull while afraid. A monster with no retreat destination may
+use ordinary adjacent melee if it can see the player; it otherwise stays put.
+Any positive damage, including trap damage, ends that monster's fear
+immediately, even before its action later in the same turn; misses and zero
+damage do not. Fear takes priority over the immediate reaction to a non-damaging
+invisible hit. Repeated casts refresh to at least the new full duration, never
+add durations. Fear timers expire on elapsed world turns even if the player
+changes maps. A violet face marker and a Frightened tooltip counter distinguish
+it from wounded fleeing. Ordinary Ruins warnings from moving fleeing monsters
+still apply.
 
-**Death Shield:** protects against melee, ranged attacks, poison, freezing,
-drowning, poisonous mushrooms and dungeon traps. The charge is consumed immediately
-at damage resolution; another hit or hazard in the same turn can kill the player.
-Melee and ranged combat logs show the triggering hit **before** the shield-shatter
-message, even when a faster weapon earns a follow-up strike. Shield resolution
-still occurs synchronously before status effects, knockback and that next hit.
-It neither heals further nor cures poison. There is no expiry and healing does not
-recharge it. Reading another while ready consumes neither item nor turn. Its ready
-status stays visible, with a distinct shield-breaking message and floating effect.
+**Death Shield:** Castaway, when available with a safe reachable shore during
+actual swimming, resolves before Death Shield. Death Shield protects against
+melee, ranged attacks, poison, freezing, drowning, poisonous mushrooms and
+dungeon traps. The charge is consumed immediately at damage resolution; another
+hit or hazard in the same turn can kill the player. Melee and ranged combat logs
+show the triggering hit **before** the shield-shatter message, even when a
+faster weapon earns a follow-up strike. Shield resolution still occurs
+synchronously before status effects, knockback and that next hit. It neither
+heals further nor cures poison. There is no expiry and healing does not recharge
+it. Reading another while ready consumes neither item nor turn. Its ready status
+stays visible, with a distinct shield-breaking message and floating effect.
 
-**Chaos:** the affected set is captured before anyone moves. Each actor receives a
-random distinct safe destination within 8 tiles of its own starting position, in
-its currently reachable terrain component on the same map/level. Connectivity uses
-that actor's movement abilities and eight-direction movement; closed and locked
-doors block connectivity. Landing tiles must be walkable dry ground, excluding
-water, rivers, lava, ice, trap triggers and occupied tiles. NPCs never move; monsters
-cannot land within the surface Temple's sanctuary. Original actor tiles remain
-reserved so an actor without a valid destination can safely stay put. The player
-is resolved first, then monsters in their existing stable order. Only actors with
-valid destinations consume a seeded destination roll. Movement resolves together
-before presentation; exploration, swimming state, occupancy and player pickup are
-updated immediately. Teleportation does not automatically enter stairs or another
-map. Monsters receive their ordinary action after the scroll is used.
+**Chaos:** the affected set is captured before anyone moves. Each actor receives
+a random distinct safe destination within 8 tiles of its own starting position,
+in its currently reachable terrain component on the same map/level. Connectivity
+uses that actor's movement abilities and eight-direction movement; closed and
+locked doors block connectivity. Landing tiles must be walkable dry ground,
+excluding water, rivers, lava, ice, trap triggers and occupied tiles. NPCs never
+move; monsters cannot land within the surface Temple's sanctuary. Original actor
+tiles remain reserved so an actor without a valid destination can safely stay
+put. The player is resolved first, then monsters in their existing stable order.
+Only actors with valid destinations consume a seeded destination roll. Movement
+resolves together before presentation; exploration, swimming state, occupancy
+and player pickup are updated immediately. Teleportation does not automatically
+enter stairs or another map. Monsters receive their ordinary action after the
+scroll is used.
 
-**Combat potions:** bonuses are sampled when drunk from the corresponding current
-stat excluding both combat potions. The stat used for scaling is floored at zero;
-gear, racial bonuses, terrain and other existing modifiers still apply. A repeated
-dose replaces the sampled bonus and refreshes duration without stacking or feeding
-its own bonus back into the formula. Both potion types may coexist. GRACE penalties
-stack with gear penalties in the character sheet's penalty total and combat timing;
-the existing minimum effective weapon GRACE of 1 still applies, so slow weapons
-pay less of a timing cost. Expiry or actual death removes the modifiers. Highscores
-uses permanent stats, excluding both potions and their GRACE penalties.
+**Combat potions:** bonuses are sampled when drunk from the corresponding
+current stat excluding both combat potions. The stat used for scaling is floored
+at zero; gear, racial bonuses, terrain and other existing modifiers still apply.
+A repeated dose replaces the sampled bonus and refreshes duration without
+stacking or feeding its own bonus back into the formula. Both potion types may
+coexist. GRACE penalties stack with gear penalties in the character sheet's
+penalty total and combat timing; the existing minimum effective weapon GRACE of
+1 still applies, so slow weapons pay less of a timing cost. Expiry or actual
+death removes the modifiers. Highscores uses permanent stats, excluding both
+potions and their GRACE penalties.
 
 Ordinary chests use the percentages above; guaranteed-artifact chests keep their
 artifact rule. On the surface, **75%** of the nine loose Invisibility-scroll
-slots instead become Identification, Fear, Chaos or Fireball scrolls with respective
-relative weights **3:2:1:1**; 25% remain Invisibility. Expected Invisibility
-scrolls from these slots fall from **5.4 to 2.25 per world**. The separate
-loose Speed-Potion slots keep their **40%** chance to become a tactical
-consumable (Stone Skin 3, Berserk 3, Fear 2, Chaos 1.5, Death Shield 0.5, Fireball 1.5).
-Total loose-item counts and Life Potions are unchanged. Both replacement tables are editable in `content/loot_tables.json`.
+slots instead become Identification, Fear, Chaos or Fireball scrolls with
+respective relative weights **3:2:1:1**; 25% remain Invisibility. Expected
+Invisibility scrolls from these slots fall from **5.4 to 2.25 per world**. The
+separate loose Speed-Potion slots keep their **40%** chance to become a tactical
+consumable (Stone Skin 3, Berserk 3, Fear 2, Chaos 1.5, Death Shield 0.5,
+Fireball 1.5). Total loose-item counts and Life Potions are unchanged. Both
+replacement tables are editable in `content/loot_tables.json`.
 
 Player potion timers, exact sampled bonuses and ready shield charge, plus each
-monster's remaining fear timer, initialize on new actors, persist in current saves
-and replay snapshots, and restore without rerolling effects. Save version 55 rejects
-older saves/replays; no conversion is provided. All item RNG and state changes run
-synchronously before animations.
+monster's remaining fear timer, initialize on new actors, persist in current
+saves and replay snapshots, and restore without rerolling effects. Save version
+55 rejects older saves/replays; no conversion is provided. All item RNG and
+state changes run synchronously before animations.
 
 ## Scroll of Fireball
 
-Reading opens targeting without consuming a scroll, turn, or RNG. Choose a visible,
-unobstructed tile within **6 tiles Chebyshev distance**. On desktop, hover to
-preview and click once to cast; Escape cancels. No Cast/Cancel panel is shown.
-Arrow keys/WASD move the aim and Enter casts. On touch devices, tap to preview,
-then press Cast or tap the same tile again. Cancel/Escape costs nothing. The amber range overlay and stronger
-blast overlay work in tile and ASCII modes; the player's tile turns red when
-inside the blast. Targeting closes on save restoration and is never persisted.
+Reading opens targeting without consuming a scroll, turn, or RNG. Choose a
+visible, unobstructed tile within **6 tiles Chebyshev distance**. On desktop,
+hover to preview and click once to cast; Escape cancels. No Cast/Cancel panel is
+shown. Arrow keys/WASD move the aim and Enter casts. On touch devices, tap to
+preview, then press Cast or tap the same tile again. Cancel/Escape costs
+nothing. The amber range overlay and stronger blast overlay work in tile and
+ASCII modes; the player's tile turns red when inside the blast. Targeting closes
+on save restoration and is never persisted.
 
-The footprint is **5×5 with the four corners removed (21 tiles before clipping)**.
-Relative offsets run from −2 to +2 on each axis, centered on the selected tile.
-The projectile lands at that exact center.
-Walls, opaque terrain and shut opaque doors block both the shot and straight
-blast rays; two touching opaque corners also block diagonal fire. Bars pass fire.
-The blast does not bend around walls. Other creatures do not intercept the shot.
-Only visible cells are previewed; creatures in unseen blast cells still take damage.
-A disguised Mimic inside the clipped blast is revealed and damaged by that
-same cast, without a free opening ambush attack.
+The footprint is **5×5 with the four corners removed (21 tiles before
+clipping)**. Relative offsets run from −2 to +2 on each axis, centered on the
+selected tile. The projectile lands at that exact center. Walls, opaque terrain
+and shut opaque doors block both the shot and straight blast rays; two touching
+opaque corners also block diagonal fire. Bars pass fire. The blast does not bend
+around walls. Other creatures do not intercept the shot. Only visible cells are
+previewed; creatures in unseen blast cells still take damage. A disguised Mimic
+inside the clipped blast is revealed and damaged by that same cast, without a
+free opening ambush attack.
 
-Each living monster in the footprint and the player independently roll an integer
-from **10 through 50**, uniformly (mean **30**), without armor/DEF reduction,
-shield blocks, accuracy checks, critical hits, or weapon-skill training. Magical
-immunity and one-use Death Shields retain their effects; ethereal bodies are not
-immune to magical fire. Positive damage wakes and alerts monsters, breaks fear,
-and reveals invisible victims. Ordinary kill XP, quest credit and loot apply;
-distant drops stay at the victim's tile. Noncombat NPCs and terrain are unaffected.
-Casting from Temple sanctuary is prohibited, as with bow attacks. Swimming
-restrictions and Berserk's 25% adjacent-enemy interruption apply at commitment;
-an interrupted cast attacks instead without spending the scroll.
+Each living monster in the footprint and the player independently roll an
+integer from **10 through 50**, uniformly (mean **30**), without armor/DEF
+reduction, shield blocks, accuracy checks, critical hits, or weapon-skill
+training. Magical immunity and one-use Death Shields retain their effects;
+ethereal bodies are not immune to magical fire. Positive damage wakes and alerts
+monsters, breaks fear, and reveals invisible victims. Ordinary kill XP, quest
+credit and loot apply; distant drops stay at the victim's tile. Noncombat NPCs
+and terrain are unaffected. Casting from Temple sanctuary is prohibited, as with
+bow attacks. Swimming restrictions and Berserk's 25% adjacent-enemy interruption
+apply at commitment; an interrupted cast attacks instead without spending the
+scroll.
 
 One scroll is consumed on a valid cast. Damage resolves in the casting turn,
 then surviving monsters take their normal turn. All damage rolls are captured
@@ -8279,28 +8617,29 @@ before effects and kill rewards; self-inflicted lethal damage cannot be undone
 by leveling up from a simultaneous kill. A fiery projectile travels for 280 ms,
 then a 780 ms effect flashes at the center and expands into a turbulent, hollow
 ring of fire with fading embers. Flame tongues can extend slightly beyond the
-exact damage footprint on open ground, so the circular ring is not visibly
-cut off at tile boundaries. The visual effect still stops at opaque terrain,
-blocked rays and unseen cells; the target preview marks the actual affected
-tiles, including its excluded corners. Victims remain visible until impact,
-then play their falling death effects. A lethal self-hit starts the player's
-fall only at impact, and the death-screen fade waits until the fireball burst
-finishes. Damage and death still resolve in the casting turn; these delays are
-purely visual and input remains blocked through presentation. Animation frames
-never consume gameplay RNG or resolve damage. Replay records the scroll's
-identity and target coordinates, reusing the same action and seeded damage rolls.
-Changing the blast footprint changes replay outcomes; saves and replay initial
-states require the current save schema. No older-save conversion is provided.
-No new persistent combat status is introduced; inventory, ground drops and stock
-use ordinary item save/replay serialization.
+exact damage footprint on open ground, so the circular ring is not visibly cut
+off at tile boundaries. The visual effect still stops at opaque terrain, blocked
+rays and unseen cells; the target preview marks the actual affected tiles,
+including its excluded corners. Victims remain visible until impact, then play
+their falling death effects. A lethal self-hit starts the player's fall only at
+impact, and the death-screen fade waits until the fireball burst finishes.
+Damage and death still resolve in the casting turn; these delays are purely
+visual and input remains blocked through presentation. Animation frames never
+consume gameplay RNG or resolve damage. Replay records the scroll's identity and
+target coordinates, reusing the same action and seeded damage rolls. Changing
+the blast footprint changes replay outcomes; saves and replay initial states
+require the current save schema. No older-save conversion is provided. No new
+persistent combat status is introduced; inventory, ground drops and stock use
+ordinary item save/replay serialization.
 
 The merchant stocks **three at 250g each**, selling value **125g**. Empty stock
-persists through save/load; selling back replenishes it normally. Fireball matches
-Chaos's loot frequency: **1.5% per ordinary chest**, **0.9% per dwarven crate**,
-and equal relative weights in surface supply variants and Ruins Library rooms.
-The chest probability comes from gold (30.5%), keeping Identification at 5%; crate
-probability comes from empty crates (83.1%). Adding it to weighted surface pools
-shares those existing supply slots rather than increasing their count.
+persists through save/load; selling back replenishes it normally. Fireball
+matches Chaos's loot frequency: **1.5% per ordinary chest**, **0.9% per dwarven
+crate**, and equal relative weights in surface supply variants and Ruins Library
+rooms. The chest probability comes from gold (30.5%), keeping Identification at
+5%; crate probability comes from empty crates (83.1%). Adding it to weighted
+surface pools shares those existing supply slots rather than increasing their
+count.
 
 ## Scroll of Identification
 
@@ -8308,17 +8647,18 @@ Identifies an artifact. The Merchant starts with six at 100g each.
 
 ## Healing Herb
 
-Foraged item. Its ordinary healing amount is calculated from maximum HP, then bounded before
-racial consumable bonuses:
+Foraged item. Its ordinary healing amount is calculated from maximum HP, then
+bounded before racial consumable bonuses:
 
 ```text
 base heal = clamp(round(25% of max HP), 20, 50)
 final heal = round(base heal × consumable multiplier)
 ```
 
-Wyrdling therefore increases the already-bounded base heal by 25%. For example, a 40-max-HP
-character heals 20 HP normally or 25 HP as a Wyrdling; a 400-max-HP character heals 50 HP
-normally or 63 HP as a Wyrdling. Actual recovery is still capped by missing HP.
+Wyrdling therefore increases the already-bounded base heal by 25%. For example,
+a 40-max-HP character heals 20 HP normally or 25 HP as a Wyrdling; a 400-max-HP
+character heals 50 HP normally or 63 HP as a Wyrdling. Actual recovery is still
+capped by missing HP.
 
 ## Handful of Berries
 
@@ -8339,23 +8679,23 @@ without creating a second healing stream; see Cooking and fireplace resting.
 Abandoned campfires and permanent **Dwarven Stoves** are reusable cooking and
 resting locations. Stand on or beside a campfire, or adjacent to a stove, and
 press **F** (the hand/forage control on touch) to open the cooking/rest panel.
-Use **Inspect** to search campfire ashes, including from an adjacent tile.
-Walls and sealed diagonal corners prevent interaction through them. Abandoned
+Use **Inspect** to search campfire ashes, including from an adjacent tile. Walls
+and sealed diagonal corners prevent interaction through them. Abandoned
 campfires retain their single 30% Potato search; stoves have no ash-search loot.
-Portable fire placement is not available.
-Outside scripted cave camps, ordinary shallow caves have a 25% campfire chance
-and ordinary z:-2 grotto caves have a 20% chance, subject to valid placement.
-Deep-cave campfires are independent of monster and treasure budgets and are
-placed on reachable dry cave floors, at least four tiles from every cave entrance.
+Portable fire placement is not available. Outside scripted cave camps, ordinary
+shallow caves have a 25% campfire chance and ordinary z:-2 grotto caves have a
+20% chance, subject to valid placement. Deep-cave campfires are independent of
+monster and treasure budgets and are placed on reachable dry cave floors, at
+least four tiles from every cave entrance.
 
 Lighting requires a reusable **Flint Stone** and consumes **one Brushwood** and
 one world turn. Campfires then support **12 subsequent turns**; Dwarven Stoves
 support **18 subsequent turns**. Refueling consumes another bundle and one turn,
 restoring the corresponding full duration without banking additional fuel.
-Stoves have a quieter ignition sound (see Monster AI). Expiration follows global game turns,
-including time spent on another floor. The cold fireplace remains reusable.
-Campfires do not block movement or deal contact damage. Stoves block movement;
-the player cooks from an adjacent accessible tile.
+Stoves have a quieter ignition sound (see Monster AI). Expiration follows global
+game turns, including time spent on another floor. The cold fireplace remains
+reusable. Campfires do not block movement or deal contact damage. Stoves block
+movement; the player cooks from an adjacent accessible tile.
 
 Each portion takes one real turn and transforms one ingredient:
 
@@ -8366,47 +8706,47 @@ Each portion takes one real turn and transforms one ingredient:
 | Fresh Fish | Cooked Fish | `24 + floor(0.04 × max HP)` |
 
 Total recovery is calculated **when eaten**, using current effective maximum HP.
-Wyrdlings receive `round(total × 1.25)` recovery; that bonus applies once.
-At 50 maximum HP the three foods provide 10, 14 and 26 HP; at 200 maximum HP
-these become 16, 20 and 32 HP. Eating takes one turn and adds five regeneration
-turns per HP to the existing shared food effect. Ordinary recovery remains
-**1 HP per five global turns**. Multiple foods extend the effect rather than
-stacking its rate. Eating is blocked once **300 or more food-regeneration turns**
-remain; the player sees “You are full.” One serving started below the cap can
-cross it, but no further servings can stack until the counter drops below 300.
-This also limits berries and Fresh Fish (subject to their existing Troll
-regeneration exemption). The timer continues at full HP, and ordinary ticks at full
-HP are lost. Cooked-food recovery works for Trolls; their natural regeneration
-remains independent. Roasted Meat sells for the same 2g as raw Meat; baked
-potatoes and cooked fish cannot be sold. Cooking grants no XP or proficiency.
+Wyrdlings receive `round(total × 1.25)` recovery; that bonus applies once. At 50
+maximum HP the three foods provide 10, 14 and 26 HP; at 200 maximum HP these
+become 16, 20 and 32 HP. Eating takes one turn and adds five regeneration turns
+per HP to the existing shared food effect. Ordinary recovery remains **1 HP per
+five global turns**. Multiple foods extend the effect rather than stacking its
+rate. Eating is blocked once **300 or more food-regeneration turns** remain; the
+player sees “You are full.” One serving started below the cap can cross it, but
+no further servings can stack until the counter drops below 300. This also
+limits berries and Fresh Fish (subject to their existing Troll regeneration
+exemption). The timer continues at full HP, and ordinary ticks at full HP are
+lost. Cooked-food recovery works for Trolls; their natural regeneration remains
+independent. Roasted Meat sells for the same 2g as raw Meat; baked potatoes and
+cooked fish cannot be sold. Cooking grants no XP or proficiency.
 
 **Rest** queues up to eight real turns. While food recovery remains, each rest
 turn restores up to `max(2, ceil(0.03 × max HP))` HP, bounded by missing HP and
 remaining food recovery. This consumes the corresponding food benefit, including
 partial progress toward its next ordinary tick, rather than multiplying the
 food's total healing. At 50/100/150/200/300 maximum HP the rate is 2/3/5/6/9 HP
-per turn. Without food, four consecutive rest turns restore **1 HP**. Non-rest
-actions or danger reset that weak-rest progress; closing the panel alone does
-not grant or erase progress. The panel shows progress toward the next weak-rest
-HP and warns when the remaining fire duration is too short to complete it;
-partial rest gives no HP and is lost if the fire dies before the fourth turn.
-Progress messages never describe an unhealed rest turn as recovered HP.
-Rest ends at full HP or when its active food
+per turn. Without food, four consecutive rest turns restore **1 HP** (two with
+Firekeeper). Non-rest actions or danger reset that weak-rest progress; closing
+the panel alone does not grant or erase progress. The panel shows progress
+toward the next weak-rest HP and warns when the remaining fire duration is too
+short to complete it; partial rest gives no HP and is lost if the fire dies
+before the required number of turns. Progress messages never describe an
+unhealed rest turn as recovered HP. Rest ends at full HP or when its active food
 recovery runs out; another rest can use weak food-free recovery. There is no
-recovery cooldown or once-per-floor limit: food, fuel, accessible fireplaces and safety limit use.
+recovery cooldown or once-per-floor limit: food, fuel, accessible fireplaces and
+safety limit use.
 
 Cooking can queue up to three portions. Cooking/rest queues stop when a
 detectable hostile within eight tiles has clear sight to the player, damage
-occurs, poison/drowning or an active chamber hazard makes camping unsafe, the player is displaced, the fire expires,
-or the player cancels. Hidden enemies do not veto starting a camp action.
-Perception uses world geometry, independent of camera animation, zoom and
-viewport size.
-Every executed action runs ordinary enemies, NPCs, statuses and environmental
-rules. A portion cooked during the last burning turn completes; an unstarted
-portion never spends ingredients. No queue automatically eats or refuels.
-Normal swimming item restrictions apply.
-An approaching detectable threat disables cooking and resting in the panel;
-an explicit notice explains that those options are unavailable until the danger
+occurs, poison/drowning or an active chamber hazard makes camping unsafe, the
+player is displaced, the fire expires, or the player cancels. Hidden enemies do
+not veto starting a camp action. Perception uses world geometry, independent of
+camera animation, zoom and viewport size. Every executed action runs ordinary
+enemies, NPCs, statuses and environmental rules. A portion cooked during the
+last burning turn completes; an unstarted portion never spends ingredients. No
+queue automatically eats or refuels. Normal swimming item restrictions apply. An
+approaching detectable threat disables cooking and resting in the panel; an
+explicit notice explains that those options are unavailable until the danger
 passes. Eating prepared food and adding fuel remain available.
 
 Firelight reaches three tiles using the existing wall-aware cave illumination
@@ -8414,20 +8754,19 @@ rules. Adjacent warmth suppresses environmental freezing. A lit area removes
 forest concealment, and ignition can lure nearby monsters (see Monster AI).
 Lit/cold graphics, fuel duration, recipe recovery, available supplies, current
 HP and food recovery are shown in the contextual panel. The existing status
-interface displays warmth and the food effect. Recipes and meals use food-specific
-meat, potato and fish symbols; cooked-food inventory names
-show the name and stack count, with recovery details behind the `?` control.
-Fine-pointer desktop panels
-group Hearth, Cook, Eat and Rest controls in compact two-column rows with
-warm brown/copper actions, dock at the right edge, and leave the game view
-undimmed and unblurred. Narrow and touch layouts retain centered, full-width,
-touch-sized actions with the modal backdrop. Appearance does not affect
-gameplay or replay.
+interface displays warmth and the food effect. Recipes and meals use
+food-specific meat, potato and fish symbols; cooked-food inventory names show
+the name and stack count, with recovery details behind the `?` control.
+Fine-pointer desktop panels group Hearth, Cook, Eat and Rest controls in compact
+two-column rows with warm brown/copper actions, dock at the right edge, and
+leave the game view undimmed and unblurred. Narrow and touch layouts retain
+centered, full-width, touch-sized actions with the modal backdrop. Appearance
+does not affect gameplay or replay.
 
-Fire expiry and campfire searched state persist on the existing ground object. The
-shared food timer and partial food-free rest progress persist on the player.
-Each completed cooking/rest/lighting/refueling action is recorded separately;
-UI queues and animation delays are not gameplay state. Loading cancels the UI
+Fire expiry and campfire searched state persist on the existing ground object.
+The shared food timer and partial food-free rest progress persist on the player.
+Each completed cooking/rest/lighting/refueling action is recorded separately; UI
+queues and animation delays are not gameplay state. Loading cancels the UI
 queue, restores its completed effects, and never silently resumes automation.
 
 ## Mushroom
@@ -8441,8 +8780,9 @@ one Mushroom is guaranteed on every kill. The drop uses the existing
 `mushroom` inventory kind and therefore stacks with foraged Mushrooms. It is
 separate from the normal enemy artifact/equipment loot path.
 
-Wyrdling increases the healing effect by 25%, but does not increase poison damage.
-Example: a healing result restores 25% HP normally or 31.25% HP for a Wyrdling.
+Wyrdling increases the healing effect by 25%, but does not increase poison
+damage. Example: a healing result restores 25% HP normally or 31.25% HP for a
+Wyrdling.
 
 ---
 
@@ -8457,14 +8797,15 @@ Ordinary forest tiles can be foraged.
 
 Each forest tile can only be foraged once. Each eligible search has an
 independent **75% chance to grant one Brushwood**, up to five carried. The
-ordinary herb, mushroom and berry roll still occurs even when the brushwood
-roll fails or succeeds; brushwood does not replace a foraging reward.
-Repeated searches never generate new brushwood. Merchant fuel remains available in sparse
-forests and cold worlds. Finding brushwood, berries, a herb, or a
-mushroom displays a short rising, fading **found!** label above the searched
-tile in both tile and ASCII modes. Searches finding neither food nor brushwood, and repeat searches, show no
-label. This feedback is cosmetic: the item and turn resolve immediately,
-without animation timing or extra RNG; simulation-only replay skips the effect.
+ordinary herb, mushroom and berry roll still occurs even when the brushwood roll
+fails or succeeds; brushwood does not replace a foraging reward. Repeated
+searches never generate new brushwood. Merchant fuel remains available in sparse
+forests and cold worlds. Finding brushwood, berries, a herb, or a mushroom
+displays a short rising, fading **found!** label above the searched tile in both
+tile and ASCII modes. Searches finding neither food nor brushwood, and repeat
+searches, show no label. This feedback is cosmetic: the item and turn resolve
+immediately, without animation timing or extra RNG; simulation-only replay skips
+the effect.
 
 Results:
 
@@ -8475,10 +8816,9 @@ Results:
 75% → No food
 ```
 
-Taiga and Ancient Forest cannot be foraged. Cursed world traits can change
-the three result probabilities; the remaining chance yields nothing. The
-table above is the normal-world distribution; see
-[§85. Cursed World](#85-cursed-world).
+Taiga and Ancient Forest cannot be foraged. Cursed world traits can change the
+three result probabilities; the remaining chance yields nothing. The table above
+is the normal-world distribution; see [§85. Cursed World](#85-cursed-world).
 
 ## Digging
 
@@ -8499,7 +8839,8 @@ After the treasure-map check, digging checks for a hidden world-generated
 `buriedgear` or `buriedartifact` object on that exact tile. If found, its
 predetermined item is recovered and the ordinary digging roll is skipped.
 
-For normal sand, digging uses a separate 1–100 roll. Current results are listed under "Normal digging loot" section.
+For normal sand, digging uses a separate 1–100 roll. Current results are listed
+under "Normal digging loot" section.
 
 See section 79 for the full digging rules and treasure-map interaction.
 
@@ -8509,20 +8850,23 @@ When the player is standing directly on a special tile or special ground
 object, the inspect action handles that object and **does not also inspect the
 surroundings**.
 
-This is implemented as an early return in the inspection logic. Examples
-include crypt coffins/sarcophagi, tombstones, special graves, village/landmark
-tiles, dwarven columns (`dwarvenstatue`), and special ground objects such as skeletons,
+This is implemented as an early return in the inspection logic. Examples include
+crypt coffins/sarcophagi, tombstones, special graves, village/landmark tiles,
+dwarven columns (`dwarvenstatue`), and special ground objects such as skeletons,
 campfires, dwarven props, explorer remains, and dead bodies.
 
-An abandoned campfire can be searched once using Inspect while on or beside
-the fire; F/hand opens cooking instead. A seeded 30% roll grants one Potato; a failed search
-finds nothing. The `searched` flag is stored on its ground object and saved,
-preventing repeated rolls. Potatoes stack in the inventory and use
-`img/icons/potato.svg`, matching the 24x24 item icon format. They cannot be eaten raw, equipped, or sold; a lit fire can bake them.
-Searched campfires have a gray ASCII glyph and a slightly dimmed, desaturated
-tile image.
+An abandoned campfire can be searched once using Inspect while on or beside the
+fire; F/hand opens cooking instead. A seeded 30% roll grants one Potato; a
+failed search finds nothing. The `searched` flag is stored on its ground object
+and saved, preventing repeated rolls. Potatoes stack in the inventory and use
+`img/icons/potato.svg`, matching the 24x24 item icon format. They cannot be
+eaten raw, equipped, or sold; a lit fire can bake them. Searched campfires have
+a gray ASCII glyph and a slightly dimmed, desaturated tile image.
 
-Player-facing compass descriptions use hyphens for all diagonal bearings (`north-east`, `north-west`, `south-east`, `south-west`) across inspection, tracking, NPC dialogue, creature calls and treasure-map clues. Cardinal directions are unchanged.
+Player-facing compass descriptions use hyphens for all diagonal bearings
+(`north-east`, `north-west`, `south-east`, `south-west`) across inspection,
+tracking, NPC dialogue, creature calls and treasure-map clues. Cardinal
+directions are unchanged.
 
 Ordinary surroundings inspection only runs when no higher-priority special
 inspection has handled the current tile/object. It reports nearby nondecorative
@@ -8544,7 +8888,8 @@ Skeleton ground objects (dead bodies) occur mostly in caves and can be searched.
 Once searched, their `looted` state gives their tile image the same dimmed,
 desaturated treatment as campfires; the ASCII glyph remains gray.
 
-Searching one technically generates a temporary tier-1 chest at its location and immediately opens it. The word "chest" is not mentioned in the logs.
+Searching one technically generates a temporary tier-1 chest at its location and
+immediately opens it. The word "chest" is not mentioned in the logs.
 
 ---
 
@@ -8575,17 +8920,17 @@ message log, below the HUD. Spoken dialogue and choices use larger, brighter
 text and touch-sized buttons; longer conversations remain scrollable rather
 than being covered by the log.
 
-The Merchant offers Talk, Rumors and Trade; the Herbalist offers Talk,
-Gossip and Services; the Drunk offers Talk and Gossip. The Old Hunter
-offers Talk, ancient-forest lore and a separate hunt action. The Fisherman
-Hermit offers Talk, the Empty Nets quest, a swimming-lesson reminder while
-training is pending, and fish purchases after turn-in. The Gravedigger offers
-Talk, Gossip and a separate tombstone return when the item is held; the Ancient Lich
-offers an additional Black Key topic when equipped. Quest labels reflect
-whether work can be taken, reviewed or turned in; a ready reward gets a visible
-`!` in the menu. Accepting work or claiming rewards requires selecting the
-quest choice, not merely speaking to that NPC. There is no free preview-and-
-reroll of a procedurally generated hunt before acceptance.
+The Merchant offers Talk, Rumors and Trade; the Herbalist offers Talk, Gossip
+and Services; the Drunk offers Talk and Gossip. The Old Hunter offers Talk,
+ancient-forest lore and a separate hunt action. The Fisherman Hermit offers
+Talk, the Empty Nets quest, a swimming-lesson reminder while training is
+pending, and fish purchases after turn-in. The Gravedigger offers Talk, Gossip
+and a separate tombstone return when the item is held; the Ancient Lich offers
+an additional Black Key topic when equipped. Quest labels reflect whether work
+can be taken, reviewed or turned in; a ready reward gets a visible `!` in the
+menu. Accepting work or claiming rewards requires selecting the quest choice,
+not merely speaking to that NPC. There is no free preview-and- reroll of a
+procedurally generated hunt before acceptance.
 
 Informational topics remain zero-turn interactions. Topics that use world
 state, such as the Herbalist's rare clue toward the Fisherman, compute from the
@@ -8612,20 +8957,19 @@ caves, mines, ruins, or the tower neither advance their wandering nor consume
 NPC movement RNG. This also ensures underground floor tiles cannot be mistaken
 for valid surface terrain when deciding an NPC's next step.
 
-NPC tile artwork is configured by exact NPC name in
-`content/rendering.json` under `npc.characters`, with `image` and `scale`
-per character. Drunk, Herbalist, Ancient Lich, Merchant, Old Hunter and Fisherman use
-transparent `img/tiles/npc-*.png` sprites at scale 1.0. These sources are
-larger than 40x40 and use chunky pixel shapes; the shared nearest-neighbor
-sprite cache renders them at the current tile size, including zoom.
-Both initial visual loading and background preloading include these paths.
-`drawNpcVisual()` uses the existing image renderer and falls back to the
-configured white initial if a mapping/image is absent or tile images are
-disabled with P. Gravedigger retains that fallback until his standalone
-sprite is supplied; the supplied composite preview is not used as a tile.
-Swimming clipping, movement interpolation and the Old Hunter's quest marker
-remain in the existing NPC draw pass. NPC dialogue portraits are separate
-and unchanged. These visuals consume no RNG and change no NPC behavior,
+NPC tile artwork is configured by exact NPC name in `content/rendering.json`
+under `npc.characters`, with `image` and `scale` per character. Drunk,
+Herbalist, Ancient Lich, Merchant, Old Hunter and Fisherman use transparent
+`img/tiles/npc-*.png` sprites at scale 1.0. These sources are larger than 40x40
+and use chunky pixel shapes; the shared nearest-neighbor sprite cache renders
+them at the current tile size, including zoom. Both initial visual loading and
+background preloading include these paths. `drawNpcVisual()` uses the existing
+image renderer and falls back to the configured white initial if a mapping/image
+is absent or tile images are disabled with P. Gravedigger retains that fallback
+until his standalone sprite is supplied; the supplied composite preview is not
+used as a tile. Swimming clipping, movement interpolation and the Old Hunter's
+quest marker remain in the existing NPC draw pass. NPC dialogue portraits are
+separate and unchanged. These visuals consume no RNG and change no NPC behavior,
 quest state, balance, save format or replay state.
 
 The Merchant's Trade choice opens his trading interface; the Herbalist's
@@ -8637,7 +8981,8 @@ gift dialogue is the spoken response; if Gossip is selected first, the gift
 and gossip responses both appear in the conversation panel. If Services is
 selected first, the gift speech appears above the service list.
 
-The Ancient Lich addresses the player by their selected race in its dialogue. This is flavor only and does not branch quests or rewards.
+The Ancient Lich addresses the player by their selected race in its dialogue.
+This is flavor only and does not branch quests or rewards.
 
 ## Fisherman Hermit / Empty Nets
 
@@ -8651,54 +8996,56 @@ He uses the ordinary sprite cache, preloading, tooltip and `!` marker draw pass.
 
 After surface population/structures are complete, deterministic placement finds
 a Temple-foot-reachable grass/sand/hill bank beside an unfrozen connected water
-region of at least 25 tiles, with an adjacent small `fishermanhut`. No structures
-are overwritten. Seed-selected preferred village distances of 40, 80 and 140
-tiles diversify proximity; suitable terrain and safety take precedence.
+region of at least 25 tiles, with an adjacent small `fishermanhut`. No
+structures are overwritten. Seed-selected preferred village distances of 40, 80
+and 140 tiles diversify proximity; suitable terrain and safety take precedence.
 Naturally safe footprints are tried first. If necessary, only explicitly marked
 ordinary surface spawns may be relocated; special encounters remain untouched.
 Relocations are planned atomically using reachable, unoccupied species terrain,
 outside the Hermit's safe area and the Temple/village exclusion zones. No
-world-generation or dialogue decision depends on animation or unseeded randomness.
+world-generation or dialogue decision depends on animation or unseeded
+randomness.
 
-`fishermanQuest` is an extensible `{type, state, targetId, ...}` record. The current
-`fish_predator` variant is **Empty Nets**. No predator exists before the first
-quest choice. Ordinary Talk does not activate Empty Nets. Activation chooses a free, foot-reachable land bank at least 25
-tiles away, preferring the same connected water region. The generated village
-center used by the target exclusion rule is persisted exactly in saves/replay
-snapshots so restoring the same action cannot change the legal target set. Activation
-then creates one non-wandering **Fat Slurper** (Slurper, `fat` prefix, double template HP).
+`fishermanQuest` is an extensible `{type, state, targetId, ...}` record. The
+current `fish_predator` variant is **Empty Nets**. No predator exists before the
+first quest choice. Ordinary Talk does not activate Empty Nets. Activation
+chooses a free, foot-reachable land bank at least 25 tiles away, preferring the
+same connected water region. The generated village center used by the target
+exclusion rule is persisted exactly in saves/replay snapshots so restoring the
+same action cannot change the legal target set. Activation then creates one
+non-wandering **Fat Slurper** (Slurper, `fat` prefix, double template HP).
 Fishbone clues appear near a suitable water-bank target before the quest is
-accepted; activation favors those prepared banks when valid, allowing the
-player to recognize the Slurper's feeding ground ahead of time. Only that
-stored enemy ID's death, through the shared kill hook, makes the
-quest ready. The `!` is shown before activation, when ready, and on completed
-quests with an unclaimed reward and no pending lesson. The quest menu option
-accepts the job, reviews progress or turns it in, while Talk only supplies
-short, gruff dialogue without advancing quest state. An active quest's **Ask about the nets** option
-asks about the missing fish without naming the predator; the lesson uses shore-based,
+accepted; activation favors those prepared banks when valid, allowing the player
+to recognize the Slurper's feeding ground ahead of time. Only that stored enemy
+ID's death, through the shared kill hook, makes the quest ready. The `!` is
+shown before activation, when ready, and on completed quests with an unclaimed
+reward and no pending lesson. The quest menu option accepts the job, reviews
+progress or turns it in, while Talk only supplies short, gruff dialogue without
+advancing quest state. An active quest's **Ask about the nets** option asks
+about the missing fish without naming the predator; the lesson uses shore-based,
 natural instructions. Once the player has learned numeric Swimming, ordinary
 Talk also acknowledges their improved technique without consuming a turn.
 
 Turn-in completes the quest but only offers non-Merlings a persistent pending
 lesson (`player.fishermanLessonPending`). The reward is claimed and Swimming 5
-learned only on a successful step from a walkable bank into deep water, with both
-tiles within three tiles (Chebyshev distance) of the Hermit on the surface;
-the move itself must still be exactly one tile. Waiting, teleporting, distant water
-and god-mode travel cannot complete it. The lesson completes before entry practice
-and drowning checks; pending lessons survive saves and deterministic replay.
-The dialogue marker clears while a lesson is pending and returns if god-mode
-disable restores reward entitlement. Merlings instead receive natural-
+learned only on a successful step from a walkable bank into deep water, with
+both tiles within three tiles (Chebyshev distance) of the Hermit on the surface;
+the move itself must still be exactly one tile. Waiting, teleporting, distant
+water and god-mode travel cannot complete it. The lesson completes before entry
+practice and drowning checks; pending lessons survive saves and deterministic
+replay. The dialogue marker clears while a lesson is pending and returns if
+god-mode disable restores reward entitlement. Merlings instead receive natural-
 swimmer dialogue and 100 XP, without numeric Swimming or practice. State changes
 before granting the reward prevent repeated rewards/restarts. After completion,
-the Hermit gives exactly one Fresh Fish per character at first turn-in, including
-Merlings. The persisted `fishermanFishGiftGiven` flag is not cleared by debug
-lesson resets, only by creating a new character. The Buy fish conversation option
-opens the shared services interface, including while the lesson is pending, with only
-**Buy fish (5g)**. Purchases stack fish and record a `fisherman` / `buyFish` replay
-action. The Hermit retains normal one-tile home-radius wandering.
-His discovered hut (not his current position) is a deep-blue (`#003366`) square
-exactly one map tile in both map views, using the shared fog-aware terrain cache.
-Fish uses the **same regeneration helper as
+the Hermit gives exactly one Fresh Fish per character at first turn-in,
+including Merlings. The persisted `fishermanFishGiftGiven` flag is not cleared
+by debug lesson resets, only by creating a new character. The Buy fish
+conversation option opens the shared services interface, including while the
+lesson is pending, with only **Buy fish (5g)**. Purchases stack fish and record
+a `fisherman` / `buyFish` replay action. The Hermit retains normal one-tile
+home-radius wandering. His discovered hut (not his current position) is a
+deep-blue (`#003366`) square exactly one map tile in both map views, using the
+shared fog-aware terrain cache. Fish uses the **same regeneration helper as
 berries** (+100 regeneration turns), including Troll immunity and normal item
 turn consumption.
 
@@ -8710,9 +9057,11 @@ turn consumption.
 
 The Old Hunter is associated with the Ancient Forest.
 
-His warning contains a direction derived from the actual generated Ancient Forest location.
+His warning contains a direction derived from the actual generated Ancient
+Forest location.
 
-He warns the player about entering the Ancient Forest in a particular direction after midnight.
+He warns the player about entering the Ancient Forest in a particular direction
+after midnight.
 
 ## Procedurally generated quests
 
@@ -8720,13 +9069,25 @@ The Old Hunter can generate a new quest when the player selects **Take a hunt**
 (or **Take a rare hunt** after learning Tracking). Ordinary Talk and his
 ancient-forest lore topic do not accept a quest. The menu changes to discuss an
 active hunt or claim its reward, without altering the existing quest logic.
-Quest objectives are selected from the current world state rather than from a fixed quest list.
+Quest objectives are selected from the current world state rather than from a
+fixed quest list.
 
-There is a 30% chance to receive an investigation quest when a cave entrance exists. It targets the cave entrance closest to the village (squared map distance; map scan order breaks ties). The target is stored by its map coordinates and landmark type, so the quest points to an actual location rather than an arbitrary wilderness tile.
+There is a 30% chance to receive an investigation quest when a cave entrance
+exists. It targets the cave entrance closest to the village (squared map
+distance; map scan order breaks ties). The target is stored by its map
+coordinates and landmark type, so the quest points to an actual location rather
+than an arbitrary wilderness tile.
 
-The quest dialogue names the landmark and gives its direction relative to the Old Hunter, and ends with "I'll mark the location on your map." The player completes the investigation simply by getting near the target tile within 2 squares; no additional interaction or hidden object search is required. The quest then becomes ready to turn in at the Old Hunter.
+The quest dialogue names the landmark and gives its direction relative to the
+Old Hunter, and ends with "I'll mark the location on your map." The player
+completes the investigation simply by getting near the target tile within 2
+squares; no additional interaction or hidden object search is required. The
+quest then becomes ready to turn in at the Old Hunter.
 
-As soon as the quest is generated, the Old Hunter also marks the location for real: a 5x5 area (the target tile plus 2 tiles in every direction - the same radius used for quest completion) is immediately revealed on the discovery grid, whether or not the player has actually been there.
+As soon as the quest is generated, the Old Hunter also marks the location for
+real: a 5x5 area (the target tile plus 2 tiles in every direction - the same
+radius used for quest completion) is immediately revealed on the discovery grid,
+whether or not the player has actually been there.
 
 Hunter dialogue uses the target's actual direction and avoids unverified
 landmark names such as roads, forts, mountain passes, or a nearby cemetery.
@@ -8736,22 +9097,24 @@ adding "of here" to them.
 
 Other generated quest types include:
 
-- **Kill a specific monster:** kill a particular nearest eligible monster, preferring tier 3 over tier 4.
-- **Recover an item:** retrieve an item carried by a particular tier-3-or-4 monster.
+- **Kill a specific monster:** kill a particular nearest eligible monster,
+  preferring tier 3 over tier 4.
+- **Recover an item:** retrieve an item carried by a particular tier-3-or-4
+  monster.
 
-The first quest’s monster objectives use reachable surface enemies. Eight-direction
-walking distance from the village determines proximity; water and impassable
-terrain cannot shorten a route. If any eligible tier-3 enemies are reachable,
-tier 4 is excluded. Otherwise reachable tier-4 enemies are the fallback. Only
-the closest targets in that preferred tier remain eligible; equally close
-targets retain seeded quest variety. Every individual `kill_specific` quest names a prefixed enemy. If the nearest
-chosen living target lacks a prefix, accepting that quest gives it one random
-non-Champion enemy prefix (with the usual stat changes) before saving its name.
-Group kills and item recoveries do not require prefixed targets. Quest target ID,
-position, and spawn pool are unchanged; this prevents ordinary monsters from
-being described as special named individuals.
-Group kills use equally close members of the same species. Ground-item delivery
-candidates retain their existing rules.
+The first quest’s monster objectives use reachable surface enemies.
+Eight-direction walking distance from the village determines proximity; water
+and impassable terrain cannot shorten a route. If any eligible tier-3 enemies
+are reachable, tier 4 is excluded. Otherwise reachable tier-4 enemies are the
+fallback. Only the closest targets in that preferred tier remain eligible;
+equally close targets retain seeded quest variety. Every individual
+`kill_specific` quest names a prefixed enemy. If the nearest chosen living
+target lacks a prefix, accepting that quest gives it one random non-Champion
+enemy prefix (with the usual stat changes) before saving its name. Group kills
+and item recoveries do not require prefixed targets. Quest target ID, position,
+and spawn pool are unchanged; this prevents ordinary monsters from being
+described as special named individuals. Group kills use equally close members of
+the same species. Ground-item delivery candidates retain their existing rules.
 
 Tier-5 monsters, all far-wanderers (including world-generation promotions), and
 every base template with rarity <= 0.02 are excluded from new kill, group-kill,
@@ -8762,19 +9125,22 @@ hunt keeps its edge-biome selection and difficulty, and its opening names the
 quarry as “<monster name>, they call it.” Monster names retain their exact
 configured spelling and capitalization.
 
-Quest progress is persisted in the save data. Completed objectives become ready for turn-in, and turning in a quest grants the configured reward and marks the quest completed.
-Hunter delivery candidates must be actual named, nonstackable recoverable items
-in surface thief bags; artifacts must already be identified. Unopened loot
-containers cannot supply a delivery target. The exact item is tagged for the
-quest, and dialogue uses its name instead of the former "the lost item" fallback.
+Quest progress is persisted in the save data. Completed objectives become ready
+for turn-in, and turning in a quest grants the configured reward and marks the
+quest completed. Hunter delivery candidates must be actual named, nonstackable
+recoverable items in surface thief bags; artifacts must already be identified.
+Unopened loot containers cannot supply a delivery target. The exact item is
+tagged for the quest, and dialogue uses its name instead of the former "the lost
+item" fallback.
 
-Completing the first quest also teaches **Tracking**, once per character, using the
-Hunter's craft-teaching dialogue. The character sheet then shows `Tracking: Learned`;
-before learning, the skill is hidden. The first quest's existing XP reward is unchanged.
+Completing the first quest also teaches **Tracking**, once per character, using
+the Hunter's craft-teaching dialogue. The character sheet then shows
+`Tracking: Learned`; before learning, the skill is hidden. The first quest's
+existing XP reward is unchanged.
 
-After Tracking is learned and the first quest is completed, the Hunter has one final
-**rare hunt** to offer. The quarry is selected at quest creation from enemy templates
-that satisfy all three rules:
+After Tracking is learned and the first quest is completed, the Hunter has one
+final **rare hunt** to offer. The quarry is selected at quest creation from
+enemy templates that satisfy all three rules:
 
 - `wander: "far"`
 - `humanoid: false`
@@ -8788,30 +9154,31 @@ save/load, replay and character changes, and resets only with a new world.
 Existing active hunts retain their exact target; this restriction applies when
 offering a new hunt.
 
-The selection remains data-driven: adding or changing an enemy template automatically
-changes the eligible pool. A candidate must also have at least one valid surface spawn
-tile in one of its configured biomes. The spawn tile must be walkable, reachable from
-the village/Hunter over ordinary surface terrain, unoccupied, and preferably very far
-from the village. The desired minimum Chebyshev distance is:
+The selection remains data-driven: adding or changing an enemy template
+automatically changes the eligible pool. A candidate must also have at least one
+valid surface spawn tile in one of its configured biomes. The spawn tile must be
+walkable, reachable from the village/Hunter over ordinary surface terrain,
+unoccupied, and preferably very far from the village. The desired minimum
+Chebyshev distance is:
 
 `max(20, floor(min(world width, world height) × 0.35))`
 
-Among qualifying distant tiles, the hunt uses the closest available world-edge band
-and allows tiles up to 3 squares farther inward. A species with no valid tile beyond
-the minimum village distance is skipped. If the eligible pool is empty or no
-candidate can be placed that far away, the Hunter postpones the hunt without
-spawning a duplicate or moving the quarry closer.
+Among qualifying distant tiles, the hunt uses the closest available world-edge
+band and allows tiles up to 3 squares farther inward. A species with no valid
+tile beyond the minimum village distance is skipped. If the eligible pool is
+empty or no candidate can be placed that far away, the Hunter postpones the hunt
+without spawning a duplicate or moving the quarry closer.
 
-The Hunter emphasizes that the creature is exceptionally rare and gives the direction
-of the **initial sign** he found. That bearing is frozen when the quest starts; it does
-not update as the far-wandering quarry moves. The quest never reveals the quarry on the
-map and only the exact spawned enemy ID can complete it, so killing another monster of
-the same species does not count. This is intentionally a practical Tracking test rather
-than a live-direction hunt.
+The Hunter emphasizes that the creature is exceptionally rare and gives the
+direction of the **initial sign** he found. That bearing is frozen when the
+quest starts; it does not update as the far-wandering quarry moves. The quest
+never reveals the quarry on the map and only the exact spawned enemy ID can
+complete it, so killing another monster of the same species does not count. This
+is intentionally a practical Tracking test rather than a live-direction hunt.
 
-Returning after killing that exact quarry grants **400 base XP** through the normal XP
-pipeline and one non-stackable **Echo-Blight Horn**. The rare hunt is then permanently
-completed for that character.
+Returning after killing that exact quarry grants **400 base XP** through the
+normal XP pipeline and one non-stackable **Echo-Blight Horn**. The rare hunt is
+then permanently completed for that character.
 
 Normal death preserves the lesson and quest. A new permadeath character starts
 with no Tracking knowledge, no species kill counts and no Old Hunter quest,
@@ -8822,34 +9189,36 @@ so the Hunter can offer a fresh quest in the surviving world.
 `src/rareFlee.js` applies to unalarmed surface enemies whose **base template**
 sets `ultraRare: true`, independent of numerical spawn rarity, quest membership,
 prefix, humanoid type and wander mode. Current species: NULK, SKELD, DRUSK,
-GAUR, ASHFANG, MIREHOWL and NHALUUN. Unflagged low-weight species such as
-Myrka and Vampire use normal AI; setting a low rarity alone never enables flight.
-Underground encounters use normal AI; an off-level flight pauses until returning.
+GAUR, ASHFANG, MIREHOWL and NHALUUN. Unflagged low-weight species such as Myrka
+and Vampire use normal AI; setting a low rarity alone never enables flight.
+Underground encounters use normal AI; an off-level flight pauses until
+returning.
 
 Two sightings precede ordinary combat. An unaware, armed beast senses a player
 within 5 tiles on its **first encounter**, even through normal or God Mode
 invisibility. Forest concealment and Temple sanctuary still apply. This sensing
 is exclusive to the first encounter, not permanent true sight or normal combat
-targeting. The first sighting cannot be hit or cornered, including by an invisible
-melee or ranged attack; its protected flight continues even if the player remains
-invisible. The second sighting follows the ordinary visibility rules and can be
-caught by reaching adjacency or blocking every outward step. Caught beasts become
-aware and Alarmed; a third approach uses ordinary combat.
+targeting. The first sighting cannot be hit or cornered, including by an
+invisible melee or ranged attack; its protected flight continues even if the
+player remains invisible. The second sighting follows the ordinary visibility
+rules and can be caught by reaching adjacency or blocking every outward step.
+Caught beasts become aware and Alarmed; a third approach uses ordinary combat.
 
 Attacks can initiate the protected first flight before damage or evasion. During
 later encounters, invisibility still prevents starting a new sighting, pauses an
 existing flight and removes its temporary speed bonus; revealing the player
-resumes it. An unseen attack during a later flight cancels that flight and resolves
-normally. Active flight takes priority over temple flight and idle AI.
+resumes it. An unseen attack during a later flight cancels that flight and
+resolves normally. Active flight takes priority over temple flight and idle AI.
 
 The first steps occur immediately, including when a wander step enters sighting
-range. Flight itself deals no damage, sets no alarm or spotted message, and leaves
-no tracks. Each flee step deterministically chooses a legal neighboring tile that
-strictly increases Chebyshev distance from the player and prefers the direction most
-directly away from the player. This prevents arbitrary sideways/diagonal bolts when a
-straight escape is open; terrain and world edges force the next-best legal direction.
-If no outward step exists, the normal catch/slip rules apply. Far paths are cleared when flight starts; normal far targeting
-and tracks resume afterward.
+range. Flight itself deals no damage, sets no alarm or spotted message, and
+leaves no tracks. Each flee step deterministically chooses a legal neighboring
+tile that strictly increases Chebyshev distance from the player and prefers the
+direction most directly away from the player. This prevents arbitrary
+sideways/diagonal bolts when a straight escape is open; terrain and world edges
+force the next-best legal direction. If no outward step exists, the normal
+catch/slip rules apply. Far paths are cleared when flight starts; normal far
+targeting and tracks resume afterward.
 
 Configuration in `content/enemy_config.json`:
 
@@ -8871,37 +9240,39 @@ the final escape remains guaranteed even if the player corners it. During the
 second, catchable sighting, each turn adds
 `clamp(enemySpd / playerSpd, paceMin, paceMax)` to a fractional accumulator and
 takes its whole-number steps. **Startled** temporarily raises effective enemy
-SPD to at least 5 during either flight, including terrain modifiers; base template
-stats are unchanged. The bonus ends immediately on catch or escape and is shown
-with `Fleeing` and the Startled SPD bonus in the enemy tooltip. The internal
-sighting counter is not shown; its two-encounter rules are unchanged. Normal terrain bonuses still apply.
+SPD to at least 5 during either flight, including terrain modifiers; base
+template stats are unchanged. The bonus ends immediately on catch or escape and
+is shown with `Fleeing` and the Startled SPD bonus in the enemy tooltip. The
+internal sighting counter is not shown; its two-encounter rules are unchanged.
+Normal terrain bonuses still apply.
 
-Potion of Speed works through ordinary effective player SPD, costs its usual turn,
-and should be drunk before approaching. Rare sightings begin only at gaps of 5 or
-less, keeping the beast close enough to be visually readable when the flight message
-appears. The second sighting remains a speed chase: boosted or naturally fast
-characters can catch it in open terrain, while terrain and obstacles change the
-outcome. Neither natural speed nor a potion defeats the first escape.
+Potion of Speed works through ordinary effective player SPD, costs its usual
+turn, and should be drunk before approaching. Rare sightings begin only at gaps
+of 5 or less, keeping the beast close enough to be visually readable when the
+flight message appears. The second sighting remains a speed chase: boosted or
+naturally fast characters can catch it in open terrain, while terrain and
+obstacles change the outcome. Neither natural speed nor a potion defeats the
+first escape.
 
-At the end of either uncaught flee timer, or when boxed in during the first flight,
-the beast slips away. A BFS starts at the beast's own tile over walkable surface
-terrain. Seeded selection uses vacant walkable tiles in the template's native
-biomes, at least `max(slipMinDistance, rearmDistance)` from the player, without
-shrinking the current gap. Home-return/reanchored beasts prefer the closest valid
-tile to their home and re-anchor there. Occupancy is updated and move animations
-are cleared so the beast never slides across the map.
+At the end of either uncaught flee timer, or when boxed in during the first
+flight, the beast slips away. A BFS starts at the beast's own tile over walkable
+surface terrain. Seeded selection uses vacant walkable tiles in the template's
+native biomes, at least `max(slipMinDistance, rearmDistance)` from the player,
+without shrinking the current gap. Home-return/reanchored beasts prefer the
+closest valid tile to their home and re-anchor there. Occupancy is updated and
+move animations are cleared so the beast never slides across the map.
 
-If an enclosed component offers no valid tile, selection falls back to valid tiles
-outside that component. A boxed escape logs: "The enclosed <name> stampedes through
-you! You dodge aside, but it escapes!" Every rare beast uses the same short,
-charge-paced animation across the player's tile, with a visible sideways dodge
-and a fade beyond the player in both ASCII and tile mode. The destination is
-resolved immediately, independent of animation timing; it causes no damage,
-changes no actual player position, and changes no terrain. If the entire map
-has no valid destination, the protected
-flight remains active and retries next turn. Relocation establishes the 14-tile
-separation and re-arms the next sighting immediately; simply lingering nearby never
-burns the next sighting.
+If an enclosed component offers no valid tile, selection falls back to valid
+tiles outside that component. A boxed escape logs: "The enclosed <name>
+stampedes through you! You dodge aside, but it escapes!" Every rare beast uses
+the same short, charge-paced animation across the player's tile, with a visible
+sideways dodge and a fade beyond the player in both ASCII and tile mode. The
+destination is resolved immediately, independent of animation timing; it causes
+no damage, changes no actual player position, and changes no terrain. If the
+entire map has no valid destination, the protected flight remains active and
+retries next turn. Relocation establishes the 14-tile separation and re-arms the
+next sighting immediately; simply lingering nearby never burns the next
+sighting.
 
 | Enemy state | Default | Meaning |
 |---|---|---|
@@ -8918,32 +9289,33 @@ Slips and new far routes use seeded RNG; animation timing never drives gameplay.
 
 ## Tracking beast trails
 
-Only surface, non-flying, non-humanoid `far` wanderers leave tracks. Each successful
-idle travel step (including a random detour) with a valid stored destination has
-one seeded **3%** roll. Waiting, blocked movement, attacks, pursuit, teleports and
-other wander modes produce no tracks and consume no track RNG. Unfrozen
-rivers and other open water do not retain tracks or consume track RNG; frozen
-river tiles do. Tracks occupy the
-vacated tile; a new impression replaces any existing track on that tile.
+Only surface, non-flying, non-humanoid `far` wanderers leave tracks. Each
+successful idle travel step (including a random detour) with a valid stored
+destination has one seeded **3%** roll. Waiting, blocked movement, attacks,
+pursuit, teleports and other wander modes produce no tracks and consume no track
+RNG. Unfrozen rivers and other open water do not retain tracks or consume track
+RNG; frozen river tiles do. Tracks occupy the vacated tile; a new impression
+replaces any existing track on that tile.
 
-The bearing is the nearest of eight compass directions from the track tile to the
-beast's stored **final destination**, captured when the track is made. It does not
-follow the latest step, even on an obstacle detour, and does not change if the
-beast later retargets or dies. North points up; north-east rotates 45° clockwise;
-south rotates 180°. The approved transparent paw SVG and its PNG export live in
-`img/overlays/`. Tile mode rotates the PNG; ASCII mode uses a directional arrow.
-Tracks appear above ground textures but **beneath forest, taiga and Ancient
-Forest tree canopies** in tile mode, as well as beneath ground objects and
-actors. The foreground canopy is drawn over tracked tiles even when nobody
-stands there. ASCII keeps its directional arrows visible. Only discovered
+The bearing is the nearest of eight compass directions from the track tile to
+the beast's stored **final destination**, captured when the track is made. It
+does not follow the latest step, even on an obstacle detour, and does not change
+if the beast later retargets or dies. North points up; north-east rotates 45°
+clockwise; south rotates 180°. The approved transparent paw SVG and its PNG
+export live in `img/overlays/`. Tile mode rotates the PNG; ASCII mode uses a
+directional arrow. Tracks appear above ground textures but **beneath forest,
+taiga and Ancient Forest tree canopies** in tile mode, as well as beneath ground
+objects and actors. The foreground canopy is drawn over tracked tiles even when
+nobody stands there. ASCII keeps its directional arrows visible. Only discovered
 surface tiles in the viewport show tracks. Tracks do not affect movement,
 collision or loot.
 
-Hover shows only `foot tracks?`, regardless of knowledge. Existing actor, NPC and
-ground-object tooltips take priority. Inspecting the tile uses the usual inspect
-key; special terrain and ground-object interactions retain priority. Without
-Tracking it logs exactly: “You notice something that looks like foot tracks, but
-cannot make sense of them.” With Tracking, it reports bearing and freshness:
+Hover shows only `foot tracks?`, regardless of knowledge. Existing actor, NPC
+and ground-object tooltips take priority. Inspecting the tile uses the usual
+inspect key; special terrain and ground-object interactions retain priority.
+Without Tracking it logs exactly: “You notice something that looks like foot
+tracks, but cannot make sense of them.” With Tracking, it reports bearing and
+freshness:
 
 | Age in turns | Example for a recognized species |
 |---|---|
@@ -8959,13 +9331,14 @@ append “You've never seen paw prints like these before.” Knowledge is checke
 at inspection time, so killing a species also makes its surviving older tracks
 recognizable. These counters are player knowledge, not a new visible bestiary.
 
-`content/enemy_config.json → tracking` configures the chance, lifetime and freshness
-thresholds. Age advances once per game turn across all levels, independently of
-rendering, animation or inspection. Save/load and replay preserve track coordinates,
-bearing, species and age, learned Tracking, and per-species kill counts. Tracks
-remain environmental evidence across a permadeath character change; only the new
-character's knowledge resets. Tracks are clues to an earlier destination, not a
-guarantee that a living beast still occupies or is heading toward that location.
+`content/enemy_config.json → tracking` configures the chance, lifetime and
+freshness thresholds. Age advances once per game turn across all levels,
+independently of rendering, animation or inspection. Save/load and replay
+preserve track coordinates, bearing, species and age, learned Tracking, and
+per-species kill counts. Tracks remain environmental evidence across a
+permadeath character change; only the new character's knowledge resets. Tracks
+are clues to an earlier destination, not a guarantee that a living beast still
+occupies or is heading toward that location.
 
 **Generic z:-2 static spoor** is separate from these dynamic surface trails.
 It is permanent, has no freshness stages, uses the same eight directions and
@@ -8977,7 +9350,16 @@ The first Old Hunter quest excludes enemies whose current wandering mode is
 `far`, including trait-promoted wanderers. The later rare hunt deliberately
 retains its far-wandering quarry.
 
-The Old Hunter has a white `!` in the top-right corner of his glyph before the first conversation (when he has a quest to offer), after the first quest is completed and Tracking has been learned (when the rare hunt can be received), and whenever either quest can be turned in. Kill and investigation quests need the `ready` state; item quests require the requested item in inventory, even if killing its carrier has already set the quest to `ready`. An active item quest can also be turned in as soon as the item is carried. The marker is absent during unfinished quests and after the rare hunt is completed. His tooltip says `Click to talk`. The marker reuses the visual treatment of the Alarmed enemy indicator; it does not change NPC behavior or quest rewards.
+The Old Hunter has a white `!` in the top-right corner of his glyph before the
+first conversation (when he has a quest to offer), after the first quest is
+completed and Tracking has been learned (when the rare hunt can be received),
+and whenever either quest can be turned in. Kill and investigation quests need
+the `ready` state; item quests require the requested item in inventory, even if
+killing its carrier has already set the quest to `ready`. An active item quest
+can also be turned in as soon as the item is carried. The marker is absent
+during unfinished quests and after the rare hunt is completed. His tooltip says
+`Click to talk`. The marker reuses the visual treatment of the Alarmed enemy
+indicator; it does not change NPC behavior or quest rewards.
 
 When the requested delivery item is equipped, the Hunter acknowledges its
 recovery: `I see that you have retrieved my <item>. You aren't trying to claim
@@ -8987,31 +9369,33 @@ backpack hand-in.
 
 ## Echo-Blight Horn
 
-The Echo-Blight Horn is the reward for the post-Tracking rare hunt. Its inventory action
-is **Use**. A successful use consumes one game turn and emits a brief cosmetic `♪`
-sound-wave effect around the player; this animation has no gameplay RNG and is disabled
-for replay simulation.
+The Echo-Blight Horn is the reward for the post-Tracking rare hunt. Its
+inventory action is **Use**. A successful use consumes one game turn and emits a
+brief cosmetic `♪` sound-wave effect around the player; this animation has no
+gameplay RNG and is disabled for replay simulation.
 
 When used, living **non-humanoid** enemies on the player's current level within
-**40 tiles Chebyshev distance** can answer, regardless of line of sight, darkness, forest,
-walls, or other intervening terrain. To keep the signal readable, the horn reports at most
-**3 distinct directions**. For each of the eight compass directions, only the nearest
-qualifying monster is considered; the horn then reports the three closest of those
-directional candidates. Equal-distance ties are resolved deterministically. Each reported
-direction produces one deliberately imprecise log message:
+**40 tiles Chebyshev distance** can answer, regardless of line of sight,
+darkness, forest, walls, or other intervening terrain. To keep the signal
+readable, the horn reports at most **3 distinct directions**. For each of the
+eight compass directions, only the nearest qualifying monster is considered; the
+horn then reports the three closest of those directional candidates.
+Equal-distance ties are resolved deterministically. Each reported direction
+produces one deliberately imprecise log message:
 
 `You hear something answering from <direction>.`
 
-`<direction>` is one of the same eight compass bearings used by Tracking. Multiple beasts
-in the same direction therefore produce only one answer. The horn does not reveal species,
-exact distance, or map position. If no valid enemy answers, the log says `Nothing answers.`
+`<direction>` is one of the same eight compass bearings used by Tracking.
+Multiple beasts in the same direction therefore produce only one answer. The
+horn does not reveal species, exact distance, or map position. If no valid enemy
+answers, the log says `Nothing answers.`
 
-The horn is reusable, but only after the character has **earned more XP** since its last
-successful use. This uses `player.totalXpEarned`, the same proof-of-growth concept used
-by Temple healing, rather than current spendable XP. A blocked reuse consumes no turn.
-The horn stores the earned-XP total of its last successful use on that individual item;
-the value is serialized with inventory state and therefore restored by saves and replay
-starting snapshots.
+The horn is reusable, but only after the character has **earned more XP** since
+its last successful use. This uses `player.totalXpEarned`, the same
+proof-of-growth concept used by Temple healing, rather than current spendable
+XP. A blocked reuse consumes no turn. The horn stores the earned-XP total of its
+last successful use on that individual item; the value is serialized with
+inventory state and therefore restored by saves and replay starting snapshots.
 
 </details>
 
@@ -9027,14 +9411,17 @@ His separate Gossip topic always offers a rumor about the Stone Tower, without
 revealing its exact location on the map. It uses the existing eight-point
 compass to describe the bearing from the Gravedigger's current position to the
 Tower entrance. The word `far` appears only when the eight-direction (Chebyshev)
-tile distance to the nearest Tower footprint square is **greater than 80**. The clue
-is derived from the generated world and uses no random roll or persistent flag.
+tile distance to the nearest Tower footprint square is **greater than 80**. The
+clue is derived from the generated world and uses no random roll or persistent
+flag.
 
 The anomalous tombstone can trigger a special quest interaction.
 
-The player can give the odd tombstone to the Gravedigger and gets a shovel in return.
+The player can give the odd tombstone to the Gravedigger and gets a shovel in
+return.
 
-After interaction, the delivered tombstone is inserted beneath the grave next to the gravedigger.
+After interaction, the delivered tombstone is inserted beneath the grave next to
+the gravedigger.
 
 New worlds place a separate unfinished grave beside the Gravedigger, preserving
 its terrain underlay on both the active and stored surface maps. If adjacent
@@ -9072,7 +9459,8 @@ his only normal dialogue is:
 I'm done! No more drink! I heard a bell that's not there.
 ```
 
-His direction hint is dynamically calculated from the generated Big Bell location.
+His direction hint is dynamically calculated from the generated Big Bell
+location.
 
 After the treasure-map casket is unearthed, each post-bell Drunk interaction
 has a 50% chance to use the following line instead:
@@ -9115,15 +9503,15 @@ mechanism as the Old Hunter's cave investigation. It exposes the entrance and
 nearby terrain on the map, not the underground fort or a route across the world.
 A separate log confirms that the Merchant marked the ruins on the map.
 
-The world-level `merchantFortHintGiven` flag becomes true on success, suppressing
-further hint RNG rolls and map reveals, but **not** the rumor itself: selecting
-Rumors again repeats the same line. The same rumor can be told if the entrance
-was discovered independently, without rolling or revealing it again.
-Already-discovered entrances, missing entrances, other NPCs and off-surface
-interactions do not roll.
-Ordinary Talk and Trade do not roll for the hint. Rumors remains a zero-turn
-choice and can be retried after a failed roll; limiting repeated requests
-would require a separate balance rule. Opening the menu alone never rolls.
+The world-level `merchantFortHintGiven` flag becomes true on success,
+suppressing further hint RNG rolls and map reveals, but **not** the rumor
+itself: selecting Rumors again repeats the same line. The same rumor can be told
+if the entrance was discovered independently, without rolling or revealing it
+again. Already-discovered entrances, missing entrances, other NPCs and
+off-surface interactions do not roll. Ordinary Talk and Trade do not roll for
+the hint. Rumors remains a zero-turn choice and can be retried after a failed
+roll; limiting repeated requests would require a separate balance rule. Opening
+the menu alone never rolls.
 
 The flag starts false for each genuinely new world and remains unchanged through
 normal death and new characters reusing a permadeath world. Current saves store
@@ -9133,22 +9521,26 @@ the visual menu is suppressed. Merely opening the menu is not a replay action.
 Chance, reveal radius and the hint line are configured on the Merchant template
 in `content/npcs.json` under `fortHint`.
 
-The Merchant always offers reusable **Flint Stone for 100g** and **Brushwood
-for 10g per bundle**. Both have unlimited merchant stock; Flint Stone can be sold for **50g**
-per stone, while Brushwood cannot be sold back. Brushwood purchases and ordinary pickup cannot exceed five carried;
-excess dropped bundles stay on the ground. Flint can also be found while
-completing boulders (2.5%), ordinary sand digging (0.5%) and opening chests (0.5%).
+The Merchant always offers reusable **Flint Stone for 100g** and **Brushwood for
+10g per bundle**. Both have unlimited merchant stock; Flint Stone can be sold
+for **50g** per stone, while Brushwood cannot be sold back. Brushwood purchases
+and ordinary pickup cannot exceed five carried; excess dropped bundles stay on
+the ground. Flint can also be found while completing boulders (2.5%), ordinary
+sand digging (0.5%) and opening chests (0.5%).
 
 Configured fixed stock includes a **Two-handed Sword for 600g**. Scroll stock at
-world creation is **9 Homecoming**, **6 Identification**, and **3 Invisibility**.
-Homecoming scrolls are finite: an exhausted stack remains in saved stock with
-count zero and is hidden from trade. Restoration does not replenish it. Selling
-a scroll back adds exactly one; an empty stack cannot be purchased.
+world creation is **9 Homecoming**, **6 Identification**, and **3
+Invisibility**. Homecoming scrolls are finite: an exhausted stack remains in
+saved stock with count zero and is hidden from trade. Restoration does not
+replenish it. Selling a scroll back adds exactly one; an empty stack cannot be
+purchased.
 
 During new-world NPC placement, Merchant candidate tiles are rejected if a
 surface ground item already occupies that coordinate. As a compatibility guard,
-loading a save removes any surface ground item found directly under the Merchant;
-this repairs older worlds that already contain such an impossible overlap. All non-Drunk named NPCs use the Temple walk-distance placement rule described in section 50.
+loading a save removes any surface ground item found directly under the
+Merchant; this repairs older worlds that already contain such an impossible
+overlap. All non-Drunk named NPCs use the Temple walk-distance placement rule
+described in section 50.
 
 Stackable items are grouped by kind. Pickups and purchases add to an
 existing stack regardless of item name; opening the inventory merges duplicate
@@ -9190,20 +9582,20 @@ sell value = tier sell value + modifier amount × 5
 ```
 
 The modifier's name/stat does not change this formula; only `modAmt` matters.
-Converted equipment uses this same tier/modifier sell base, including bows
-with an ordinary explicit sell value; it does not bypass artifact discounts
-or the identified ability premium.
-Artifact sell prices apply an additional discount **after** the tier/modifier
-calculation: **unidentified artifacts sell for half**, and **identified cursed
-artifacts for one quarter**, rounded down to whole gold. Identified artifacts
-without a curse retain the normal tier-based sell value. An unidentified cursed
-artifact receives only the unidentified discount until it is identified.
-After the ordinary sell-value discounts, an **identified equipment artifact**
-receives an additional **floor(25% × its ability's `priceBonus`)** gold on sale.
-Unidentified artifacts receive no ability premium. The curse reduction applies
-to the ordinary sell base before the premium; it does not reduce the premium
-again. All 65 enabled powers have an individual nonnegative
-`priceBonus` in `content/artifact_abilities.json` (70g–720g).
+Converted equipment uses this same tier/modifier sell base, including bows with
+an ordinary explicit sell value; it does not bypass artifact discounts or the
+identified ability premium. Artifact sell prices apply an additional discount
+**after** the tier/modifier calculation: **unidentified artifacts sell for
+half**, and **identified cursed artifacts for one quarter**, rounded down to
+whole gold. Identified artifacts without a curse retain the normal tier-based
+sell value. An unidentified cursed artifact receives only the unidentified
+discount until it is identified. After the ordinary sell-value discounts, an
+**identified equipment artifact** receives an additional **floor(25% × its
+ability's `priceBonus`)** gold on sale. Unidentified artifacts receive no
+ability premium. The curse reduction applies to the ordinary sell base before
+the premium; it does not reduce the premium again. All 65 enabled powers have an
+individual nonnegative `priceBonus` in `content/artifact_abilities.json`
+(70g–720g).
 
 ### Non-tiered items
 
@@ -9232,17 +9624,19 @@ and purchase price remain configured in `merchant_stock.json`.
 
 Every non-gear definition in `content/items.json` and every weapon, shield and
 armor template has a nonnegative `baseValue`, representing the normal per-unit
-purchase value. Naturally generated artifacts take their `baseValue` from their selected
-entry in `artifact_effects.json`; converted gear keeps its original purchase base. The common household starting-weapon value
-and modifier purchase increment are configured in `loot_tables.json`.
+purchase value. Naturally generated artifacts take their `baseValue` from their
+selected entry in `artifact_effects.json`; converted gear keeps its original
+purchase base. The common household starting-weapon value and modifier purchase
+increment are configured in `loot_tables.json`.
 
 Initial values preserve the prior pricing: ordinary base purchase values are
 twice the existing sell value; gear modifiers add 10g per modifier point to
 purchase value while continuing to add 5g per point to sell value. Starting
 household weapons cost 4g and sell for 2g; household weapons generated as
 ordinary tier-1 loot under the relevant world trait retain their 30g base value.
-Base values and sell values can now be edited independently. Generated gear/artifact instances retain their chosen
-base value through inventory, trading, theft, saves and replay.
+Base values and sell values can now be edited independently. Generated
+gear/artifact instances retain their chosen base value through inventory,
+trading, theft, saves and replay.
 
 ### Buying from the Merchant
 
@@ -9256,19 +9650,22 @@ However, an item with an explicit `merchantPrice` uses that price instead
 as its **base**. The same `itemBuyValue()` calculation is authoritative for the
 merchant's displayed price and the gold actually charged.
 
-An equipment artifact with a generated power has identification-dependent
+An artifact with a generated power has identification-dependent
 pricing, with mutually exclusive adjustments to its base buy price:
 
 - **Unidentified:** +200g, regardless of the hidden ability or its rolled data.
-- **Identified:** +the ability's individual `priceBonus`, with no gambling surcharge.
+- **Identified:** +the ability's individual `priceBonus`, with no gambling
+  surcharge.
 
 The final artifact purchase price is capped at **1000g**, after the adjustment.
 Sell prices do not include the gambling surcharge. Passive trinkets lacking an
-ability are excluded from this adjustment. Neither displaying prices nor
-identifying a purchased artifact consumes an ability-generation RNG roll or
-mutates `merchantPrice`; buyback stock and ordinary gear keep their established
-base-price rules. Changing identification can therefore make an artifact's buy
-valuation rise or fall, without changing its generated power or properties.
+ability are excluded from this adjustment. Identified artifacts with intrinsic
+curses use the ordinary cursed base resale reduction before adding their ability
+premium. Neither displaying prices nor identifying a purchased artifact consumes
+an ability-generation RNG roll or mutates `merchantPrice`; buyback stock and
+ordinary gear keep their established base-price rules. Changing identification
+can therefore make an artifact's buy valuation rise or fall, without changing
+its generated power or properties.
 
 Merchant-generated stock can therefore use configured price multipliers or
 fixed prices from `content/merchant_stock.json`. The exact multipliers and
@@ -9311,11 +9708,11 @@ The Herbalist opens services while adjacent:
   reporting that not all could be checked. With fewer than 2g, no purification
   or RNG roll occurs.
 - **Buy Life Potion (100g)** supplies one Life Potion per purchase, with
-  unlimited stock. Buying requires adjacency to the surface Herbalist and
-  enough gold. It adds to the normal potion stack, uses no turn or RNG, and
-  records a Herbalist purchase action for replay. Existing gold/inventory
-  save fields hold the result; no separate stock or cooldown is needed.
-  The normal resale value remains 8g, so buying and reselling cannot produce gold.
+  unlimited stock. Buying requires adjacency to the surface Herbalist and enough
+  gold. It adds to the normal potion stack, uses no turn or RNG, and records a
+  Herbalist purchase action for replay. Existing gold/inventory save fields hold
+  the result; no separate stock or cooldown is needed. The normal resale value
+  remains 8g, so buying and reselling cannot produce gold.
 - Brew Life Potion consumes three Healing Herbs and 10g for one Life Potion.
 - Brew Life Potions (use all herbs) makes the maximum affordable batch:
   `potions = min(floor(herbs / 3), floor(gold / 10))`. Six herbs and at least
@@ -9328,25 +9725,27 @@ The Herbalist opens services while adjacent:
   (with the life-potion tile as an image fallback). Other service icons retain
   their current presentation.
 
-The Herbalist also hints that forests can be foraged for remedies while
-warning about forest ambushes. Her **Gossip** topic has a **10%** chance to
-mention her brother, the Fisherman Hermit, and the actual eight-way direction
-from her position to his. Otherwise she shares her ordinary forest advice.
-The clue does not mark his location on the map or start his quest. Gossip
-consumes no turn, but makes one deterministic RNG roll when the Hermit exists.
-Forest ambush candidate selection excludes enemy templates with `aggro: 0`;
-passive creatures do not initiate ambushes.
-Each step onto a forest or ancient-forest tile rolls the base
-`surfaceEnemies.forestAmbushChance` of **4%**. A spawn still requires an open
+The Herbalist also hints that forests can be foraged for remedies while warning
+about forest ambushes. Her **Gossip** topic has a **10%** chance to mention her
+brother, the Fisherman Hermit, and the actual eight-way direction from her
+position to his. Otherwise she shares her ordinary forest advice. The clue does
+not mark his location on the map or start his quest. Gossip consumes no turn,
+but makes one deterministic RNG roll when the Hermit exists. Forest ambush
+candidate selection excludes enemy templates with `aggro: 0`; passive creatures
+do not initiate ambushes. Each step onto a forest or ancient-forest tile rolls
+the base `surfaceEnemies.forestAmbushChance` of **4%**. Forestwalker multiplies
+the trait-adjusted chance by 0.25 (4% becomes 1%); racial immunity still takes
+precedence. One with the Wild cancels a rolled ambush by a protected beast
+without substituting a different monster. A spawn still requires an open
 adjacent tile of the same forest type and an eligible enemy template; the roll
 alone does not guarantee an encounter. Ancient-forest ambushes use tier 3+
 templates, ordinary forest ambushes tier 1–2. Elves, invisible players, and god
-mode do not trigger forest ambushes. A spawned ambusher begins aware and
-Alarmed immediately, gaining the usual **+2 effective AGGRO** and its marker;
-the separate bystander sound message does not appear. A successful
-forest ambush also displays the red Ambush! banner; this does not reveal
-otherwise-hidden enemies. Its Alarmed level identity is stored through the
-normal enemy save fields.
+mode do not trigger forest ambushes. A spawned ambusher begins aware and Alarmed
+immediately, gaining the usual **+2 effective AGGRO** and its marker; the
+separate bystander sound message does not appear. A successful forest ambush
+also displays the red Ambush! banner; this does not reveal otherwise-hidden
+enemies. Its Alarmed level identity is stored through the normal enemy save
+fields.
 
 Planned Herbalist ideas in source comments are not treated as current mechanics.
 
@@ -9399,7 +9798,8 @@ Ringing the bell causes a major world/lore event.
 <details>
   <summary>Details</summary>
 
-After the bell is returned to the Temple and rung, an Ancient Lich can appear near the Cemetery, somewhere near the Ancient Forest.
+After the bell is returned to the Temple and rung, an Ancient Lich can appear
+near the Cemetery, somewhere near the Ancient Forest.
 
 Its dialogue connects:
 
@@ -9420,7 +9820,8 @@ This is an implemented mystery progression chain.
 
 The Black Pillar is currently primarily a lore mystery.
 
-Its connection to the Ancient Lich suggests that its appearance changed the world.
+Its connection to the Ancient Lich suggests that its appearance changed the
+world.
 
 No broad mechanical effect should be assumed unless implementation confirms one.
 
@@ -9467,14 +9868,15 @@ The story concerns:
 <details>
   <summary>Details</summary>
 
-The generated cemetery contains ordinary dwarven tombstones and exactly one anomalous tombstone.
+The generated cemetery contains ordinary dwarven tombstones and exactly one
+anomalous tombstone.
 
 Each tombstone's name/dates/inscription is persisted across save/load
 alongside the grave tiles themselves, so reloading a save does not blank out
 cemetery inscriptions back to generic "unfinished grave" text.
 
-The odd tombstone has a future death date. Reading it in inventory preserves
-its inscription/name and dates, prefaced with
+The odd tombstone has a future death date. Reading it in inventory preserves its
+inscription/name and dates, prefaced with
 `Odd tombstone found in the ruined cemetery.`
 
 It can be picked up as:
@@ -9483,10 +9885,9 @@ It can be picked up as:
 Odd Tombstone
 ```
 
-It can then be given to the Gravedigger.
-Inspecting it in inventory displays its stored inscription, including the
-dead person's name and birth/death years, with a name/date fallback for older
-items without an inscription.
+It can then be given to the Gravedigger. Inspecting it in inventory displays its
+stored inscription, including the dead person's name and birth/death years, with
+a name/date fallback for older items without an inscription.
 
 </details>
 
@@ -9520,8 +9921,8 @@ purely atmospheric; they do not imply a guaranteed item. Dwarven remains never
 contain a pickaxe or quest key. Searching remains underfoot takes precedence
 over interacting with a nearby campfire.
 
-The wheelbarrow is mechanically significant because it enables moving the Big Bell.
-Picking it up removes the ground object and refreshes the canvas and HUD
+The wheelbarrow is mechanically significant because it enables moving the Big
+Bell. Picking it up removes the ground object and refreshes the canvas and HUD
 immediately, without waiting for another movement or animation frame.
 
 </details>
@@ -9556,7 +9957,8 @@ SPD -5
 
 The bell can then be returned to the Temple.
 
-This is a complete environmental-object → discovery → item → transport → world-event chain.
+This is a complete environmental-object → discovery → item → transport →
+world-event chain.
 
 </details>
 
@@ -9619,35 +10021,34 @@ restoration does not generate or repopulate the tower.
 The current save version is defined in `src/version.js`. The save format changes
 when stored gameplay data becomes incompatible. Incompatible replay action/turn
 rules can instead invalidate the recording independently when the character
-snapshot remains valid. The
-service worker uses an independent cache revision to refresh offline files.
-The Save Game button stays hidden until a character begins or a saved game
-is loaded. Each manual save serializes one snapshot, requests a JSON download
-and independently replaces the latest device-local recovery save in IndexedDB.
-The file request is initiated directly within the user interaction; its temporary
-Blob URL remains valid for a short grace period for mobile download managers.
-The browser cannot confirm that a requested download was actually written to disk.
-The game reports the download request separately from a confirmed local database
-commit. Explicit download failure is reported visibly even when the local backup
-succeeds; a failed local backup warns the player to verify the downloaded file.
-If both fail, the game reports a save failure; a failed write does not replace
-an earlier committed recovery snapshot.
+snapshot remains valid. The service worker uses an independent cache revision to
+refresh offline files. The Save Game button stays hidden until a character
+begins or a saved game is loaded. Each manual save serializes one snapshot,
+requests a JSON download and independently replaces the latest device-local
+recovery save in IndexedDB. The file request is initiated directly within the
+user interaction; its temporary Blob URL remains valid for a short grace period
+for mobile download managers. The browser cannot confirm that a requested
+download was actually written to disk. The game reports the download request
+separately from a confirmed local database commit. Explicit download failure is
+reported visibly even when the local backup succeeds; a failed local backup
+warns the player to verify the downloaded file. If both fail, the game reports a
+save failure; a failed write does not replace an earlier committed recovery
+snapshot.
 
 Character selection offers **Load local save** when the latest manual snapshot
 uses the current save format. Recovery uses the ordinary save loader, including
 its version validation, and does not create a new world or consume RNG. The
 single backup is shared by manual saves on the same browser profile/site;
-starting a character does not overwrite it until the next manual save. It is
-not an autosave, cloud sync, or a substitute for exported JSON files: browser
+starting a character does not overwrite it until the next manual save. It is not
+an autosave, cloud sync, or a substitute for exported JSON files: browser
 storage can be cleared, blocked, or evicted. Replay playback cannot write a
 recovery save, and neither the backup metadata nor download status enters the
-save payload or replay tape.
-Generation-only changes keep the format: saves store the complete generated
-world and current RNG state, and replays load their complete initial snapshot
-rather than rerunning generation. Optional cave metadata stored in existing
-cave descriptors does not require a new format. Incompatible required fields
-and terrain encodings require a save-version bump; incompatible replay rules
-require a replay or save version bump.
+save payload or replay tape. Generation-only changes keep the format: saves
+store the complete generated world and current RNG state, and replays load their
+complete initial snapshot rather than rerunning generation. Optional cave
+metadata stored in existing cave descriptors does not require a new format.
+Incompatible required fields and terrain encodings require a save-version bump;
+incompatible replay rules require a replay or save version bump.
 
 The loader retains its exact-version check; this does not introduce migration
 or acceptance of differently numbered saves.
@@ -9730,21 +10131,22 @@ ordinary magic. If only one spell is available, its share does not increase.
 The changed RNG sequence requires a new save/replay version; older saves are
 not supported.
 
-Version 65 updates starting player SPD, monster template base SPD, spell-selection
-weights, and Death Bolt damage; replay rules change, so the save version is
-bumped with no compatibility code for older saves.
+Version 65 updates starting player SPD, monster template base SPD,
+spell-selection weights, and Death Bolt damage; replay rules change, so the save
+version is bumped with no compatibility code for older saves.
 
-Saves are JSON files. Version 63 adds the generic monster `lowHpTeleportUsed` flag to saved
-enemies and replay initial states. Sacrifice needs no persistent flag because
-it immediately removes the victim and heals the caster through existing state.
-Low-HP Teleport and Sacrifice use a separate seeded survival roll. No survival
-RNG is consumed if neither has a valid target. Their spell eligibility, one-use
-Teleport flag, and healing effects persist correctly in current saves and replays. No migration of older saves is provided.
+Saves are JSON files. Version 63 adds the generic monster `lowHpTeleportUsed`
+flag to saved enemies and replay initial states. Sacrifice needs no persistent
+flag because it immediately removes the victim and heals the caster through
+existing state. Low-HP Teleport and Sacrifice use a separate seeded survival
+roll. No survival RNG is consumed if neither has a valid target. Their spell
+eligibility, one-use Teleport flag, and healing effects persist correctly in
+current saves and replays. No migration of older saves is provided.
 
-Version 62 adds generic monster `immunityUsed` and
-`immunityUntilTurn` fields to saved enemies and replay initial states. An
-absolute turn deadline, not animation timing, determines when immunity ends.
-No migration of older saves is provided.
+Version 62 adds generic monster `immunityUsed` and `immunityUntilTurn` fields to
+saved enemies and replay initial states. An absolute turn deadline, not
+animation timing, determines when immunity ends. No migration of older saves is
+provided.
 
 Version 61 uses the generic `weakenTurns` and `slowTurns`
 player counters and shared ability-based spell selection. Equipped and backpack
@@ -9780,7 +10182,8 @@ Version 51 adds the explicit persistent `player.highscoresDisqualified` flag.
 Current saves and replay starting snapshots must contain a boolean value; no
 older-save compatibility path is added. Live loads reconcile the flag against
 the browser's exclusion ledger, while replay initialization/restoration reads
-only the saved flag. Online cutoffs and request state are not gameplay save data.
+only the saved flag. Online cutoffs and request state are not gameplay save
+data.
 
 Version 50 changes adjacent-step cracking from guaranteed to an 85% roll.
 Failed spread checks leave intact ice unchanged and skip the extra break roll.
@@ -9788,10 +10191,10 @@ The changed conditional RNG sequence requires current-version saves and replay
 starting snapshots; no new persistent fields are added.
 
 Version 49 adds the same-step 10% break recheck only when moving from cracking
-ice onto intact ice. The origin terrain is transient action context, reconstructed
-from movement during replay rather than saved as a player flag. The additional
-conditional RNG call changes the replay contract; older saves and replay
-starting snapshots are rejected.
+ice onto intact ice. The origin terrain is transient action context,
+reconstructed from movement during replay rather than saved as a player flag.
+The additional conditional RNG call changes the replay contract; older saves and
+replay starting snapshots are rejected.
 
 Version 48 adds the 1% instant-break check and one-ring neighboring collapse.
 Their map changes use the existing surface grid and cold underlays; no new
@@ -9817,8 +10220,8 @@ It is independent of the current character's Bestiary/Tracking knowledge and
 is captured in replay snapshots. Older saves are rejected without migration.
 
 Version 43 adds the world-level Merchant fort-hint flag. It persists with the
-surface discovery grid through save/load and replay and does not reset when
-a new character reuses the same world. Older saves are rejected without migration.
+surface discovery grid through save/load and replay and does not reset when a
+new character reuses the same world. Older saves are rejected without migration.
 
 Version 42 changes deterministic damage outcomes to triangular proportional
 variance with a minimum spread. Older recordings use different combat results
@@ -9828,9 +10231,9 @@ Version 41 establishes the expanded gear-bonus RNG contract: older snapshots
 and recordings are rejected because their loot rolls consume a different random
 sequence. Item fields remain unchanged; there is no migration.
 
-Version 40 distinguishes barred prison doors from solid doors in saved
-terrain. Version 39 stores the dungeon-package shortcut registry and each deep
-level's package identity; versions 34–38 introduced the Ruins lift, traps, distinct
+Version 40 distinguishes barred prison doors from solid doors in saved terrain.
+Version 39 stores the dungeon-package shortcut registry and each deep level's
+package identity; versions 34–38 introduced the Ruins lift, traps, distinct
 terrain states, room/vault descriptors, room graph and progression-key state
 (see section 13). Saves from other schema versions are rejected.
 
@@ -9842,9 +10245,10 @@ kept as one runtime object after loading so later persistent dungeon mutations
 cannot desynchronize the two representations. No compatibility path is added
 for older save/replay schemas.
 
-Version 32 stores humanoid gear effectiveness, applied equipment bonuses, and the
-spent death-shield flag. Current saves and replay snapshots restore these values
-directly without rerolling or reapplying stat bonuses. Older schemas are rejected.
+Version 32 stores humanoid gear effectiveness, applied equipment bonuses, and
+the spent death-shield flag. Current saves and replay snapshots restore these
+values directly without rerolling or reapplying stat bonuses. Older schemas are
+rejected.
 
 Version 30 adds the generated decorative cave overlay list. Current saves and
 replay snapshots restore it without rerolling placement or consuming RNG.
@@ -9871,27 +10275,30 @@ eligibility. Armor items store their complete SPD penalty. Current saves and
 replay starting snapshots restore these values directly; no older-save
 compatibility is added.
 
-Version 22 adds sparse rare-sighting count, remaining flee turns, fractional pace and
-re-arm state to enemy saves and replay initial snapshots. Default values are omitted;
-loading restores them without rerolling or restarting a sighting. No migration for
-older save versions is added. Older replay recordings can diverge on rare encounters.
+Version 22 adds sparse rare-sighting count, remaining flee turns, fractional
+pace and re-arm state to enemy saves and replay initial snapshots. Default
+values are omitted; loading restores them without rerolling or restarting a
+sighting. No migration for older save versions is added. Older replay recordings
+can diverge on rare encounters.
 
-Version 21 adds the post-Tracking rare-hunt state and the Echo-Blight Horn's per-item
-XP-gated reuse state. The rare hunt continues to use the existing serialized Old Hunter
-quest object and exact enemy IDs; the horn's `lastUseTotalXp` travels with its inventory
-instance. Replay initial snapshots preserve the same state. No older-save migration is
-added.
+Version 21 adds the post-Tracking rare-hunt state and the Echo-Blight Horn's
+per-item XP-gated reuse state. The rare hunt continues to use the existing
+serialized Old Hunter quest object and exact enemy IDs; the horn's
+`lastUseTotalXp` travels with its inventory instance. Replay initial snapshots
+preserve the same state. No older-save migration is added.
 
 Version 20 adds per-enemy ranged shooter role and exact remaining ammunition.
-The save stores the rolled shooter ability plus `shotsRemaining`; projectile type is
-derived from the current configured ability. Replay starting snapshots therefore keep
-the same shooter assignment and partial ammunition (for example, 7/10 remains 7/10)
-without rerolling on load, z-level changes or replay. No older-save migration is added.
+The save stores the rolled shooter ability plus `shotsRemaining`; projectile
+type is derived from the current configured ability. Replay starting snapshots
+therefore keep the same shooter assignment and partial ammunition (for example,
+7/10 remains 7/10) without rerolling on load, z-level changes or replay. No
+older-save migration is added.
 
-Version 19 adds Tracking knowledge, per-species kill counts, surface track records
-and their ages, plus each far traveler’s remaining route. Turn count, consecutive waits and the Old Hunter quest serial
-are saved too; replay restores their actual starting values rather than assuming
-zero. No migration for older saves is added for these new fields.
+Version 19 adds Tracking knowledge, per-species kill counts, surface track
+records and their ages, plus each far traveler’s remaining route. Turn count,
+consecutive waits and the Old Hunter quest serial are saved too; replay restores
+their actual starting values rather than assuming zero. No migration for older
+saves is added for these new fields.
 
 Version 18 persists Fisherman hut/quest state, exact enemy IDs and the next-ID
 counter, and all Swimming skill/practice/session fields. Loading does not spawn
@@ -9923,11 +10330,12 @@ normal forest color for that load until another full rebuild. This ordering is a
 save/load rendering invariant and should be preserved when changing loader
 initialization order.
 
-Foraging a forest tile during live play must also repaint that coordinate in every
-cached minimap base immediately after adding it to `foragedTiles`. The tile is
-normally already discovered, so calling `markDiscovered()` is insufficient:
-`markDiscovered()` intentionally returns early for an already-seen tile and would
-leave the cached minimap showing ordinary forest until a later full rebuild.
+Foraging a forest tile during live play must also repaint that coordinate in
+every cached minimap base immediately after adding it to `foragedTiles`. The
+tile is normally already discovered, so calling `markDiscovered()` is
+insufficient: `markDiscovered()` intentionally returns early for an already-seen
+tile and would leave the cached minimap showing ordinary forest until a later
+full rebuild.
 
 Enemy save records now persist `levelKind` in addition to numeric `level` and
 `caveIndex`. This is required because a z value alone does not uniquely identify
@@ -9938,8 +10346,9 @@ Version 13 was introduced to preserve this enemy map identity explicitly.
 
 # 67. Save Compatibility
 
-Current gameplay state requires the save version defined in `src/version.js`. Other versions are rejected
-before world state is changed; begin a new world when upgrading. No migration is provided for older saves or replay snapshots.
+Current gameplay state requires the save version defined in `src/version.js`.
+Other versions are rejected before world state is changed; begin a new world
+when upgrading. No migration is provided for older saves or replay snapshots.
 
 Every persistent feature must cover initialization, current-save serialization
 and restoration, replay starting state, and character-reset behavior. Existing
@@ -9961,60 +10370,61 @@ sight and projectiles.
 
 The enclosed ground floor and upper floors `z:+1` to `z:+3` use the ordinary
 eight-tile line-of-sight rules and explored terrain shading. The open summit
-(`z:+4`) has **unrestricted visibility across its entire 10×10 stone footprint**,
-with no dungeon sight-radius cutoff or dimmed battlements. This does not
-reveal unexplored surrounding surface tiles or enable interactions below.
-The surface outside the tower
-keeps its existing visibility rules. Outside their footprint, previously discovered surface
-terrain is drawn without per-tile color filters to avoid slow redraws. Unexplored surroundings stay
-hidden. The backdrop also shows living surface monsters roaming on previously explored
-outside tiles. They use species sprites in tile mode when available and the
-original tier-colored glyphs in ASCII mode or when art is missing. They cannot see,
-track or attack the upstairs player; neither their Alarmed state nor their
-aggro range, status marks or inspection details are exposed. Nearby surface
-monsters receive passive, deterministic wandering opportunities on player
-turns while the player is upstairs; they respect terrain, other occupants,
-and the tower walls. They do not perform cross-floor combat or special abilities.
-Their real positions persist normally on the surface, including in saves and
-replays, and no real-time animation changes a gameplay decision. Surface loot,
-NPCs and effects remain hidden. Climbing does not reveal additional surface
-tiles. The source is the existing surface map, not a regenerated world.
+(`z:+4`) has **unrestricted visibility across its entire 10×10 stone
+footprint**, with no dungeon sight-radius cutoff or dimmed battlements. This
+does not reveal unexplored surrounding surface tiles or enable interactions
+below. The surface outside the tower keeps its existing visibility rules.
+Outside their footprint, previously discovered surface terrain is drawn without
+per-tile color filters to avoid slow redraws. Unexplored surroundings stay
+hidden. The backdrop also shows living surface monsters roaming on previously
+explored outside tiles. They use species sprites in tile mode when available and
+the original tier-colored glyphs in ASCII mode or when art is missing. They
+cannot see, track or attack the upstairs player; neither their Alarmed state nor
+their aggro range, status marks or inspection details are exposed. Nearby
+surface monsters receive passive, deterministic wandering opportunities on
+player turns while the player is upstairs; they respect terrain, other
+occupants, and the tower walls. They do not perform cross-floor combat or
+special abilities. Their real positions persist normally on the surface,
+including in saves and replays, and no real-time animation changes a gameplay
+decision. Surface loot, NPCs and effects remain hidden. Climbing does not reveal
+additional surface tiles. The source is the existing surface map, not a
+regenerated world.
 
-The renderer draws only previously explored background cells in the viewport, beneath the current floor.
-Surface terrain is composed by **one rendering path** on the ground and above it:
-when the active elevated map marks a cell as outside space, that same terrain
-renderer reads the original `surfaceMap` at its unchanged X/Y. Thus cemetery
-graves, trees, rocks, transparent underlays, deterministic tile variants, biome
-boundaries, shoreline masks and diagonal rivers have the same appearance at
-`z:0` and when viewed from `z:+1` through `z:+4`. The elevated map remains
-responsible for collision, visibility and interaction; the projected surface
-never becomes walkable or interactive. A separate exterior-only overlay dims
-this scenery and its wandering creatures on enclosed upper floors, without
-dimming the tower interior. This shared drawing never modifies map state or
-uses gameplay RNG.
-Old sand metadata under forest trees must not create square patches around
-the tower. Rendering the exterior cannot modify tower terrain, discovery,
-character positions or the replay RNG. Ground
-creatures seen below are covered by tree canopies, including while moving;
-flying creatures remain visible above them. Rocky terrain overrides any stale
-forest underlay; rocks and trees are never composited on the same background
-tile. Per-tile desaturation filters are deliberately omitted to keep movement
-responsive. Terrain transition rendering is cosmetic and deterministic. Grass,
-sand and snow boundaries use shared cell-center biome weights, sharpened to
-retain distinct textures with a soft edge. Neighboring tiles agree on the
+The renderer draws only previously explored background cells in the viewport,
+beneath the current floor. Surface terrain is composed by **one rendering path**
+on the ground and above it: when the active elevated map marks a cell as outside
+space, that same terrain renderer reads the original `surfaceMap` at its
+unchanged X/Y. Thus cemetery graves, trees, rocks, transparent underlays,
+deterministic tile variants, biome boundaries, shoreline masks and diagonal
+rivers have the same appearance at `z:0` and when viewed from `z:+1` through
+`z:+4`. The elevated map remains responsible for collision, visibility and
+interaction; the projected surface never becomes walkable or interactive. A
+separate exterior-only overlay dims this scenery and its wandering creatures on
+enclosed upper floors, without dimming the tower interior. This shared drawing
+never modifies map state or uses gameplay RNG. Old sand metadata under forest
+trees must not create square patches around the tower. Rendering the exterior
+cannot modify tower terrain, discovery, character positions or the replay RNG.
+Ground creatures seen below are covered by tree canopies, including while
+moving; flying creatures remain visible above them. Rocky terrain overrides any
+stale forest underlay; rocks and trees are never composited on the same
+background tile. Per-tile desaturation filters are deliberately omitted to keep
+movement responsive. Terrain transition rendering is cosmetic and deterministic.
+Grass, sand and snow boundaries use shared cell-center biome weights, sharpened
+to retain distinct textures with a soft edge. Neighboring tiles agree on the
 same contour at convex and concave corners. The resulting opaque ground is
-cached by local biome layout and zoom, with a bounded cache.
-Water contributes no land-biome weight; remaining grass/sand/snow weights
-are normalized consistently on both sides of shoreline junctions. Water and
-surface ice keep their full base texture. A continuous contour interpolates the neighboring land and water
-cells. Small world-coordinate variations break up straight banks, while
-each water tile keeps its center and mixed shores use the shared ground textures.
-A blend never exposes an ASCII background color
-through a missing ground layer.
+cached by local biome layout and zoom, with a bounded cache. Water contributes
+no land-biome weight; remaining grass/sand/snow weights are normalized
+consistently on both sides of shoreline junctions. Water and surface ice keep
+their full base texture. A continuous contour interpolates the neighboring land
+and water cells. Small world-coordinate variations break up straight banks,
+while each water tile keeps its center and mixed shores use the shared ground
+textures. A blend never exposes an ASCII background color through a missing
+ground layer.
 
-A river's actual map tiles never change just to improve its appearance.
-Surface lava pools use the same irregular bank contour along grass, sand, 
-snow and the ground beneath mountains and volcano cones. Connected lava tiles share an uninterrupted animated interior.
+A river's actual map tiles never change just to improve its appearance. Surface
+lava pools use the same irregular bank contour along grass, sand, snow and the
+ground beneath mountains and volcano cones. Connected lava tiles share an
+uninterrupted animated interior.
 
 Directly adjacent river/water tiles have no shoreline between them. 
 Flowing and frozen river banks vary along cardinal and diagonal runs. Diagonal
@@ -10027,33 +10437,33 @@ No directional image copies or new animation frames are needed.
 
 Opaque ground has no inferred underlay. Its edge/corner overlays are applied
 once, avoiding recursively stacked, conflicting biome transitions. Visible
-shoreline biomes follow the ground actually drawn under trees and rocks;
-stale forest underlays cannot introduce sand patches. Convex and concave grass/snow/sand corners follow the shared ground blend
-instead of stacking incompatible edge strips.
-Underground water receives no surface-shore overlays. These visual rules do
-not change world generation, FOV, saves, replay state or gameplay RNG.
+shoreline biomes follow the ground actually drawn under trees and rocks; stale
+forest underlays cannot introduce sand patches. Convex and concave
+grass/snow/sand corners follow the shared ground blend instead of stacking
+incompatible edge strips. Underground water receives no surface-shore overlays.
+These visual rules do not change world generation, FOV, saves, replay state or
+gameplay RNG.
 
-Hills, boulders and mountains each use their own regular and snow-covered
-sprite families. Hills retain single/left/middle/right variants; boulders
-retain left/middle/right variants, using the middle image for isolated
-clusters. Connectivity selects the shape independently from snow coverage,
-including mixed rows at biome edges. Transparent sprites show grass or snow
-beneath them, and that same visible ground selection determines their
-artwork. Hills and boulders prefer their recorded underlay when available;
-without one, nearby snow determines both their ground and artwork. Mountains
-likewise use the existing ground selection so a mountain rendered over snow
-appears snow-covered even if its stored terrain is `mountain`. These artwork
-choices do not change terrain IDs, collision, FOV or ASCII glyphs, nor any
-saved world data. The surface and tower views use the same selection at the
-same X/Y coordinates.
-On enclosed upper floors (`z:+1` through `z:+3`), a 50% black overlay
-covers only the outside surface, including its monsters. The summit (`z:+4`)
-leaves this view undarkened. Tower walls, interiors, actors and items are never
-darkened by this overlay. Rendering uses a small number of simple rectangles
-rather than expensive per-tile canvas filters.
-Tile and ASCII modes follow the same isolation rules. Minimap/floor selection
-shows the playable tower map, with stairs marked red and separate discovery per
-floor. Stair changes retain coordinates and map viewport settings.
+Hills, boulders and mountains each use their own regular and snow-covered sprite
+families. Hills retain single/left/middle/right variants; boulders retain
+left/middle/right variants, using the middle image for isolated clusters.
+Connectivity selects the shape independently from snow coverage, including mixed
+rows at biome edges. Transparent sprites show grass or snow beneath them, and
+that same visible ground selection determines their artwork. Hills and boulders
+prefer their recorded underlay when available; without one, nearby snow
+determines both their ground and artwork. Mountains likewise use the existing
+ground selection so a mountain rendered over snow appears snow-covered even if
+its stored terrain is `mountain`. These artwork choices do not change terrain
+IDs, collision, FOV or ASCII glyphs, nor any saved world data. The surface and
+tower views use the same selection at the same X/Y coordinates. On enclosed
+upper floors (`z:+1` through `z:+3`), a 50% black overlay covers only the
+outside surface, including its monsters. The summit (`z:+4`) leaves this view
+undarkened. Tower walls, interiors, actors and items are never darkened by this
+overlay. Rendering uses a small number of simple rectangles rather than
+expensive per-tile canvas filters. Tile and ASCII modes follow the same
+isolation rules. Minimap/floor selection shows the playable tower map, with
+stairs marked red and separate discovery per floor. Stair changes retain
+coordinates and map viewport settings.
 
 
 The game stores discovered tiles separately from the actual maps.
@@ -10067,35 +10477,37 @@ There are separate discovery structures for:
 ## Underground field of view
 
 `src/fov.js` computes a circular **eight-tile** sight radius around the player
-in ordinary underground areas and **five tiles** in the Dwarven Mines; the
-mine radius is configured by `dwarvenMines.visibilityRadius` in
-`content/world_generation.json`. The game has no facing direction, so sight extends in all
-directions. Sight lines stop at cave walls, dwarven walls, mountain stone,
-crypt niches, boulders, the Black Pillar, and closed/locked solid Dwarven doors.
-Prison bars and closed/locked barred prison doors allow sight and projectiles
-through, but block creature movement until a prison door is opened. Open and breached
-doors do **not** block sight. Opening, unlocking, or breaching a door
-immediately invalidates the cached underground FOV so tiles behind it become visible
-in the same action, even though the player has not moved. Closing an
-intact open door likewise invalidates the cached FOV, hiding tiles behind
-solid doors without altering the barred-door view. The blocking wall face itself
-remains visible. Water does not block sight. Diagonal sight follows tile
-centers: an adjacent open diagonal tile remains visible even if the two
-cardinal neighbors are walls. Surface visibility is unchanged. The same module also
-exposes its deterministic tile-center line trace for shooter sight/projectile checks;
-using that geometry for combat does not alter the player's surface discovery/FOV rules.
-Projectile collision then applies its own blocker rules on top because visibility and a
-physically clear shot are intentionally different concepts.
+in ordinary underground areas and **five tiles** in the Dwarven Mines; the mine
+radius is configured by `dwarvenMines.visibilityRadius` in
+`content/world_generation.json`. The game has no facing direction, so sight
+extends in all directions. Sight lines stop at cave walls, dwarven walls,
+mountain stone, crypt niches, boulders, the Black Pillar, and closed/locked
+solid Dwarven doors. Prison bars and closed/locked barred prison doors allow
+sight and projectiles through, but block creature movement until a prison door
+is opened. Open and breached doors do **not** block sight. Opening, unlocking,
+or breaching a door immediately invalidates the cached underground FOV so tiles
+behind it become visible in the same action, even though the player has not
+moved. Closing an intact open door likewise invalidates the cached FOV, hiding
+tiles behind solid doors without altering the barred-door view. The blocking
+wall face itself remains visible. Water does not block sight. Diagonal sight
+follows tile centers: an adjacent open diagonal tile remains visible even if the
+two cardinal neighbors are walls. Surface visibility is unchanged. The same
+module also exposes its deterministic tile-center line trace for shooter
+sight/projectile checks; using that geometry for combat does not alter the
+player's surface discovery/FOV rules. Projectile collision then applies its own
+blocker rules on top because visibility and a physically clear shot are
+intentionally different concepts.
 
 Only terrain in the current field of view becomes discovered. Never-seen tiles
 are black on the main canvas and fogged on both minimaps; previously seen tiles
-remain on the main canvas under a 50%-opaque black overlay, visibly lighter
-than unexplored tiles, and remain on the minimaps. The overlay color is defined
-in `src/fov.js` and applied by the terrain renderer in `index.html`. Enemies,
+remain on the main canvas under a 50%-opaque black overlay, visibly lighter than
+unexplored tiles, and remain on the minimaps. The overlay color is defined in
+`src/fov.js` and applied by the terrain renderer in `index.html`. Enemies,
 ground items, damage effects, inspection tooltips, and enemy range overlays
-appear only inside the current field of view, even on explored tiles. Underground
-click-to-move paths can use only discovered tiles. Enemy movement and combat
-mechanics are unchanged; this feature controls the player's information.
+appear only inside the current field of view, even on explored tiles.
+Underground click-to-move paths can use only discovered tiles. Enemy movement
+and combat mechanics are unchanged; this feature controls the player's
+information.
 
 The existing per-level discovery grids are saved and loaded as before. A
 cached field of view is recalculated when the player moves or the active map
@@ -10105,43 +10517,43 @@ wall-aware field-of-view concept in rot.js, implemented locally without a
 runtime dependency.
 
 The full-map overlay has up/down controls for browsing the surface and each
-underground map whose discovery grid contains at least one revealed tile.
-The zoom controls sit on the left of a single toolbar, with the compact
-level label and up/down controls on the right.
-Generic z:-2 caves and the separate Crypt Level 2 have distinct entries,
-despite sharing a depth. Historical views paint only their saved discovered
-tiles; undiscovered terrain stays fogged. The full-map player marker pulses
-only on the currently occupied map. The full-map canvas maintains its intrinsic
-aspect ratio even when viewport height constrains the overlay, so the marker
-stays round. Browsing does not change the active game map, field of view, side
-minimap, save state, or replay RNG. Reopening the map
-starts on the current level at the character's position. While switching
-between explored levels in the open map, the zoom and map-center coordinates
-stay unchanged, allowing direct comparison of the same location across floors.
-An unexplored area on the selected floor remains fogged even if the same
+underground map whose discovery grid contains at least one revealed tile. The
+zoom controls sit on the left of a single toolbar, with the compact level label
+and up/down controls on the right. Generic z:-2 caves and the separate Crypt
+Level 2 have distinct entries, despite sharing a depth. Historical views paint
+only their saved discovered tiles; undiscovered terrain stays fogged. The
+full-map player marker pulses only on the currently occupied map. The full-map
+canvas maintains its intrinsic aspect ratio even when viewport height constrains
+the overlay, so the marker stays round. Browsing does not change the active game
+map, field of view, side minimap, save state, or replay RNG. Reopening the map
+starts on the current level at the character's position. While switching between
+explored levels in the open map, the zoom and map-center coordinates stay
+unchanged, allowing direct comparison of the same location across floors. An
+unexplored area on the selected floor remains fogged even if the same
 coordinates were explored on another floor. Only explicit zoom/pan controls
-change the shared map viewport while browsing.
-Discovered Dwarven Ruins lift platforms and Dwarven Mines haulage-cage endpoints
-have bright-green, dark-outlined **4×4-pixel squares at base zoom**, matching
-stairs markers, on both the nearby minimap and the full map (including
-previously explored floors). The squares identify shortcuts
-whether locked or unlocked, but never reveal an undiscovered location. The
-intermediate mine rope shaft receives no marker. Markers derive from saved shortcut
-endpoints and discovery grids, without additional game state or replay RNG.
-On the surface, a discovered sand tile that has been dug shows its darker
-excavated appearance on both minimaps and the full map, matching the main
-canvas. This uses the already persisted `dugSandTiles` state; digging updates
-the active map immediately without revealing any undiscovered tiles.
-The active minimap cache also checks the map and discovery-grid identities,
-because generic and Crypt z:-2 maps can have the same depth and cave index.
+change the shared map viewport while browsing. Discovered Dwarven Ruins lift
+platforms and Dwarven Mines haulage-cage endpoints have bright-green,
+dark-outlined **4×4-pixel squares at base zoom**, matching stairs markers, on
+both the nearby minimap and the full map (including previously explored floors).
+The squares identify shortcuts whether locked or unlocked, but never reveal an
+undiscovered location. The intermediate mine rope shaft receives no marker.
+Markers derive from saved shortcut endpoints and discovery grids, without
+additional game state or replay RNG. On the surface, a discovered sand tile that
+has been dug shows its darker excavated appearance on both minimaps and the full
+map, matching the main canvas. This uses the already persisted `dugSandTiles`
+state; digging updates the active map immediately without revealing any
+undiscovered tiles. The active minimap cache also checks the map and
+discovery-grid identities, because generic and Crypt z:-2 maps can have the same
+depth and cave index.
 
-The desktop side minimap follows the player by default, but dragging directly
-on it pans its view of the currently active floor with mouse or touch. Panning
-is clamped to map bounds; double-clicking the side minimap or pressing its
-**recenter/follow** button recenters on the player and resumes following.
-The button is disabled while the map already follows the player. Changing the
-active floor or map also resumes following. Side-map panning is UI-only
-and does not move the character, reveal unexplored terrain, affect world-map browsing, or consume replay RNG.
+The desktop side minimap follows the player by default, but dragging directly on
+it pans its view of the currently active floor with mouse or touch. Panning is
+clamped to map bounds; double-clicking the side minimap or pressing its
+**recenter/follow** button recenters on the player and resumes following. The
+button is disabled while the map already follows the player. Changing the active
+floor or map also resumes following. Side-map panning is UI-only and does not
+move the character, reveal unexplored terrain, affect world-map browsing, or
+consume replay RNG.
 
 The hidden desktop side minimap is not repainted on mobile. Its dirty flag and
 player coordinates remain pending until it is visible again; opening the world
@@ -10149,14 +10561,15 @@ map still renders independently. Idle surface terrain animation uses clipped
 damage regions around animated tiles, redrawing overlapping terrain and all
 upper layers in their normal order without a persistent scene cache. Underground
 views and unsettled cameras retain full rendering. Movement, effects, visibility
-changes and zoom continue through the full renderer with a shared frame timestamp.
+changes and zoom continue through the full renderer with a shared frame
+timestamp.
 
 At the end of a movement animation, buffered movement/automatic-path processing
 is scheduled as a timer task after the animation frame, rather than running the
-next world simulation inside that frame. The camera input lock remains held until
-that task executes, and stopping the camera cancels the task. Scripted tests must
-wait for this lock to clear: awaiting `tryMove()` alone does not await animation
-or a buffered turn.
+next world simulation inside that frame. The camera input lock remains held
+until that task executes, and stopping the camera cancels the task. Scripted
+tests must wait for this lock to clear: awaiting `tryMove()` alone does not
+await animation or a buffered turn.
 
 Therefore:
 
@@ -10169,30 +10582,29 @@ Therefore:
 Wide, fine-pointer desktop layouts use a UI font scale of **1.1**; narrow
 or touch layouts retain **1.0**.
 
-The XP bar fills with white on both desktop and touch layouts and shows
-progress toward the next level without a numeric XP label. Enemy inspection
-displays rounded ATK, DEF and SPD, and the terrain DEF
-change compares rounded defense with and without terrain (excluding unrelated
-status changes from the terrain bonus).
-The character statistics show steps alongside elapsed turns and list how many
-of the four world edges have been discovered, with their compass directions.
-Reached directions appear as uppercase initials (`N`, `S`, `E`, `W`).
-Touch layouts retain their previous compact XP bar and steps row and omit the
-world-edge row. These are display-only changes; the underlying XP, turn and
+The XP bar fills with white on both desktop and touch layouts and shows progress
+toward the next level without a numeric XP label. Enemy inspection displays
+rounded ATK, DEF and SPD, and the terrain DEF change compares rounded defense
+with and without terrain (excluding unrelated status changes from the terrain
+bonus). The character statistics show steps alongside elapsed turns and list how
+many of the four world edges have been discovered, with their compass
+directions. Reached directions appear as uppercase initials (`N`, `S`, `E`,
+`W`). Touch layouts retain their previous compact XP bar and steps row and omit
+the world-edge row. These are display-only changes; the underlying XP, turn and
 edge-reward rules are unchanged.
 
 ### Active player statuses
 
 Compact badges sit inside the bottom-left of the actual tile canvas in both tile
 and ASCII modes, rather than merely using the outer desktop stage bounds. Their
-layout follows the canvas's live displayed rectangle during viewport resizing, even
-before the camera-size calculation settles, so they never drift into the surrounding
-overlay area. Only active effects
-appear; the strip disappears when empty. Backgrounds are 70% opaque (90% when
-hovered, focused, or inspected); text and icons remain fully opaque. Badges wrap
-upward on narrow screens without resizing the canvas.
-Hover, keyboard focus, or tap reveals details above the row. Tap again, tap
-outside, or press Escape to dismiss. Inspecting a badge does not spend a turn.
+layout follows the canvas's live displayed rectangle during viewport resizing,
+even before the camera-size calculation settles, so they never drift into the
+surrounding overlay area. Only active effects appear; the strip disappears when
+empty. Backgrounds are 70% opaque (90% when hovered, focused, or inspected);
+text and icons remain fully opaque. Badges wrap upward on narrow screens without
+resizing the canvas. Hover, keyboard focus, or tap reveals details above the
+row. Tap again, tap outside, or press Escape to dismiss. Inspecting a badge does
+not spend a turn.
 
 | Effect | Counter |
 |---|---|
@@ -10235,42 +10647,41 @@ Current desktop controls include:
 | Mouse wheel over game canvas | Increase / decrease game tile size           |
 | G | Toggle god mode on or off                                       |
 
-Tile size starts at **48** canvas pixels on desktop and **56** on
-coarse-pointer mobile devices (two additional zoom steps). It changes in
-four-pixel steps from 20 to 96. Wide layouts whose primary pointer is not
-coarse use the desktop overlay layout; this includes keyboard/headless contexts
-that report no primary pointer, while coarse-pointer/touch layouts remain on the
-mobile rules. Desktop `#root` has no outer padding and the stage fills the entire
-browser viewport, including the area behind the top HUD.
-The HUD is a fixed overlay centered at the top and does not reserve camera
-height. Wide desktop layouts keep the HUD on one row; narrow-window/mobile rules
-may wrap it. HUD presentation never resizes the map. The full-viewport desktop
-stage deliberately avoids creating a separate stacking context so modal overlays
-inside it can still cover gameplay-side overlays such as the minimap, keyboard
-hints and message log.
-Map tiles remain square, unscaled canvas pixels: if the available width or height
-is not an exact multiple of the tile size, the camera renders one extra edge
-column/row and the stage symmetrically clips the sub-tile excess. This avoids
-grey side/bottom gutters without distorting terrain; at most part of one tile is
-clipped at each pair of opposite edges. Canvas HUD elements that hug an edge,
-including the underground `Z` depth badge, are positioned against the **visible**
-canvas bounds rather than the oversized render buffer so this deliberate clipping
-cannot trim them after resize or zoom. A cramped window caps the effective tile size
-so at least seven columns fit; desktop otherwise has no 50-tile camera cap, so
-wide and tall monitors expose additional map instead of leaving unused space.
+Tile size starts at **48** canvas pixels on desktop and **56** on coarse-pointer
+mobile devices (two additional zoom steps). It changes in four-pixel steps from
+20 to 96. Wide layouts whose primary pointer is not coarse use the desktop
+overlay layout; this includes keyboard/headless contexts that report no primary
+pointer, while coarse-pointer/touch layouts remain on the mobile rules. Desktop
+`#root` has no outer padding and the stage fills the entire browser viewport,
+including the area behind the top HUD. The HUD is a fixed overlay centered at
+the top and does not reserve camera height. Wide desktop layouts keep the HUD on
+one row; narrow-window/mobile rules may wrap it. HUD presentation never resizes
+the map. The full-viewport desktop stage deliberately avoids creating a separate
+stacking context so modal overlays inside it can still cover gameplay-side
+overlays such as the minimap, keyboard hints and message log. Map tiles remain
+square, unscaled canvas pixels: if the available width or height is not an exact
+multiple of the tile size, the camera renders one extra edge column/row and the
+stage symmetrically clips the sub-tile excess. This avoids grey side/bottom
+gutters without distorting terrain; at most part of one tile is clipped at each
+pair of opposite edges. Canvas HUD elements that hug an edge, including the
+underground `Z` depth badge, are positioned against the **visible** canvas
+bounds rather than the oversized render buffer so this deliberate clipping
+cannot trim them after resize or zoom. A cramped window caps the effective tile
+size so at least seven columns fit; desktop otherwise has no 50-tile camera cap,
+so wide and tall monitors expose additional map instead of leaving unused space.
 The right-side minimap and keyboard hints are fixed overlays and never reserve
 canvas width. Expanding or collapsing either panel therefore does not resize the
 camera or make the map jump. Coarse-pointer layouts retain the 16-column
 baseline scaling and 7–50-column bounds, while the existing vertical drag still
 controls visible rows. Pointer hit testing uses the canvas's actual
 displayed-to-buffer ratio. Zoom is presentation-only: it does not change world
-coordinates, gameplay RNG, save data, or the separate world-map zoom.
-Narrow fine-pointer windows scale their canvas to the stage width too, preventing
-horizontal cropping without switching to touch controls.
-Both panels remember their expanded/collapsed preferences in browser-local
-storage across page loads and character playthroughs, independently of the
-game save and replay. If storage is unavailable, both default to expanded.
-Rasterized terrain and item image caches are rebuilt when tile size changes.
+coordinates, gameplay RNG, save data, or the separate world-map zoom. Narrow
+fine-pointer windows scale their canvas to the stage width too, preventing
+horizontal cropping without switching to touch controls. Both panels remember
+their expanded/collapsed preferences in browser-local storage across page loads
+and character playthroughs, independently of the game save and replay. If
+storage is unavailable, both default to expanded. Rasterized terrain and item
+image caches are rebuilt when tile size changes.
 
 Wheel zoom listens only on the game canvas: scrolling over the message log,
 inventory, trade panels, or other scrollable content keeps its usual behavior.
@@ -10280,25 +10691,24 @@ before each tile-size step. Desktop inspection tooltips remain overlays above
 the canvas and side panels; near the right or top edge they flip/clamp back into
 the visible canvas instead of being clipped by the browser edge.
 
-On desktop the message log floats as a narrow panel along the lower-left
-side of the canvas rather than consuming camera height. It keeps its original
-40 px bottom inset relative to the stage instead of shifting in response to
-active-status badges. Very tall status strips may therefore overlap the log.
-Its panel background is lightly transparent so terrain remains perceptible beneath
-it, with brighter informational text and gentler fading of older messages.
-The log remains scrollable and continues to intercept
-pointer/wheel input normally. A top-right resize grip lets the player change both
-width and height without resizing the game camera; the grip is inset from the
-native vertical scrollbar so the scrollbar cannot cover its visible or clickable
-area. The default is 420×220 px; resizing is bounded to at least 300×120 px when
-space permits, at most 80% of the stage width and 60% of its height, and always
-kept inside the stage. The bottom anchor is preserved while resizing, so the
-panel grows upward/rightward without moving its resting position. The resize is
-presentation-only and is not saved or replayed.
-The newest entry stays
-fully bright, the second- and third-newest use slightly lower brightness, and
-older history is further dimmed and mildly desaturated. Loot messages use white
-as their base text color; when the looted object has an item tier, the item name
+On desktop the message log floats as a narrow panel along the lower-left side of
+the canvas rather than consuming camera height. It keeps its original 40 px
+bottom inset relative to the stage instead of shifting in response to
+active-status badges. Very tall status strips may therefore overlap the log. Its
+panel background is lightly transparent so terrain remains perceptible beneath
+it, with brighter informational text and gentler fading of older messages. The
+log remains scrollable and continues to intercept pointer/wheel input normally.
+A top-right resize grip lets the player change both width and height without
+resizing the game camera; the grip is inset from the native vertical scrollbar
+so the scrollbar cannot cover its visible or clickable area. The default is
+420×220 px; resizing is bounded to at least 300×120 px when space permits, at
+most 80% of the stage width and 60% of its height, and always kept inside the
+stage. The bottom anchor is preserved while resizing, so the panel grows
+upward/rightward without moving its resting position. The resize is
+presentation-only and is not saved or replayed. The newest entry stays fully
+bright, the second- and third-newest use slightly lower brightness, and older
+history is further dimmed and mildly desaturated. Loot messages use white as
+their base text color; when the looted object has an item tier, the item name
 uses the same tier color as inventory/equipment UI. Mobile keeps its existing
 separate log layout and safe-area behavior. Touch/narrow safe-area measurements
 are applied after layout settles and only when their measured dimensions change,
@@ -10308,16 +10718,21 @@ so HUD/log resizing cannot feed back into the same resize-observer cycle.
 
 Desktop layouts with a mouse or other fine pointer use a brown scrollbar thumb
 and dark brown track, including devices that also support touch. Narrow touch
-layouts keep native scrollbar styling. The treasure map renders its terrain in sepia while
-retaining the red treasure X, with no effect on world or discovery state.
+layouts keep native scrollbar styling. The treasure map renders its terrain in
+sepia while retaining the red treasure X, with no effect on world or discovery
+state.
 
 # 70. Mobile
 
 Touch controls reuse the same gameplay functions as keyboard controls. Enemy
 inspection separates SPD and hit chance with a centered dot on mobile; desktop
-retains its existing line break.
-The inspection prompt and touch controls are hidden while a modal overlay is open. The Bestiary keeps its own full-screen scrolling list and close control on touch layouts.
-The backpack opens the inventory, the magnifier runs the normal inspect action (including village huts), and the hand button uses the normal forage/loot action. Each button handles touch and click input while suppressing the duplicate click browsers emit after a touch.
+retains its existing line break. The inspection prompt and touch controls are
+hidden while a modal overlay is open. The Bestiary keeps its own full-screen
+scrolling list and close control on touch layouts. The backpack opens the
+inventory, the magnifier runs the normal inspect action (including village
+huts), and the hand button uses the normal forage/loot action. Each button
+handles touch and click input while suppressing the duplicate click browsers
+emit after a touch.
 
 Mobile supports:
 
@@ -10336,8 +10751,16 @@ four-pixel tile steps as `+`/`-`. Pinching out enlarges tiles; pinching in
 shrinks them. Lifting either finger suppresses a tap or one-finger row resize
 until the gesture ends. The full-map pinch continues to zoom the map only.
 
-The intent is to keep mobile gameplay rules equivalent to desktop rules.
-Walking uses an uncapped `requestAnimationFrame` loop for a 140 ms camera pan. The renderer redraws the viewport each frame, including terrain, items, and creatures. Occupied tree-canopy overlays now consider only entities near the visible viewport; offscreen entities cannot contribute to the current frame. Ground creatures remain behind the canopy; flying enemies and their status markers are drawn after it and remain visible above trees. This reduces per-frame world scans without changing visibility or turn timing. Frame pacing and canvas scaling on a specific phone still require device measurements to diagnose any remaining glyph shimmer.
+The intent is to keep mobile gameplay rules equivalent to desktop rules. Walking
+uses an uncapped `requestAnimationFrame` loop for a 140 ms camera pan. The
+renderer redraws the viewport each frame, including terrain, items, and
+creatures. Occupied tree-canopy overlays now consider only entities near the
+visible viewport; offscreen entities cannot contribute to the current frame.
+Ground creatures remain behind the canopy; flying enemies and their status
+markers are drawn after it and remain visible above trees. This reduces
+per-frame world scans without changing visibility or turn timing. Frame pacing
+and canvas scaling on a specific phone still require device measurements to
+diagnose any remaining glyph shimmer.
 
 There is currently no mobile button for waiting (skipping the turn).
 
@@ -10345,39 +10768,51 @@ There is currently no mobile button for waiting (skipping the turn).
 
 # 71. Debug Mode
 
-`G` requests activation of a developer/debug mode. In live play, enabling
-it first opens a confirmation explaining that the current character will be
+`G` requests activation of a developer/debug mode. In live play, enabling it
+first opens a confirmation explaining that the current character will be
 **permanently disqualified from Highscores**, even after disabling God Mode,
 refreshing, or loading a save from before its activation. Cancelling does not
-change the world, character, leaderboard eligibility, replay actions, turns,
-or RNG. Acceptance disqualifies the character before applying the debug buffs.
+change the world, character, leaderboard eligibility, replay actions, turns, or
+RNG. Acceptance disqualifies the character before applying the debug buffs.
 Recorded God Mode actions are replayed without a confirmation or browser-ledger
 writes. Disabling an active God Mode needs no confirmation and cannot undo the
-exclusion. Once enabled, God Mode makes the player invisible. Pressing
-`G` again turns god mode and its invisibility off, restoring normal movement
-restrictions and drowning. Activating God Mode sets the character's gold to
-**5000g**, along with its normal debug stat grants. Granted stats/gold remain,
-and discovery on other floors is unchanged.
-Disabling God Mode forgets only the **current map's** discovered terrain,
-including the surface or a separate dungeon map. Terrain within ordinary
-current sight (and valid underground light) is rediscovered immediately;
-other floors retain their exploration state. This takes no turn, persists
-in saves, and is reproduced by replay.
-Enabling God Mode also permanently teaches the character **Tracking** using
-the same learned-skill flag as the Old Hunter. If the character does not already
-carry a Pickaxe, enabling God Mode grants one; toggling God Mode off does not
-remove it, and enabling it again never duplicates it. These effects persist in
-saves/replay.
-Activating God Mode in live play automatically collapses keyboard hints and
-remembers that panel preference for future playthroughs. Turning God Mode off
-does not reopen hints; the player can expand them manually at any time.
-Replay playback never changes the browser's stored panel preferences.
-It also permits artifact identification without a Scroll of Identification,
-while preserving the ordinary identification turn and saved item state.
-Holding the key does not trigger repeated toggles. The key press is a replay
-action; older recordings that toggled only god-mode invisibility still replay
-with their original behavior. The visibility flag is saved; older god mode
-saves load with invisibility on.
+exclusion. Once enabled, God Mode makes the player invisible. Pressing `G` again
+turns god mode and its invisibility off, restoring normal movement restrictions
+and drowning. Activating God Mode sets the character's gold to **5000g**, along
+with its normal debug stat grants. Granted stats/gold remain. God Mode shows a
+visual reveal overlay for all generated floors, including maps not yet visited,
+and allows debug map navigation on that overlay. The underlying discovery grids
+are not filled or cleared on either toggle. Real movement still discovers
+terrain with the ordinary rules, so exploration-dependent powers remain
+testable. Disabling God Mode hides the overlay and restores ordinary fog without
+forgetting any genuinely explored terrain. Toggling the overlay consumes no turn
+or RNG and its state is saved and replayed. Enabling God Mode also permanently
+teaches the character **Tracking** using the same learned-skill flag as the Old
+Hunter. If the character does not already carry a Pickaxe, enabling God Mode
+grants one; toggling God Mode off does not remove it, and enabling it again
+never duplicates it. These effects persist in saves/replay. The first accepted
+activation per character adds identified test artifacts to Merchant stock: one
+representative for each eligible power in each category (melee weapon, bow,
+shield, armor, trinket), using the ordinary domain and weapon-type restrictions.
+The first eligible base in catalog order is used. These are ability-only
+specimens, without random bonuses or ordinary curses; intrinsic curses remain
+active, and instance-specific rolls use a fixed midpoint for testing. Debug
+trinkets use the lowest natural effect tier and its base price. They use
+ordinary identified artifact pricing. The assortment does not advance gameplay
+RNG, and toggling God Mode or loading a save does not replenish purchased items.
+Test stock and dropped test artifacts are removed when permadeath replaces the
+character in the same world; test gear is not inherited through the previous
+character's remains. The granted flag, item identities and remaining stock
+persist through save and replay. Activating God Mode in live play automatically
+collapses keyboard hints and remembers that panel preference for future
+playthroughs. Turning God Mode off does not reopen hints; the player can expand
+them manually at any time. Replay playback never changes the browser's stored
+panel preferences. It also permits artifact identification without a Scroll of
+Identification, while preserving the ordinary identification turn and saved item
+state. Holding the key does not trigger repeated toggles. The key press is a
+replay action; older recordings that toggled only god-mode invisibility still
+replay with their original behavior. The visibility flag is saved; older god
+mode saves load with invisibility on.
 
 While God Mode is active, hidden **Page Down / Page Up** controls instantly
 move to the next generated lower / higher z level without a turn or RNG roll,
@@ -10435,11 +10870,13 @@ Future races should ideally use the same architecture.
 
 ## Rule C - RNG is gameplay state
 
-Random gameplay should use the existing RNG architecture and preserve its save/load behavior.
+Random gameplay should use the existing RNG architecture and preserve its
+save/load behavior.
 
 ## Rule D - World state persists
 
-When a feature changes the world, determine whether the change must survive save/load.
+When a feature changes the world, determine whether the change must survive
+save/load.
 
 ## Rule E - Death behavior is explicit
 
@@ -10449,7 +10886,8 @@ recoverable body.
 
 ## Rule F - Mysteries are stateful
 
-Mysteries often progress through actual interactions and world state rather than being disconnected lore.
+Mysteries often progress through actual interactions and world state rather than
+being disconnected lore.
 
 ---
 
@@ -10457,13 +10895,17 @@ Mysteries often progress through actual interactions and world state rather than
 
 Do not infer a general system from a specific implemented mechanic:
 
-- general crafting (the Herbalist brews potions; there is no general crafting system)
+- general crafting (the Herbalist brews potions; there is no general crafting
+  system)
 - unrestricted tunneling (Mining excavates only generated weak mine walls,
-  mineral deposits and overworld boulders; ordinary cave and Fort walls remain solid)
+  mineral deposits and overworld boulders; ordinary cave and Fort walls remain
+  solid)
 - skill tree (combat and Mining proficiency improve through use; Tracking and
   Swimming are learned individually, with no tree)
-- generic cross-NPC quest framework (the Old Hunter and Fisherman Hermit have NPC-specific quests)
-- generic wound system (wounded enemies can flee, but there are no persistent wounds)
+- generic cross-NPC quest framework (the Old Hunter and Fisherman Hermit have
+  NPC-specific quests)
+- generic wound system (wounded enemies can flee, but there are no persistent
+  wounds)
 - bleeding
 - broken limbs
 - generic burning
@@ -10472,11 +10914,14 @@ Do not infer a general system from a specific implemented mechanic:
 - New Game+
 - meta progression
 - multiplayer
-- general status-effect framework (specific effects have separate counters and UI badges; see section 69)
-- general hunger/thirst survival system (berries, fish, mushrooms and herbs are consumables)
+- general status-effect framework (specific effects have separate counters and
+  UI badges; see section 69)
+- general hunger/thirst survival system (berries, fish, mushrooms and herbs are
+  consumables)
 
-Poison, enemy abilities, player critical hits, and the strongest-kill achievement
-are current; see sections 20, 28, 4 and 84. Design notes/TODOs are **not implementation**.
+Poison, enemy abilities, player critical hits, and the strongest-kill
+achievement are current; see sections 20, 28, 4 and 84. Design notes/TODOs are
+**not implementation**.
 
 ---
 
@@ -10553,7 +10998,8 @@ NPC- or feature-specific where the corresponding general system remains absent.
 
 - [x] 8-direction movement, auto-pathing and swimming/drowning
 - [x] Procedural surface; selectable XS–XXL world size (260×260 L default)
-- [x] Terrain effects, rivers, volcanoes and lava, snow/freezing, taiga and Ancient Forest
+- [x] Terrain effects, rivers, volcanoes and lava, snow/freezing, taiga and
+  Ancient Forest
 - [x] Temple, village, cemetery, Black Pillar and Big Bell
 - [x] Surface caves, deeper caves, crypt, mausoleum and ordinary cave scenarios
 - [x] Dwarven Fort (D0) and Dwarven Ruins (D1–D5): stairs, doors,
@@ -10587,7 +11033,8 @@ NPC- or feature-specific where the corresponding general system remains absent.
 
 - [x] Save/load, persistent RNG, replay and Cursed world traits
 - [x] Online Graveyard (optional), Bestiary and strongest-kill record
-- [x] Desktop controls, active-status badges, mobile controls and character sheet
+- [x] Desktop controls, active-status badges, mobile controls and character
+  sheet
 - [x] Developer mode
 
 ## Known gaps / unverified
@@ -10606,7 +11053,8 @@ Before implementing a new feature, answer:
 
 ### Does it consume a turn?
 
-If yes, define exactly when the turn is consumed and what systems tick afterward.
+If yes, define exactly when the turn is consumed and what systems tick
+afterward.
 
 ### Does it modify a stat?
 
@@ -10783,13 +11231,16 @@ The same character continues after death.
 
 # 79. Digging
 
-Digging is performed with `tryDig()`. The forage key (`F`) automatically calls the digging action when the player has a shovel and is standing on sand.
+Digging is performed with `tryDig()`. The forage key (`F`) automatically calls
+the digging action when the player has a shovel and is standing on sand.
 
 ## Rules
 
 - Digging requires a shovel.
-- Pressing `F` while holding a shovel and standing on a `sand` tile automatically digs.
-- Pressing `F` on any non-sand tile does not dig; it uses the normal forage/search/special-pickup behavior instead.
+- Pressing `F` while holding a shovel and standing on a `sand` tile
+  automatically digs.
+- Pressing `F` on any non-sand tile does not dig; it uses the normal
+  forage/search/special-pickup behavior instead.
 - The player can dig only while standing on a `sand` tile.
 - Attempting to dig on any other tile logs:
   ```text
@@ -10798,7 +11249,8 @@ Digging is performed with `tryDig()`. The forage key (`F`) automatically calls t
 - The tile is recorded in `dugSandTiles` and immediately redrawn so its hole
   becomes visible in tile-image mode (or its darker background in ASCII mode),
   including both minimaps and the full map once that tile is discovered.
-- Digging the same treasure-map location does not create another casket if the casket is already present in the player's inventory or on the current level.
+- Digging the same treasure-map location does not create another casket if the
+  casket is already present in the player's inventory or on the current level.
 - The treasure-map location takes priority over the normal digging loot table.
 - A world-generated `buriedgear` or `buriedartifact` object takes priority over
   the normal digging loot table but not over the treasure-map location. It
@@ -10830,7 +11282,8 @@ When the player digs at the treasure map's marked X:
 <details>
   <summary>Normal digging loot</summary>
 
-If the dig is not at the treasure-map location, a roll from 1 to 100 determines the result:
+If the dig is not at the treasure-map location, a roll from 1 to 100 determines
+the result:
 
 | Roll | Result |
 |---|---|
@@ -10870,7 +11323,8 @@ On the Scarab result:
 - The destination cannot be the player's current tile.
 - The Scarab is created from the `Scarab` entry in `ENEMY_TEMPLATES`.
 - No fallback enemy template is used.
-- The Scarab's HP, attack, defense, speed, and other properties come from that template.
+- The Scarab's HP, attack, defense, speed, and other properties come from that
+  template.
 - If no valid adjacent tile exists, no Scarab is spawned and the game logs:
   ```text
   You hear something moving beneath the sand, but nothing emerges.
@@ -10961,7 +11415,8 @@ DOCUMENTATION CHANGES:
 - ...
 ```
 
-This is the preferred way to keep future features consistent with Vagabond's current architecture and gameplay rules.
+This is the preferred way to keep future features consistent with Vagabond's
+current architecture and gameplay rules.
 
 ---
 
@@ -10980,9 +11435,11 @@ and the actual implemented behavior:
 
 > **The implemented behavior wins.**
 
-If the implementation is ambiguous, mark the rule as **BUG/SUSPICIOUS** or **UNKNOWN** rather than inventing an answer.
+If the implementation is ambiguous, mark the rule as **BUG/SUSPICIOUS** or
+**UNKNOWN** rather than inventing an answer.
 
-The purpose of this document is to describe **Vagabond as it exists**, not an imagined or idealized version of the game.
+The purpose of this document is to describe **Vagabond as it exists**, not an
+imagined or idealized version of the game.
 
 ---
 
@@ -11008,30 +11465,29 @@ save.replay = {
 }
 ```
 
-The recording version is independent of the game save schema and covers
-recorded turn rules as well as tape structure. A recording from incompatible
-rules remains in the exported JSON but cannot be played or extended; the
-character snapshot can still be loaded if its save schema matches. The game
-notifies the player when loading such a recording.
-The replay field is written for characters with a recording, including after
-watching it; characters without one do not gain an empty replay structure.
-RNG stack-trace diagnostics are disabled by default (`RNG_DEBUG` in
-`src/replay.js`). Loading a recorded current-schema save drops its optional `_rngCallers`
-diagnostics, so saving it again retains its actions and RNG values without
-the debug payload.
-Watching a replay temporarily rewinds the game; on completion (or desync) the
-live state from before playback is restored, including its RNG state and
-recording. Loading a compatible recorded save resumes appending actions to that replay.
-NPC save records include `talkFreezeTurns`. This counter is deterministic gameplay
-state, not presentation state: while it is positive, `npcTurn()` skips that NPC
-without consuming its wandering RNG. Persisting it is required when a recorded
-run is saved/loaded or when the pre-replay live snapshot is restored; otherwise
+The recording version is independent of the game save schema and covers recorded
+turn rules as well as tape structure. A recording from incompatible rules
+remains in the exported JSON but cannot be played or extended; the character
+snapshot can still be loaded if its save schema matches. The game notifies the
+player when loading such a recording. The replay field is written for characters
+with a recording, including after watching it; characters without one do not
+gain an empty replay structure. RNG stack-trace diagnostics are disabled by
+default (`RNG_DEBUG` in `src/replay.js`). Loading a recorded current-schema save
+drops its optional `_rngCallers` diagnostics, so saving it again retains its
+actions and RNG values without the debug payload. Watching a replay temporarily
+rewinds the game; on completion (or desync) the live state from before playback
+is restored, including its RNG state and recording. Loading a compatible
+recorded save resumes appending actions to that replay. NPC save records include
+`talkFreezeTurns`. This counter is deterministic gameplay state, not
+presentation state: while it is positive, `npcTurn()` skips that NPC without
+consuming its wandering RNG. Persisting it is required when a recorded run is
+saved/loaded or when the pre-replay live snapshot is restored; otherwise
 continuing the recording after a replay can append actions from a different NPC
 RNG state than a full replay reconstructs.
 
-The save also stores `herbalistGiftGiven`. Opening the Herbalist service window is
-a recorded non-turn replay action, so replay applies the first-gift transition at
-the same interaction boundary as the live run.
+The save also stores `herbalistGiftGiven`. Opening the Herbalist service window
+is a recorded non-turn replay action, so replay applies the first-gift
+transition at the same interaction boundary as the live run.
 
 `initialState` is captured when the run truly begins, immediately after
 character creation, after the world/spawn/enemies already exist. The snapshot is
@@ -11040,21 +11496,21 @@ deep-cloned before recording continues. This is important because
 references directly would allow later inventory/equipment/merchant/enemy changes
 to mutate the supposed starting state and make playback begin from the wrong
 state. Playback restores this snapshot through the normal load path rather than
-using a separate replay-specific world format.
-The mausoleum fix added `mausoleumHutPos` to normal saves as an additive field
-alongside `villageHuts` and `cemeteryTombstones`. That change did not itself
-require a save-version bump because the loader can fall back to the existing
-odd-name relationship when this field is absent from current-schema data.
-Subsequent save versions added per-enemy wandering state, temporary Alarmed
-status and the current persistent skill/evidence fields (see section 66).
+using a separate replay-specific world format. The mausoleum fix added
+`mausoleumHutPos` to normal saves as an additive field alongside `villageHuts`
+and `cemeteryTombstones`. That change did not itself require a save-version bump
+because the loader can fall back to the existing odd-name relationship when this
+field is absent from current-schema data. Subsequent save versions added
+per-enemy wandering state, temporary Alarmed status and the current persistent
+skill/evidence fields (see section 66).
 
 ## Recorded actions
 
 Replay records gameplay actions at their shared gameplay-function entry points,
 not raw keyboard events. Current action types are:
 
-- `move` - one requested grid movement, including movement into an enemy (attack),
-  an NPC (interaction), or an otherwise non-walkable destination;
+- `move` - one requested grid movement, including movement into an enemy
+  (attack), an NPC (interaction), or an otherwise non-walkable destination;
 - `shoot` - a successful Short Bow firing action, recorded against one enemy ID
   and its tile at the time of firing;
 - `inspect` - inspect / surroundings action;
@@ -11071,15 +11527,16 @@ not raw keyboard events. Current action types are:
 
 Inventory-dependent actions carry a stable `replayId` for the relevant item.
 Array indices are retained as fallbacks for compatibility, but playback first
-resolves the recorded item identity so inventory reordering from previous actions
-does not silently target a different item. Replay IDs are assigned to gameplay
-items and persist through saves/replays.
+resolves the recorded item identity so inventory reordering from previous
+actions does not silently target a different item. Replay IDs are assigned to
+gameplay items and persist through saves/replays.
 
 Actions are recorded from the actual gameplay functions shared by keyboard,
-mouse/canvas, and touch input. UI-only input, held modifiers, CapsLock, save/load
-shortcuts, and character-name typing are not replay actions. An action entry does
-not necessarily mean that a turn was consumed: for example, a blocked movement
-or the wait-limit refusal can still reproduce as the same requested action.
+mouse/canvas, and touch input. UI-only input, held modifiers, CapsLock,
+save/load shortcuts, and character-name typing are not replay actions. An action
+entry does not necessarily mean that a turn was consumed: for example, a blocked
+movement or the wait-limit refusal can still reproduce as the same requested
+action.
 
 ## RNG
 
@@ -11102,14 +11559,14 @@ actions, and actual RNG values/caller information when available. A completed
 replay also reports whether it consumed exactly the recorded RNG length.
 
 **Determinism rule:** any gameplay condition that controls whether an RNG call
-happens must depend only on replayed gameplay state, not rendering/browser state.
-In particular, enemy/NPC wandering and Temple fleeing use the same fixed
+happens must depend only on replayed gameplay state, not rendering/browser
+state. In particular, enemy/NPC wandering and Temple fleeing use the same fixed
 20-tile active-range helper (`enemyIsOnScreen`) based on Chebyshev distance from
 the player, rather than the live camera viewport. NPC wandering performs this
-range check **before** `chance(ENEMY_WANDER_CHANCE)`, so an NPC outside the active
-range consumes no wander RNG. This keeps enemy and NPC wandering on the same
-spatial rule and prevents window size, device, sidebar state, or other viewport
-differences from changing RNG consumption during playback.
+range check **before** `chance(ENEMY_WANDER_CHANCE)`, so an NPC outside the
+active range consumes no wander RNG. This keeps enemy and NPC wandering on the
+same spatial rule and prevents window size, device, sidebar state, or other
+viewport differences from changing RNG consumption during playback.
 
 Old Hunter quest generation also uses the seeded RNG path (`chance()`), so its
 procedural quest selection is included in the recorded RNG sequence.
@@ -11132,7 +11589,13 @@ These diagnostics do not pin seeds or retry failed generation.
 The forced post-population retry scenario uses a fixed compact silhouette and
 world size, isolating validation retries from portrait rasterization. Cave
 ecosystem/reward assertions exclude the Tower labyrinth; mine encounter-budget
-assertions distinguish ordinary corridors from separately populated hidden nests.
+assertions distinguish ordinary corridors from separately populated hidden
+nests.
+
+Shared browser/Node rule helpers are evaluated from their original source in
+the game context, not from transpiled function strings that can reference
+helpers outside that context. Tests of non-debug announcements explicitly
+disable the temporary trolling debug override.
 
 E2E tests that start a world through Begin must wait for the loading overlay
 to close before reading or modifying generated map state. Mechanics fixtures
@@ -11165,8 +11628,8 @@ the current save. Clicking it:
 2. closes transient overlays and clears pathing/pending movement;
 3. loads the replay's deep-cloned `initialState` through the normal load path;
 4. disables recording while watching so playback cannot append new actions;
-5. resets `turnCount`, `consecutiveWaitTurns`, and `oldHunterQuestSerial` to their
-   run-start values;
+5. resets `turnCount`, `consecutiveWaitTurns`, and `oldHunterQuestSerial` to
+   their run-start values;
 6. executes the recorded actions in order through the normal gameplay functions;
 7. restores the live state, RNG state, and recording when playback finishes or
    desynchronizes. Loading another save during playback replaces that state.
@@ -11174,8 +11637,8 @@ the current save. Clicking it:
 Malformed RNG boundaries before the first action abort playback with a visible
 desync message and restore the live recording, as do later replay mismatches.
 
-The current inter-action playback delay is **12 ms**. The delay is between
-whole actions, not individual RNG calls: an action's movement/combat/loot and its
+The current inter-action playback delay is **12 ms**. The delay is between whole
+actions, not individual RNG calls: an action's movement/combat/loot and its
 enemy/NPC turn happen together before the next action is scheduled.
 
 The replay button becomes **Pause Replay** while playing and **Resume Replay**
@@ -11190,10 +11653,10 @@ a video recording or a sequence of pre-rendered frames.
 
 The optional online Graveyard is never called from replay execution. The central
 recording entry point checks `replayPlaying`, `replaySimulationMode`,
-`replayAnimationsDisabled`, `replayActionRunning`, and `replayCurrentActionIndex`
-before generating a UUID or touching storage/network. Opening the Graveyard
-while replaying makes no database query. Graveyard UI activity is not a recorded
-action and never draws from the gameplay RNG.
+`replayAnimationsDisabled`, `replayActionRunning`, and
+`replayCurrentActionIndex` before generating a UUID or touching storage/network.
+Opening the Graveyard while replaying makes no database query. Graveyard UI
+activity is not a recorded action and never draws from the gameplay RNG.
 
 ## Not implemented (by design, v1)
 
@@ -11207,41 +11670,39 @@ operation.
 
 # 84. Online Graveyard / Records (optional)
 
-The desktop and mobile HUDs have a 💀 button (desktop tooltip: Graveyard)
-opening an in-game overlay with the 50
-most recent deaths (`created_at DESC LIMIT 50`). All, Permadeath, and
-Non-permadeath each use a separately limited query. A record can be expanded
-for equipment/stats. Equipped gear shows the inventory stat line in brackets,
-for example `Meat Cleaver (ATK 1, GRACE 1)`; earlier records without the
-additional item stats still show their stored names. Red highlights permadeath;
-amber highlights normal deaths.
-The HUD button remains reachable during character selection. Character
-selection keeps its panel below the desktop HUD, while narrow-window dialogs
-reserve the measured HUD area above their content.
-Opening/closing never consumes a game turn or changes replay/save state. The
-overlay fills the viewport with one scrolling records list; its title and X
-close control remain visible.
+The desktop and mobile HUDs have a 💀 button (desktop tooltip: Graveyard) opening
+an in-game overlay with the 50 most recent deaths (`created_at DESC LIMIT 50`).
+All, Permadeath, and Non-permadeath each use a separately limited query. A
+record can be expanded for equipment/stats. Equipped gear shows the inventory
+stat line in brackets, for example `Meat Cleaver (ATK 1, GRACE 1)`; earlier
+records without the additional item stats still show their stored names. Red
+highlights permadeath; amber highlights normal deaths. The HUD button remains
+reachable during character selection. Character selection keeps its panel below
+the desktop HUD, while narrow-window dialogs reserve the measured HUD area above
+their content. Opening/closing never consumes a game turn or changes replay/save
+state. The overlay fills the viewport with one scrolling records list; its title
+and X close control remain visible.
 
 Architecture: GitHub Pages -> lazily loaded, pinned Supabase browser JS SDK
-(`src/supabase.js`) -> Supabase Data API -> PostgreSQL `death_records`. There
-is no backend, account, service key, build step, reward, or gameplay dependency.
+(`src/supabase.js`) -> Supabase Data API -> PostgreSQL `death_records`. There is
+no backend, account, service key, build step, reward, or gameplay dependency.
 Edit `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` at the top of
-`src/supabase.js`. Both Graveyard and Highscores use its shared client,
-SDK initialization, browser identity and offline/replay guards. Use the Project
-URL and browser publishable key (or legacy
-anon key), **never** a secret/service_role key. The schema, policies, indexes,
-validation and pre-request rate limit are in `supabase-graveyard.sql`: paste it
-into the Supabase SQL Editor of a new project. Keep the Data API enabled. No
-other dashboard configuration is required for a new default project. If the
-project already has a `pgrst.db_pre_request` hook, compose the checks rather
-than overwrite it.
-The database uses a nullable JSONB `strongest_enemy_killed` column with bounded
-name, species, tier, strength and stat snapshot validation. New snapshots include
-`stats.maxHp` alongside the four existing integer component stats and preserve
-the rounded HP-inclusive score from gameplay. Older online rows retain their
-original scores and need no invented HP value. The existing Graveyard constraint
-permits extra JSON fields without requiring the strength to equal a four-stat
-sum. The frontend includes the snapshot in death and highscore submissions.
+`src/supabase.js`. Both Graveyard and Highscores use its shared client, SDK
+initialization, browser identity and offline/replay guards. Use the Project URL
+and browser publishable key (or legacy anon key), **never** a
+secret/service_role key. The schema, policies, indexes, validation and
+pre-request rate limit are in `supabase-graveyard.sql`: paste it into the
+Supabase SQL Editor of a new project. Keep the Data API enabled. No other
+dashboard configuration is required for a new default project. If the project
+already has a `pgrst.db_pre_request` hook, compose the checks rather than
+overwrite it. The database uses a nullable JSONB `strongest_enemy_killed` column
+with bounded name, species, tier, strength and stat snapshot validation. New
+snapshots include `stats.maxHp` alongside the four existing integer component
+stats and preserve the rounded HP-inclusive score from gameplay. Older online
+rows retain their original scores and need no invented HP value. The existing
+Graveyard constraint permits extra JSON fields without requiring the strength to
+equal a four-stat sum. The frontend includes the snapshot in death and highscore
+submissions.
 
 For an existing database, also run
 `supabase-graveyard-add-world-death-fields.sql` **before deploying this
@@ -11312,40 +11773,38 @@ remain unmatchable. Graveyard's read view and other policies are unchanged.
 
 Exact uploaded columns (apart from server-generated `id` and `created_at`):
 `death_event_id`, `killed_at`, `last_position` (x/y/z, level kind, tile/biome),
-`player_id`, `character_id`, `character_name`, `race` (game race ID), `permadeath`, `level`,
-`cumulated_xp` (`totalXpEarned`), `death_number`, `killer_name`,
-`killer_prefix`, `cause_of_death` (`enemy`, `poisonous_mushroom`, `freezing`,
-`drowning` (shown as Drown), `poison` (shown as Poisoned to death),
-`dungeon trap` (shown as Dungeon trap),
-or legacy/unknown `environment`), `max_hp`, `atk`,
-`def`, `spd`, `grace`, `gold`, `weapon`, `armor`, `shield` (base equipment
-names), `equipment` (JSONB equipped-item snapshots with base/name, actual
-ATK/DEF/SPD/GRACE, speed penalty, tier, modifiers, XP bonus, replay ID if
-present, artifact effect ID when present, and the inventory-formatted
-`stat_line`), `artifacts` (compact JSONB artifact inventory snapshots with
-their `stat_line`), `steps_taken`,
-`creatures_slain`, `strongest_enemy_killed` (name, species, integer tier,
-rounded integer strength and independently rounded integer ATK/DEF/SPD/GRACE/MaxHP),
-`turn_count` (turns in the current page session, reset on
-load), `world_seed` (original seed restored from saves), `world_size` (the
-selected XS–XXL preset), `world_traits` (JSONB array of actual selected trait
-names and resolved additive effects, or an empty array for normal worlds),
-`dropped_item` (nullable compact JSONB snapshot of what the player lost),
-and `game_version`
-(the current release version from `src/version.js`). `WORLD_SEED` is reassignable so
-loading a save restores its original seed instead of reporting the new page
-load's seed. The service worker imports that same version file as part of its
-cache key, alongside the independent cache revision described in §1.
-Registration bypasses the HTTP cache for service-worker imports so changes to
-that version file can trigger a worker update even without editing `sw.js`. Playtime is not recorded:
-there is no reliable persisted playtime counter. Neither full saves nor
-replay/RNG histories are uploaded. The existing service worker precaches
-`src/supabase.js`, `src/graveyard.js`, `src/version.js`, and CSS under the current versioned cache.
-The cross-origin SDK is **not** precached or required for boot,
-and `navigator.onLine === false` skips SDK loading and every SELECT/INSERT.
-Offline deaths are not queued or retried.
-SDK failures and network request timeouts display only a generic UI state or
-a console warning; gameplay never waits for them.
+`player_id`, `character_id`, `character_name`, `race` (game race ID),
+`permadeath`, `level`, `cumulated_xp` (`totalXpEarned`), `death_number`,
+`killer_name`, `killer_prefix`, `cause_of_death` (`enemy`, `poisonous_mushroom`,
+`freezing`, `drowning` (shown as Drown), `poison` (shown as Poisoned to death),
+`dungeon trap` (shown as Dungeon trap), or legacy/unknown `environment`),
+`max_hp`, `atk`, `def`, `spd`, `grace`, `gold`, `weapon`, `armor`, `shield`
+(base equipment names), `equipment` (JSONB equipped-item snapshots with
+base/name, actual ATK/DEF/SPD/GRACE, speed penalty, tier, modifiers, XP bonus,
+replay ID if present, artifact effect ID when present, and the
+inventory-formatted `stat_line`), `artifacts` (compact JSONB artifact inventory
+snapshots with their `stat_line`), `steps_taken`, `creatures_slain`,
+`strongest_enemy_killed` (name, species, integer tier, rounded integer strength
+and independently rounded integer ATK/DEF/SPD/GRACE/MaxHP), `turn_count` (turns
+in the current page session, reset on load), `world_seed` (original seed
+restored from saves), `world_size` (the selected XS–XXL preset), `world_traits`
+(JSONB array of actual selected trait names and resolved additive effects, or an
+empty array for normal worlds), `dropped_item` (nullable compact JSONB snapshot
+of what the player lost), and `game_version` (the current release version from
+`src/version.js`). `WORLD_SEED` is reassignable so loading a save restores its
+original seed instead of reporting the new page load's seed. The service worker
+imports that same version file as part of its cache key, alongside the
+independent cache revision described in §1. Registration bypasses the HTTP cache
+for service-worker imports so changes to that version file can trigger a worker
+update even without editing `sw.js`. Playtime is not recorded: there is no
+reliable persisted playtime counter. Neither full saves nor replay/RNG histories
+are uploaded. The existing service worker precaches `src/supabase.js`,
+`src/graveyard.js`, `src/version.js`, and CSS under the current versioned cache.
+The cross-origin SDK is **not** precached or required for boot, and
+`navigator.onLine === false` skips SDK loading and every SELECT/INSERT. Offline
+deaths are not queued or retried. SDK failures and network request timeouts
+display only a generic UI state or a console warning; gameplay never waits for
+them.
 
 Freezing and poisonous mushrooms pass their actual fatal cause to `die()`; an
 enemy death remains `enemy`. Older or otherwise unspecified environmental
@@ -11377,14 +11836,14 @@ Remote text is rendered with DOM `textContent`, never interpolated into HTML.
 The desktop/mobile HUD has a 🏆 button with the tooltip **Highscores**, available
 during character selection as well as play. It opens a Graveyard-style dialog
 with Non-permadeath and Permadeath mode buttons. Rows show rank, character/race,
-level and rounded permanent strength; expanded rows show the character's
-stats, equipment, artifacts, achievements, world details, version and date,
-without a redundant level-up achievement label. Permadeath rows show 💀
-when a matching permadeath death is recorded; an unmarked row is not proof
-that the character is still alive (including older deaths, offline deaths or
-failed uploads). Non-permadeath rows never show death markers. Remote text
-is rendered as text, never HTML, and long names/stat lines wrap within the scrollable list.
-Narrow HUD action rows wrap to keep the trophy reachable with Replay visible.
+level and rounded permanent strength; expanded rows show the character's stats,
+equipment, artifacts, achievements, world details, version and date, without a
+redundant level-up achievement label. Permadeath rows show 💀 when a matching
+permadeath death is recorded; an unmarked row is not proof that the character is
+still alive (including older deaths, offline deaths or failed uploads).
+Non-permadeath rows never show death markers. Remote text is rendered as text,
+never HTML, and long names/stat lines wrap within the scrollable list. Narrow
+HUD action rows wrap to keep the trophy reachable with Replay visible.
 
 The title, mode controls and close button remain outside the scrolling list on
 desktop and mobile. Escape, X or clicking the backdrop closes it; keyboard
@@ -11394,11 +11853,12 @@ queued movement and hides touch controls; it consumes no turn or RNG and blocks
 live gameplay keys. Recorded replay actions continue normally if the dialog is
 opened during playback, but its unavailable state makes no online query.
 
-An unidentified artifact remains unidentified in public highscore snapshots.
-The expanded equipment/artifact rows show only its generic `Unidentified <noun>` name and `???`,
-never the dwarven owner's name, hidden curse or item bonuses. Secret item fields are
-removed before submission; the ordinary character-level permanent stats and
-ranking remain visible and use the item's real equipped effects.
+An unidentified artifact remains unidentified in public highscore snapshots. The
+expanded equipment/artifact rows show only its generic `Unidentified <noun>`
+name and `???`, never the dwarven owner's name, hidden curse or item bonuses.
+Secret item fields are removed before submission; the ordinary character-level
+permanent stats and ranking remain visible and use the item's real equipped
+effects.
 
 Each mode has its own top ten: permadeath and non-permadeath. Cursed and normal
 worlds share their mode board. Ranking uses level first, then exact permanent
@@ -11411,21 +11871,21 @@ potions, temporary curse debuffs, frozen-water penalties or carried-item speed
 effects. Permanent race/level bonuses, equipped modifiers, active artifact
 ATK/DEF, shield/armor penalties, SPD's minimum of 1, and GRACE's minimum of 0
 remain. Unarmed GRACE and artifact-weapon handling match the current character
-stat formula. The calculation changes no state or RNG. Artifact SPD bonuses contribute to permanent SPD and highscore ranking strength
-through the normal player speed formula.
+stat formula. The calculation changes no state or RNG. Artifact SPD bonuses
+contribute to permanent SPD and highscore ranking strength through the normal
+player speed formula.
 
 `supabase-highscores.sql` creates `highscore_records` and the read-only
 `highscores_top_ten(p_permadeath)` RPC. The query selects each character's
 highest-level milestone before sorting and limiting to ten. Character IDs, not
-names, identify records. The separate
-`highscores_permadeath_top_ten()` RPC uses the same ranking, then adds an
-`is_dead` boolean through at most ten indexed `death_records` lookups. Only
-the permadeath board invokes it; normal-mode reads use the original RPC and
-never query Graveyard. The death marker updates when the board is refreshed,
-without polling or an additional client request. One immutable snapshot is
-permitted per character and level, so a repeat cannot replace its equipment
-or strength. Numeric stats retain fractions and the database generates their
-summed strength.
+names, identify records. The separate `highscores_permadeath_top_ten()` RPC uses
+the same ranking, then adds an `is_dead` boolean through at most ten indexed
+`death_records` lookups. Only the permadeath board invokes it; normal-mode reads
+use the original RPC and never query Graveyard. The death marker updates when
+the board is refreshed, without polling or an additional client request. One
+immutable snapshot is permitted per character and level, so a repeat cannot
+replace its equipment or strength. Numeric stats retain fractions and the
+database generates their summed strength.
 
 Startup fetches both boards once without delaying boot, character creation,
 loading, or world generation. Fewer than ten entries permit any new milestone;
@@ -11457,14 +11917,13 @@ characters during a pending request cannot change its captured identity/data.
 file. Both online features use the configured client and timeout from
 `src/supabase.js`, which creates the client using `SUPABASE_URL` and
 `SUPABASE_PUBLISHABLE_KEY`. Graveyard's item snapshot serializers remain shared.
-Highscores reads through
-`client.rpc('highscores_top_ten', {p_permadeath})` and sends milestones through
-`client.from('highscore_records').insert(record)`.
-Offline actions skip network work; failed submissions are neither
-queued nor automatically retried. Playback guards run before snapshot/storage
-work and again before a pending insert. No gameplay RNG, turns or rules depend
-on network timing. The shared transport and Highscores scripts are precached
-for offline play. Extracting the client changes no database schema or save format.
+Highscores reads through `client.rpc('highscores_top_ten', {p_permadeath})` and
+sends milestones through `client.from('highscore_records').insert(record)`.
+Offline actions skip network work; failed submissions are neither queued nor
+automatically retried. Playback guards run before snapshot/storage work and
+again before a pending insert. No gameplay RNG, turns or rules depend on network
+timing. The shared transport and Highscores scripts are precached for offline
+play. Extracting the client changes no database schema or save format.
 
 God-mode activation is gated by an explicit live-play confirmation warning
 that Highscores eligibility is permanently lost, including across rollback to
@@ -11482,13 +11941,14 @@ Install `supabase-highscores.sql` first, then
 `supabase-highscores-enable-writes.sql`. The follow-up adds only Highscores
 objects and permissions. A dedicated BEFORE INSERT statement trigger calls
 `private.limit_highscore_writes()` once per insert statement. No Graveyard
-function, table, secret, trigger, grants, or authenticator hook setting is changed.
-Highscores generates and preserves its own `private.highscore_secret` and has a
-separate quota of **60 committed write requests per IP per UTC hour**, shared
-across both modes. Only the HMAC of the forwarded address is stored. The same
-gateway/header trust and shared-NAT limitations as Graveyard apply. Counters
-are transactional: failed or rejected inserts roll back their increments.
-The trigger also applies to administrative inserts, which need request headers.
+function, table, secret, trigger, grants, or authenticator hook setting is
+changed. Highscores generates and preserves its own `private.highscore_secret`
+and has a separate quota of **60 committed write requests per IP per UTC hour**,
+shared across both modes. Only the HMAC of the forwarded address is stored. The
+same gateway/header trust and shared-NAT limitations as Graveyard apply.
+Counters are transactional: failed or rejected inserts roll back their
+increments. The trigger also applies to administrative inserts, which need
+request headers.
 
 An earlier draft extended the Graveyard hook. If already applied, run the
 optional `supabase-highscores-restore-graveyard.sql` repair before the corrected
@@ -11501,9 +11961,10 @@ Browser roles can insert only the snapshot payload columns. IDs and timestamps
 remain server-generated; strength is calculated by the database. Direct table
 reads, updates and deletes remain denied; reads use the bounded RPC. Duplicate
 milestones and multi-row submissions remain rejected. The follow-up is safe to
-reapply without clearing counters, checks the foundation and pgcrypto,
-and reloads the API schema. No game/save-format change is required. See
-`HIGHSCORES_SETUP.md` for installation and database verification. For the optional permadeath skull marker, apply
+reapply without clearing counters, checks the foundation and pgcrypto, and
+reloads the API schema. No game/save-format change is required. See
+`HIGHSCORES_SETUP.md` for installation and database verification. For the
+optional permadeath skull marker, apply
 `supabase-highscores-permadeath-deaths.sql` after the Highscores migrations and
 before deploying the changed browser client. It adds no permission to edit or
 delete records and does not alter either write rate limiter. The marker is
@@ -11518,24 +11979,22 @@ to the live Supabase project.
 
 ## Selection
 
-The **Cursed world** checkbox in character creation is off by default.
-The Cursed world label has a brown desktop tooltip warning that the mode may
-be unbalanced. On mobile-sized or touch screens, the World size selector appears separately and
-the three checkboxes form separate full-width rows. The warning appears below
-them only while Cursed world is checked.
-The desktop tooltip is anchored to
-the Cursed world label; each checkbox sits beside its text with a small fixed
-gap. With the checkbox off, generation
-uses the base configuration and logs no trait line.
-The mobile checkbox layout and the warning's checked/unchecked visibility
-are covered by `tests/e2e/021-startup-ui.cy.js` and
-`tests/e2e/022-cursed-world-options.cy.js`.
-After a valid name/race is confirmed, a cursed world draws the requested
-number of traits before world generation. All generation retries use the
-same resolved effects. Each nonempty `flavor_text` is logged on a new line
-after the introductory story text, in selected order. A trait without
-`flavor_text` is silent but fully active. The flavor describes evidence in the
-world rather than revealing the changed parameter.
+The **Cursed world** checkbox in character creation is off by default. The
+Cursed world label has a brown desktop tooltip warning that the mode may be
+unbalanced. On mobile-sized or touch screens, the World size selector appears
+separately and the three checkboxes form separate full-width rows. The warning
+appears below them only while Cursed world is checked. The desktop tooltip is
+anchored to the Cursed world label; each checkbox sits beside its text with a
+small fixed gap. With the checkbox off, generation uses the base configuration
+and logs no trait line. The mobile checkbox layout and the warning's
+checked/unchecked visibility are covered by `tests/e2e/021-startup-ui.cy.js` and
+`tests/e2e/022-cursed-world-options.cy.js`. After a valid name/race is
+confirmed, a cursed world draws the requested number of traits before world
+generation. All generation retries use the same resolved effects. Each nonempty
+`flavor_text` is logged on a new line after the introductory story text, in
+selected order. A trait without `flavor_text` is silent but fully active. The
+flavor describes evidence in the world rather than revealing the changed
+parameter.
 
 `content/world_traits.json` is an object:
 
@@ -11557,16 +12016,15 @@ world rather than revealing the changed parameter.
 }
 ```
 
-This example is illustrative and is not an active trait. Every active trait
-has a human-readable `_note` explaining its mechanical changes relative to
-the base values in
-`world_generation.json`. `_note` is
-metadata for developers and is not an effect or a player-facing flavor line.
-`count` may be an integer **3–6**, or `"random"` to draw an integer inclusively from `min` to
-`max` (default **3–6**). The chosen count is fixed for this world. Candidates
-are drawn without replacement using the seeded gameplay RNG. The optional
-positive `weight` defaults to `1`; `the_bell_is_guarded` uses `0.25` so it is
-less likely to be drawn.
+This example is illustrative and is not an active trait. Every active trait has
+a human-readable `_note` explaining its mechanical changes relative to the base
+values in `world_generation.json`. `_note` is metadata for developers and is not
+an effect or a player-facing flavor line. `count` may be an integer **3–6**, or
+`"random"` to draw an integer inclusively from `min` to `max` (default **3–6**).
+The chosen count is fixed for this world. Candidates are drawn without
+replacement using the seeded gameplay RNG. The optional positive `weight`
+defaults to `1`; `the_bell_is_guarded` uses `0.25` so it is less likely to be
+drawn.
 
 `exclusiveGroup` prevents two entries in the same group from being active
 (e.g. two competing snow climates). `excludes` can name further incompatible
@@ -11638,33 +12096,31 @@ The generation code reads neutral values from `world_generation.json` on every
 world. `caves.shallow.extraEntranceChance` controls optional second entrances
 (the first cave still gets its guaranteed second entrance). Surface enemy
 density, far/roam promotion, and migrant group count/size use
-`surfaceEnemies.*`; migrant edge width, local radius, spacing, and maximum
-tier are also configured there. Only mobile home/roam templates are promoted;
+`surfaceEnemies.*`; migrant edge width, local radius, spacing, and maximum tier
+are also configured there. Only mobile home/roam templates are promoted;
 immobile enemies stay still. Migrants select legal surface edge sites and use
-the existing opposite-edge `far` path logic.
-Beast Kingdom changes only the **relative** template-selection weight of
-non-humanoids from 1× to 2.5×, with no new enemies or extra population.
-Humanoids are still possible, but dropped equipment is less plentiful.
-It conflicts with Drought, whose weighting favors humanoids. This is a
-species-composition choice, not a change to underground or mandatory spawns.
-Drowned Lands lowers the lake noise threshold from 0.72 to 0.66, raises lake
-carving from 0.40 to 0.44, and raises maximum river sources from 14 to 17.
-Its submerged-chest budget rises from 15–30 to 20–38, with target lake share
-35% → 55%. This share is conditional on having eligible submerged tiles
-4–8 swimming steps from shore; chests are never placed on land or closer to
-shore just to reach the budget. Stronger lake carving can reduce accessible
-land, so normal landmark reachability checks still apply. Water inside the
-cold region freezes under the general lake-ice rules (§12), including with
-Drowned Lands; this trait adds no separate ice or drowning modifiers.
-Forest ambush odds are additive: `eyes_in_the_trees` raises 4% to 13%,
-`wild_frontier` raises 4% to 8%, and `drought` raises 4% to 11%.
-The first two conflict as forest traits, but either can stack with Drought,
-giving 20% or 15%, respectively. These are roll chances before checking for
-an available adjacent spawn tile.
+the existing opposite-edge `far` path logic. Beast Kingdom changes only the
+**relative** template-selection weight of non-humanoids from 1× to 2.5×, with no
+new enemies or extra population. Humanoids are still possible, but dropped
+equipment is less plentiful. It conflicts with Drought, whose weighting favors
+humanoids. This is a species-composition choice, not a change to underground or
+mandatory spawns. Drowned Lands lowers the lake noise threshold from 0.72 to
+0.66, raises lake carving from 0.40 to 0.44, and raises maximum river sources
+from 14 to 17. Its submerged-chest budget rises from 15–30 to 20–38, with target
+lake share 35% → 55%. This share is conditional on having eligible submerged
+tiles 4–8 swimming steps from shore; chests are never placed on land or closer
+to shore just to reach the budget. Stronger lake carving can reduce accessible
+land, so normal landmark reachability checks still apply. Water inside the cold
+region freezes under the general lake-ice rules (§12), including with Drowned
+Lands; this trait adds no separate ice or drowning modifiers. Forest ambush odds
+are additive: `eyes_in_the_trees` raises 4% to 13%, `wild_frontier` raises 4% to
+8%, and `drought` raises 4% to 11%. The first two conflict as forest traits, but
+either can stack with Drought, giving 20% or 15%, respectively. These are roll
+chances before checking for an available adjacent spawn tile.
 `surfaceLoot.looseHerbs/looseMushrooms` control additional loose supplies.
-`cavePopulation.ecosystem.stairClearance` and `spacing` control ordinary
-z:-2 ecosystem spawn safety and crowding. Champion escorts and tier-4 threats
-are optional and draw from the same population threat budget.
+`cavePopulation.ecosystem.stairClearance` and `spacing` control ordinary z:-2
+ecosystem spawn safety and crowding. Champion escorts and tier-4 threats are
+optional and draw from the same population threat budget.
 
 Foraging uses a single `rng() × 100` roll and cumulative percentage thresholds
 in `loot_tables.json`: 9 for berries, 17 for herbs, and 25 for mushrooms.
@@ -11681,31 +12137,31 @@ their old stored effect paths remain readable.
 `environment.enemyAggroBonus` acts through `effectiveAggroRange()`; cave walls
 still block sight. `environment.humanoidHpMultiplier` applies while preparing
 ordinary humanoid equipment, before any prefix or item bonus. Story spawns
-without that preparation are unaffected. `surfaceEnemies.nonHumanoidRarityMultiplier`
-multiplies template `rarity` weights only when selecting ordinary surface
-enemies, using each template's `humanoid` flag. It changes species composition
-while keeping the same surface population count, cave scenarios, and
-guaranteed Liches. `lootRules.enemyEquipmentChanceBase/PerTier/Cap` and
-`enemyEquipmentWeaponShare/ArmorShare` configure what ordinary humanoids
-carry; the remaining share is shields. The first-roll trait bonus does not
-change the fallback base probability; depth and configured prefix multipliers
-scale both rolls (see §44). `lootRules.worldGoldMultiplier` scales chest gold but leaves
-merchant prices untouched. The Age of Rust `commonStartingWeapons` switch
-still adds the hut's improvised weapons as tier-one ordinary drops and marks
-the hut copy tier one. World size presets live in `map_config.json` and are independent of all
-cursed traits. Neutral generation values reproduce the normal world's
+without that preparation are unaffected.
+`surfaceEnemies.nonHumanoidRarityMultiplier` multiplies template `rarity`
+weights only when selecting ordinary surface enemies, using each template's
+`humanoid` flag. It changes species composition while keeping the same surface
+population count, cave scenarios, and guaranteed Liches.
+`lootRules.enemyEquipmentChanceBase/PerTier/Cap` and
+`enemyEquipmentWeaponShare/ArmorShare` configure what ordinary humanoids carry;
+the remaining share is shields. The first-roll trait bonus does not change the
+fallback base probability; depth and configured prefix multipliers scale both
+rolls (see §44). `lootRules.worldGoldMultiplier` scales chest gold but leaves
+merchant prices untouched. The Age of Rust `commonStartingWeapons` switch still
+adds the hut's improvised weapons as tier-one ordinary drops and marks the hut
+copy tier one. World size presets live in `map_config.json` and are independent
+of all cursed traits. Neutral generation values reproduce the normal world's
 probabilities and counts.
 
 Drought lowers lake carving and river sources, reduces the water elevation
-threshold, widens the sand band, cuts forest forage and cave Fungus, and
-raises forest ambush chance. It leaves the frozen-river guarantee active. Its
+threshold, widens the sand band, cuts forest forage and cave Fungus, and raises
+forest ambush chance. It leaves the frozen-river guarantee active. Its
 non-humanoid rarity multiplier is 0.4 and prepared humanoid HP multiplier is
-0.85; the equipment roll rises from `0.45 + 0.03 × tier` to
-`0.61 + 0.03 × tier` before spawn multipliers, with weapon share rising from 50% to 70%. It excludes
-Herbal Bloom, Blighted Harvest, Fungal Bloom, Flooded Depths,
-Beast Kingdom and Drowned Lands. Ordinary
-population is unchanged, so humanoids replace some beasts rather than making
-the world empty.
+0.85; the equipment roll rises from `0.45 + 0.03 × tier` to `0.61 + 0.03 × tier`
+before spawn multipliers, with weapon share rising from 50% to 70%. It excludes
+Herbal Bloom, Blighted Harvest, Fungal Bloom, Flooded Depths, Beast Kingdom and
+Drowned Lands. Ordinary population is unchanged, so humanoids replace some
+beasts rather than making the world empty.
 
 ## Adaptive Player Trolling
 
@@ -11717,12 +12173,12 @@ adaptive tracking, encounter creation, special AI, Venom Eater healing and
 Warden arrow protection are disabled. Disabling the system does not delete
 previously created enemies, items or their ordinary stats.
 
-Existing step, Bestiary, foraging, exploration and combat-skill statistics remain
-the source of truth. Derived Bestiary totals are refreshed after credited kills
-and rebuilt after loading or resetting a character; they are not extra saved
-counters. Spawn searches share temporary entrance and occupancy lookups within
-a checkpoint, while preserving candidate order, habitat-specific traversal,
-placement rules and seeded random draws.
+Existing step, Bestiary, foraging, exploration and combat-skill statistics
+remain the source of truth. Derived Bestiary totals are refreshed after credited
+kills and rebuilt after loading or resetting a character; they are not extra
+saved counters. Spawn searches share temporary entrance and occupancy lookups
+within a checkpoint, while preserving candidate order, habitat-specific
+traversal, placement rules and seeded random draws.
 
 ### All 38 triggers and reactions
 
@@ -11772,19 +12228,20 @@ placement rules and seeded random draws.
 
 </details>
 
-The table covers the **38 active events** in `content/adaptive_player_trolling.json`.
-The independent **Unsold Equipment** thief-rate modifier is documented below,
-not counted as an event. **Relieved Thief** remains unimplemented and is not
-part of this table. Detailed qualification, placement, balance and counterplay
-rules follow beneath the spoiler.
+The table covers the **38 active events** in
+`content/adaptive_player_trolling.json`. The independent **Unsold Equipment**
+thief-rate modifier is documented below, not counted as an event. **Relieved
+Thief** remains unimplemented and is not part of this table. Detailed
+qualification, placement, balance and counterplay rules follow beneath the
+spoiler.
 
-One-time reactions reset with the character, including when a new character starts on the same
-world following permadeath. The core bookkeeping reserves at most **two optional special threats per
-underground floor** for the entire character run, without recycling slots
-after enemies die. A multi-enemy ambush consumes one slot, not one per
-member. On the surface, two threats are allowed per map-size-scaled region.
-Nemesis is an independent guaranteed encounter that can appear **in
-addition to both slots** on the last ruin floor.
+One-time reactions reset with the character, including when a new character
+starts on the same world following permadeath. The core bookkeeping reserves at
+most **two optional special threats per underground floor** for the entire
+character run, without recycling slots after enemies die. A multi-enemy ambush
+consumes one slot, not one per member. On the surface, two threats are allowed
+per map-size-scaled region. Nemesis is an independent guaranteed encounter that
+can appear **in addition to both slots** on the last ruin floor.
 
 **Scheduled encounter checks:** The first optional check happens on the
 **500th actual walking step** or upon first reaching **Dwarven Ruins floor 2**,
@@ -11830,11 +12287,11 @@ requirements is met:
 
 The buy and sell totals accumulate separately throughout a character's life,
 including across saves/replays. They are not netted or added together: selling
-900g and buying 600g is not enough. Herbalist transactions do not count.
-For the Temple challenge, the eligible population is captured on the first
-surface turn; later monsters arriving inside the circle are included at the next
-enemy death. A tracked monster must actually die, even if it wanders or is
-lured outside the circle; traps and other genuine deaths count. Far-wandering surface enemies and
+900g and buying 600g is not enough. Herbalist transactions do not count. For the
+Temple challenge, the eligible population is captured on the first surface turn;
+later monsters arriving inside the circle are included at the next enemy death.
+A tracked monster must actually die, even if it wanders or is lured outside the
+circle; traps and other genuine deaths count. Far-wandering surface enemies and
 all underground enemies are excluded. Merely having an empty radius without
 killing any eligible enemy cannot award stock.
 
@@ -11862,29 +12319,31 @@ restored just by reopening the shop or loading the game.
 
 **Fort Quest — Merchant's Dwarven Trade Ledger commission:**
 
-At **level 10 or higher**, a character who has **never entered the Dwarven Fort**
-can accept the Merchant's one-time **Fort Quest**. Entering the fort by its
-surface gate, a lower-cave hole, or another chain-level transition disqualifies
-an unaccepted quest for that character. Returning after reaching level 10 does
-not undo the disqualification; an already accepted commission survives entry,
-leaving, saving and replay. The Merchant has a dedicated quest dialogue choice
-alongside Talk, Rumors and Trade; talking about an active commission repeats the
-objective without resetting its state or re-rolling anything. The quest is
-available only with Adaptive Player Trolling in Cursed World.
+At **level 10 or higher**, a character who has **never entered the Dwarven
+Fort** can accept the Merchant's one-time **Fort Quest**. Entering the fort by
+its surface gate, a lower-cave hole, or another chain-level transition
+disqualifies an unaccepted quest for that character. Returning after reaching
+level 10 does not undo the disqualification; an already accepted commission
+survives entry, leaving, saving and replay. The Merchant has a dedicated quest
+dialogue choice alongside Talk, Rumors and Trade; talking about an active
+commission repeats the objective without resetting its state or re-rolling
+anything. The quest is available only with Adaptive Player Trolling in Cursed
+World.
 
 Accepting reveals the fort gate and the surrounding **radius-2 / 5×5** area on
-the overworld map, without revealing corridors or underground treasures.
-The Merchant mentions only the old dwarven ruins, never the ledger's exact floor or Z coordinate, both when offering the commission and on follow-up. The
-objective is a **Dwarven Trade Ledger**, a unique physical quest item placed
-on **z:-5, the second Dwarven Ruins floor** (not in the z:-3 entrance fort or
-on the first ruins floor at z:-4). This depth exists in all 3–5-floor ruins.
-It is placed on an unoccupied, trap-safe tile reachable from the arrival tile
-by a walkable path of **8–200 cardinal steps**. Placement avoids blocked or
-locked paths, stair transitions and other ground objects. If no legal site is
-available at first arrival, later visits to z:-5 can retry. It does not consume
-an optional enemy-threat slot or an RNG roll. A placed ledger is never
-duplicated by floor revisits: it remains a normal, saved ground pickup, then
-a non-droppable, non-sellable inventory item after collection.
+the overworld map, without revealing corridors or underground treasures. The
+Merchant mentions only the old dwarven ruins, never the ledger's exact floor or
+Z coordinate, both when offering the commission and on follow-up. The objective
+is a **Dwarven Trade Ledger**, a unique physical quest item placed on **z:-5,
+the second Dwarven Ruins floor** (not in the z:-3 entrance fort or on the first
+ruins floor at z:-4). This depth exists in all 3–5-floor ruins. It is placed on
+an unoccupied, trap-safe tile reachable from the arrival tile by a walkable path
+of **8–200 cardinal steps**. Placement avoids blocked or locked paths, stair
+transitions and other ground objects. If no legal site is available at first
+arrival, later visits to z:-5 can retry. It does not consume an optional
+enemy-threat slot or an RNG roll. A placed ledger is never duplicated by floor
+revisits: it remains a normal, saved ground pickup, then a non-droppable,
+non-sellable inventory item after collection.
 
 With the ledger in inventory, a white exclamation mark appears above the
 Merchant in both display modes, and he offers **Return the Dwarven Trade
@@ -11896,14 +12355,13 @@ The gold payment and item removal happen in the same recorded NPC-topic action.
 
 ### Monster encounters, environmental lures and rewards
 
-**Nemesis:** If at least two deaths
-were inflicted on the same monster species, a Champion of that species is
-guaranteed on entry to the final Dwarven Ruins floor (including a later return).
-If several species qualify, the most frequent killer wins; the latest death
-breaks ties. It spawns off-screen on connected, safe terrain and never
-reappears after the event has been committed. The Champion uses the ordinary
-Champion bonuses and normal monster combat rules. Merely inspecting the UI or
-re-entering a floor does not consume randomness.
+**Nemesis:** If at least two deaths were inflicted on the same monster species,
+a Champion of that species is guaranteed on entry to the final Dwarven Ruins
+floor (including a later return). If several species qualify, the most frequent
+killer wins; the latest death breaks ties. It spawns off-screen on connected,
+safe terrain and never reappears after the event has been committed. The
+Champion uses the ordinary Champion bonuses and normal monster combat rules.
+Merely inspecting the UI or re-entering a floor does not consume randomness.
 
 **Venom Eater:** Only in Cursed World, successfully poisoning **15 different
 monsters**, or spending **5 venom coatings attempting to poison undead**, makes
@@ -11911,15 +12369,16 @@ one Venom Eater eligible in either of the last two Dwarven Ruins floors. A
 poison refresh against the same creature does not count as another unique
 monster. A missed attack or unused coating does not count, and attempting to
 poison a construct does not count toward the undead threshold. The encounter
-uses the same depth-weighted probability and equal-weight candidate selection
-as other optional ruins events. It spawns once, out of sight and on connected,
+uses the same depth-weighted probability and equal-weight candidate selection as
+other optional ruins events. It spawns once, out of sight and on connected,
 trap-free terrain with stair clearance; unsuccessful placement leaves it
-eligible for a later transition. The Venom Eater is a **tier-4, 150 HP, 18
-ATK, 6 DEF, 5 SPD** monster (3 GRACE), using the Venom Absorption ability
-described in the monster properties section. Its walking tile is the Bog
-Spitter's, with its own Venom Eater portrait. The species is otherwise excluded from
-natural spawning. The player can respond with uncoated attacks, avoidance,
-or by avoiding venom: every qualifying venom hit can restore another 20% of its maximum HP.
+eligible for a later transition. The Venom Eater is a **tier-4, 150 HP, 18 ATK,
+6 DEF, 5 SPD** monster (3 GRACE), using the Venom Absorption ability described
+in the monster properties section. Its walking tile is the Bog Spitter's, with
+its own Venom Eater portrait. The species is otherwise excluded from natural
+spawning. The player can respond with uncoated attacks, avoidance, or by
+avoiding venom: every qualifying venom hit can restore another 20% of its
+maximum HP.
 
 **Venom Absorption (Venom Eater)** is a special defensive response, distinct
 from the undead/construct family immunity rule. The creature is permanently
@@ -11947,22 +12406,23 @@ the remains can be placed:
 - **30%:** an unread **Scroll of Homecoming** lies on a different adjacent
   ground tile; searching the corpse recovers **5–25 gold**. The adjacent gear
   can be a weapon, armor or shield (equally likely).
-- **70%:** the corpse contains a randomly named **improvised weapon** drawn
-  from `content/starting_weapons.json`, with the same ATK 1, GRACE 1 and
-  one-handed rules as the village starter weapon. Searching the corpse recovers
-  both the weapon and **5–25 gold**; no Homecoming scroll is generated.
-  The adjacent gear is armor or a shield (equally likely), never a second weapon.
+- **70%:** the corpse contains a randomly named **improvised weapon** drawn from
+  `content/starting_weapons.json`, with the same ATK 1, GRACE 1 and one-handed
+  rules as the village starter weapon. Searching the corpse recovers both the
+  weapon and **5–25 gold**; no Homecoming scroll is generated. The adjacent gear
+  is armor or a shield (equally likely), never a second weapon.
 
-The regular tier-one gear must still be picked up from the ground. The
-remains use ordinary search/loot behavior, and no chest is created. Their descriptive variant persists in the saved ground item and is not rerolled by inspecting it. This
-one-time response does not consume a special-threat slot. Placement still
+The regular tier-one gear must still be picked up from the ground. The remains
+use ordinary search/loot behavior, and no chest is created. Their descriptive
+variant persists in the saved ground item and is not rerolled by inspecting it.
+This one-time response does not consume a special-threat slot. Placement still
 requires the corpse and two clear adjacent tiles so neither reward outcome
-changes which floors can host the event. If the tiles cannot be placed,
-the response remains pending on the specific qualifying floor; it does not
-move to a different cave, crypt or fort level. Re-entering cannot create
-duplicate loot. Selection, placement and corpse contents use the seeded RNG
-and persist through saves and replay. The encounter is exclusive to Cursed
-World. The uncertain escape scroll makes descending early a meaningful risk.
+changes which floors can host the event. If the tiles cannot be placed, the
+response remains pending on the specific qualifying floor; it does not move to a
+different cave, crypt or fort level. Re-entering cannot create duplicate loot.
+Selection, placement and corpse contents use the seeded RNG and persist through
+saves and replay. The encounter is exclusive to Cursed World. The uncertain
+escape scroll makes descending early a meaningful risk.
 
 **Opposite Weapon and Neglected Shield:** These mutually exclusive, one-time
 Cursed World rewards encourage experimenting with combat options the character
@@ -11980,10 +12440,10 @@ consumed. The selected reward is saved and replayed like other ground items.
 
 - **Opposite Weapon** qualifies when either One-Handed or Two-Handed weapon
   proficiency reaches **60/100** while the other stays at **10/100 or below**.
-  It grants a non-ranged tier-five artifact weapon of the *less-practiced* style:
-  Bone Cleaver for one-handed, or Giant Sword, Crescent Blades or Titan Warpick
-  for two-handed. This is not a forced equipment swap; using the unfamiliar
-  weapon is the player's choice.
+  It grants a non-ranged tier-five artifact weapon of the *less-practiced*
+  style: Bone Cleaver for one-handed, or Giant Sword, Crescent Blades or Titan
+  Warpick for two-handed. This is not a forced equipment swap; using the
+  unfamiliar weapon is the player's choice.
 - **Neglected Shield** qualifies after **15 separate fights** conducted without
   an equipped shield, despite carrying a usable shield and wielding no
   two-handed weapon, with Shielding proficiency at **10/100 or below**. A fight
@@ -12038,35 +12498,34 @@ reaction and does not consume an optional monster-threat slot. The streak and
 completion are saved and replayed, with no RNG consumed during turn counting.
 
 **The Previous Owner — a named dwarf's artifact:** In Cursed World, merely
-**possessing a non-cursed artifact named after a dwarf that was 
-not originally bought from the Merchant** qualifies this
-reaction immediately, without an identification, equipment, hit or turn
-requirement. Weapons, armor, shields and inventory-only trinkets qualify.
-Purchases from original merchant stock retain their acquisition provenance
-through inventory, equipment, drops, trade, save and replay. Selling and
-buying back a found artifact does not change its provenance or prevent an
-existing haunting.
-The artifact's existing dwarven-owner name (`possessor`) determines the Ghost's
-name; no independent random owner is generated. A cursed artifact with only a
-cursed-prefix name does not qualify. A **Champion Ghost** can appear in either of the
-**last two Dwarven Ruins floors**, outside sight and at least 10 tiles away,
-subject to the scheduled encounter roll and threat limit. Spawn candidates
-are reachable, clear of hazards and no more than **12 tiles (Chebyshev)** from
-the downward stairs. If that floor has no downward stair, the same search uses
-its upward stairs; if neither has a valid candidate, placement is deferred. At most one such
-encounter appears per character.
+**possessing a non-cursed artifact named after a dwarf that was not originally
+bought from the Merchant** qualifies this reaction immediately, without an
+identification, equipment, hit or turn requirement. Weapons, armor, shields and
+inventory-only trinkets qualify. Purchases from original merchant stock retain
+their acquisition provenance through inventory, equipment, drops, trade, save
+and replay. Selling and buying back a found artifact does not change its
+provenance or prevent an existing haunting. The artifact's existing
+dwarven-owner name (`possessor`) determines the Ghost's name; no independent
+random owner is generated. A cursed artifact with only a cursed-prefix name does
+not qualify. A **Champion Ghost** can appear in either of the **last two Dwarven
+Ruins floors**, outside sight and at least 10 tiles away, subject to the
+scheduled encounter roll and threat limit. Spawn candidates are reachable, clear
+of hazards and no more than **12 tiles (Chebyshev)** from the downward stairs.
+If that floor has no downward stair, the same search uses its upward stairs; if
+neither has a valid candidate, placement is deferred. At most one such encounter
+appears per character.
 
-The Ghost waits until it sees the player carrying its artifact within
-**7 tiles**, with an unobstructed sight line and no successful concealment.
-Once recognized, it pursues using ordinary Ghost combat AI. Merely
-**unequipping** the artifact does not stop pursuit, because it remains owned;
-**dropping or selling** the exact linked artifact does stop an unprovoked
-Ghost. Picking it up again renews pursuit. Wounding or poisoning the Ghost
-makes it permanently hostile, even without the artifact. The ghost's name,
-linked artifact, recognition and provocation survive save and replay. Killing
-the Ghost ends this haunting; no second owner is spawned. The encounter uses existing Ghost visuals with the Champion aura, prefix
-bonuses and ordinary Ghost abilities. Its personal name and artifact link
-remain unchanged by the Champion prefix.
+The Ghost waits until it sees the player carrying its artifact within **7
+tiles**, with an unobstructed sight line and no successful concealment. Once
+recognized, it pursues using ordinary Ghost combat AI. Merely **unequipping**
+the artifact does not stop pursuit, because it remains owned; **dropping or
+selling** the exact linked artifact does stop an unprovoked Ghost. Picking it up
+again renews pursuit. Wounding or poisoning the Ghost makes it permanently
+hostile, even without the artifact. The ghost's name, linked artifact,
+recognition and provocation survive save and replay. Killing the Ghost ends this
+haunting; no second owner is spawned. The encounter uses existing Ghost visuals
+with the Champion aura, prefix bonuses and ordinary Ghost abilities. Its
+personal name and artifact link remain unchanged by the Champion prefix.
 
 **Undead Warden — response to Marksmanship:** In Cursed World,
 reaching **30/100 Marksmanship** makes a single Undead Warden eligible
@@ -12101,31 +12560,30 @@ when it shatters. The rule resolves at the time the attack lands, independent
 of animations. Shield durability and the broken state persist through saves,
 replays and level transitions; there is no recovery or repair.
 
-**Depth Guardian — over-mining the Dwarven Mines:** In Cursed World,
-breaking **30 distinct ordinary mineable walls** (not surface boulders,
-mineral-bearing seams or strikes that leave a wall intact) awakens a warning
-on that mine floor. The first warning lasts **five completed gameplay turns**.
-If the player remains on the same floor, the **Guardian of the Deep** can
-appear on an existing, reachable corridor at least **10 tiles** away and
-outside the player's vision, clear of stairs, lifts, traps, items and other
-special threats. There is no tunneling or teleporting through solid rock.
-If there is no valid corridor or free threat slot, the creature waits rather
-than spawning in an inaccessible location. Leaving the floor before its
-arrival cancels that warning; mining another ordinary wall can provoke a new
-warning, but there is only **one successful Guardian encounter per character**.
-Normal warning and arrival messages describe distant, unsettling stone noises
-without naming the creature or revealing the encounter trigger or timing.
-Explicit encounter diagnostics are debug-only.
-The Guardian uses its own stone-creature portrait in inspection and the
-Bestiary, separate from its walking tile. It is a slow **construct** with
-**120 HP, 16 ATK, 8 DEF, 2 SPD,
-1 GRACE** and tier 4, using the existing stone-golem artwork and an
-existing mining-noise investigation toward the player's last mining position
-for up to **25 movement attempts**. It then uses ordinary combat AI on contact. It is immune to poison through its construct family, but
-no artificial combat immunity is added. Its appearance occupies **one**
-local special-threat slot, grants normal monster XP and never consumes
-random numbers during warning turns. Total walls mined, current pending
-warning, the spawned enemy and one-time completion persist in saves/replays.
+**Depth Guardian — over-mining the Dwarven Mines:** In Cursed World, breaking
+**30 distinct ordinary mineable walls** (not surface boulders, mineral-bearing
+seams or strikes that leave a wall intact) awakens a warning on that mine floor.
+The first warning lasts **five completed gameplay turns**. If the player remains
+on the same floor, the **Guardian of the Deep** can appear on an existing,
+reachable corridor at least **10 tiles** away and outside the player's vision,
+clear of stairs, lifts, traps, items and other special threats. There is no
+tunneling or teleporting through solid rock. If there is no valid corridor or
+free threat slot, the creature waits rather than spawning in an inaccessible
+location. Leaving the floor before its arrival cancels that warning; mining
+another ordinary wall can provoke a new warning, but there is only **one
+successful Guardian encounter per character**. Normal warning and arrival
+messages describe distant, unsettling stone noises without naming the creature
+or revealing the encounter trigger or timing. Explicit encounter diagnostics are
+debug-only. The Guardian uses its own stone-creature portrait in inspection and
+the Bestiary, separate from its walking tile. It is a slow **construct** with
+**120 HP, 16 ATK, 8 DEF, 2 SPD, 1 GRACE** and tier 4, using the existing
+stone-golem artwork and an existing mining-noise investigation toward the
+player's last mining position for up to **25 movement attempts**. It then uses
+ordinary combat AI on contact. It is immune to poison through its construct
+family, but no artificial combat immunity is added. Its appearance occupies
+**one** local special-threat slot, grants normal monster XP and never consumes
+random numbers during warning turns. Total walls mined, current pending warning,
+the spawned enemy and one-time completion persist in saves/replays.
 
 **Unfinished Business — returning wounded survivor:** When the player
 personally wounds **three distinct ordinary, hostile enemies below 25% of
@@ -12138,18 +12596,18 @@ prefixed monsters, special quest targets, stolen-item carriers, guarded
 progression-key carriers and other reserved encounter roles do not qualify.
 Repeatedly attacking or fleeing the same enemy never credits it twice.
 
-The returning foe is **the original persistent monster**, not a clone: it
-keeps its ID, species, equipment and existing abilities, gains the ordinary
+The returning foe is **the original persistent monster**, not a clone: it keeps
+its ID, species, equipment and existing abilities, gains the ordinary
 **Champion** prefix and its bonuses (including HP scaled from its original
 **maximum HP**, not the near-death HP at which it escaped), heals to its new
-maximum HP, and receives
-a random proper name (for example, *Grukhar, the Unfinished Goblin*).
-It reappears on a safe, connected, off-screen tile **12–28 path steps** away
-in a habitat appropriate to its species; it cannot attack on the appearance
-turn. If the original enemy has died or no legal destination/optional threat
-slot exists, placement waits without duplicating it. Only one successful
-return occurs per character. The credited enemy IDs, identity, upgraded
-stats, slot use and completion persist through saves and deterministic replay.
+maximum HP, and receives a random proper name (for example, *Grukhar, the
+Unfinished Goblin*). It reappears on a safe, connected, off-screen tile **12–28
+path steps** away in a habitat appropriate to its species; it cannot attack on
+the appearance turn. If the original enemy has died or no legal
+destination/optional threat slot exists, placement waits without duplicating it.
+Only one successful return occurs per character. The credited enemy IDs,
+identity, upgraded stats, slot use and completion persist through saves and
+deterministic replay.
 
 **Hidden Leader — organized Champion escort:** In Cursed World, killing a
 real **Champion** while at least **two different living non-Champion followers**
@@ -12163,70 +12621,69 @@ A scheduled special-threat check may then deploy **one Guarded Champion** with
 **two ordinary guards** of a single native gang-capable humanoid species
 (Goblin, Kobold, Skink or Ratling), in surface, cave or matching ruins habitat.
 The group occupies **one** persistent threat slot and spawns connected,
-off-screen, far from entrances and other special threats. A shortest route
-from the player defines its formation: one guard blocks the route directly
-in front of the Champion, and the other usually stands alongside it
-(or farther forward when terrain is narrow).
-The Champion applies its normal **Inspired (+2 ATK, +1 DEF)** aura to guards
-within two tiles. It holds its rear position while a guard survives, unless
-attacked or the player reaches melee; guards pursue with ordinary AI. Pulling
-guards away removes their aura bonus, and killing them frees the leader to
-advance. Ranged combat, alternate approaches and terrain can circumvent the
-formation: guards are **not** a magical projectile shield. Leader and guard
-identities, formation and state persist in saves/replays without added runtime
-randomness. The player recognizes the Champion by its name and existing aura.
+off-screen, far from entrances and other special threats. A shortest route from
+the player defines its formation: one guard blocks the route directly in front
+of the Champion, and the other usually stands alongside it (or farther forward
+when terrain is narrow). The Champion applies its normal **Inspired (+2 ATK, +1
+DEF)** aura to guards within two tiles. It holds its rear position while a guard
+survives, unless attacked or the player reaches melee; guards pursue with
+ordinary AI. Pulling guards away removes their aura bonus, and killing them
+frees the leader to advance. Ranged combat, alternate approaches and terrain can
+circumvent the formation: guards are **not** a magical projectile shield. Leader
+and guard identities, formation and state persist in saves/replays without added
+runtime randomness. The player recognizes the Champion by its name and existing
+aura.
 
-**Unused Scroll Ambush — cave-exit retaliation:** In Cursed World, spending
-**at least 100 actual gameplay turns during one continuous visit to an ordinary
-cave**, personally killing a **Goblin, Kobold or Skink during that visit**, and still
-carrying **at least two Scrolls of Invisibility or at least two Scrolls of
+**Unused Scroll Ambush — cave-exit retaliation:** In Cursed World, spending **at
+least 100 actual gameplay turns during one continuous visit to an ordinary
+cave**, personally killing a **Goblin, Kobold or Skink during that visit**, and
+still carrying **at least two Scrolls of Invisibility or at least two Scrolls of
 Homecoming** when emerging to the surface can cause an ambush. One scroll of
 each type is insufficient; counts from separate stacks of the same kind add up.
-Reading **any** scroll during the character's life permanently disqualifies
-this encounter. Merely possessing or identifying scrolls does not count as
-reading them. The visited cave can span shallow and deeper floors, but moving
-between its stair levels neither resets nor duplicates the turn counter.
-Crypts, Dwarven Fort visits and stairs within underground levels do not trigger
-the cave-exit roll. The kill count and turns are for the *current cave visit*,
-not lifetime Bestiary totals; trap-only kills do not qualify.
+Reading **any** scroll during the character's life permanently disqualifies this
+encounter. Merely possessing or identifying scrolls does not count as reading
+them. The visited cave can span shallow and deeper floors, but moving between
+its stair levels neither resets nor duplicates the turn counter. Crypts, Dwarven
+Fort visits and stairs within underground levels do not trigger the cave-exit
+roll. The kill count and turns are for the *current cave visit*, not lifetime
+Bestiary totals; trap-only kills do not qualify.
 
 At the first qualifying ascent from the cave to the surface, the world makes
 **one 20% roll**, increased to **40% when that cave has more than two surface
-entrances**. The game chooses the Goblin, Kobold or Skink species the player killed
-more often during the visit (ties resolved alphabetically), but skips a species
-that cannot form a valid group on reachable terrain near that particular exit.
-If successful, **three ordinary, immediately alert enemies** of the selected
-species appear as a group, 3–9 cardinal path steps from the cave entrance and
-no farther than three tiles from their leader. They use their normal species
-abilities and existing sprites, without additional Champion strength or loot.
-All spawn sites must be safe, unoccupied, native for the species, away from
-sanctuary and transition tiles, and inside the exit's surface threat region.
-The entire ambush occupies **one persistent special-threat slot**. If no safe
-placement or slot is available, no roll is made; leaving the cave still ends
-this visit. A failed roll also ends the visit, so climbing back into the same
-cave does **not** permit another immediate attempt. The player must spend
-another 100 turns and kill another qualifying enemy on a new visit. Once it
-successfully spawns, the encounter cannot repeat during that character's life.
-The player sees the same red Ambush! banner used for forest ambushes at the
-moment the encounter is announced.
-Cave-visit identity, last counted turn, turn count and species kills persist in
-save/replay snapshots; the chance roll uses seeded gameplay RNG, independent of
-transition animation. All thresholds, odds and group dimensions are stored in
-`content/adaptive_player_trolling.json`.
+entrances**. The game chooses the Goblin, Kobold or Skink species the player
+killed more often during the visit (ties resolved alphabetically), but skips a
+species that cannot form a valid group on reachable terrain near that particular
+exit. If successful, **three ordinary, immediately alert enemies** of the
+selected species appear as a group, 3–9 cardinal path steps from the cave
+entrance and no farther than three tiles from their leader. They use their
+normal species abilities and existing sprites, without additional Champion
+strength or loot. All spawn sites must be safe, unoccupied, native for the
+species, away from sanctuary and transition tiles, and inside the exit's surface
+threat region. The entire ambush occupies **one persistent special-threat
+slot**. If no safe placement or slot is available, no roll is made; leaving the
+cave still ends this visit. A failed roll also ends the visit, so climbing back
+into the same cave does **not** permit another immediate attempt. The player
+must spend another 100 turns and kill another qualifying enemy on a new visit.
+Once it successfully spawns, the encounter cannot repeat during that character's
+life. The player sees the same red Ambush! banner used for forest ambushes at
+the moment the encounter is announced. Cave-visit identity, last counted turn,
+turn count and species kills persist in save/replay snapshots; the chance roll
+uses seeded gameplay RNG, independent of transition animation. All thresholds,
+odds and group dimensions are stored in `content/adaptive_player_trolling.json`.
 
-**Unused Healing:** In Cursed World, two character deaths while still
-carrying **at least two Life Potions each time** qualify a single reward.
-Using potions earlier in a fight does not disqualify the player, and both
-enemy and environmental deaths count. On the **next scheduled adaptive check
-that occurs underground** (caves, mines, crypt or fort), searchable remains
-containing **two Life Potions in one stack** can appear on safe, reachable ground at least
-10 tiles away, outside sight and at least three tiles from stairs. The player
-searches the remains normally to recover both potions; there is no chest.
-If no safe space exists, the reward waits for another underground check.
-The encounter uses no special-threat slot and never appears on the surface.
-Its qualification count, one-time completion and remains all persist in saves
-and replay. Permadeath runs cannot meet the two-death threshold for one
-character. Death-by-species tracking for Nemesis remains independent.
+**Unused Healing:** In Cursed World, two character deaths while still carrying
+**at least two Life Potions each time** qualify a single reward. Using potions
+earlier in a fight does not disqualify the player, and both enemy and
+environmental deaths count. On the **next scheduled adaptive check that occurs
+underground** (caves, mines, crypt or fort), searchable remains containing **two
+Life Potions in one stack** can appear on safe, reachable ground at least 10
+tiles away, outside sight and at least three tiles from stairs. The player
+searches the remains normally to recover both potions; there is no chest. If no
+safe space exists, the reward waits for another underground check. The encounter
+uses no special-threat slot and never appears on the surface. Its qualification
+count, one-time completion and remains all persist in saves and replay.
+Permadeath runs cannot meet the two-death threshold for one character.
+Death-by-species tracking for Nemesis remains independent.
 
 **Strong Enemy Hunter — opportunist pack:** In Cursed World, deliberately
 starting combat against **five distinct, previously unalarmed enemies** whose
@@ -12241,66 +12698,65 @@ and saved in the adaptive state, including replay snapshots.
 
 At a subsequent **scheduled adaptive check**, **four individually weaker
 humanoids of one native species** can gather off-screen on connected, trap-free
-terrain. The possible species are Goblin, Kobold, Skink and Ratling; only species
-that belong to the current habitat and whose base combat strength is at most
-**85% of the player's current strength** are eligible. They keep their normal
-combat stats, possible ranged roles and **gangPower** ability, without extra
-equipment rolls or artificial damage buffs. The pack is identifiable by the
-*Opportunist* name prefix and consists of exactly four members within two
-tiles of their anchor. It appears 12–28 cardinal path steps away, well clear
-of entrances, sanctuary, active hazards and occupied tiles, and counts as
-**one** of the area's persistent special threats. If the habitat, threat
-budget or connected terrain cannot support the pack, the encounter is deferred
-without a random roll. Spawning uses only the seeded game RNG and can occur
-once per character. The player can separate the gang to suppress gangPower,
-use terrain to disrupt its shooters, fight or escape.
+terrain. The possible species are Goblin, Kobold, Skink and Ratling; only
+species that belong to the current habitat and whose base combat strength is at
+most **85% of the player's current strength** are eligible. They keep their
+normal combat stats, possible ranged roles and **gangPower** ability, without
+extra equipment rolls or artificial damage buffs. The pack is identifiable by
+the *Opportunist* name prefix and consists of exactly four members within two
+tiles of their anchor. It appears 12–28 cardinal path steps away, well clear of
+entrances, sanctuary, active hazards and occupied tiles, and counts as **one**
+of the area's persistent special threats. If the habitat, threat budget or
+connected terrain cannot support the pack, the encounter is deferred without a
+random roll. Spawning uses only the seeded game RNG and can occur once per
+character. The player can separate the gang to suppress gangPower, use terrain
+to disrupt its shooters, fight or escape.
 
-**Last Survivor — Bestiary retaliation:** In Cursed World, killing at least
-**20 enemies of one base species** when that species represents **at least 20%
-of all player-credited kills** can qualify a once-per-character retaliation.
-The game reads the existing Bestiary `killsBySpecies` totals, including
-prefixed variants under their base species; trap-only deaths are excluded.
-Only ordinary hostile species with a native habitat at the current surface,
-cave or dungeon location can form a band. At a later **scheduled 500-step
-check**, a reachable group may gather off-screen: **one individually named Last Survivor**
-with Champion stats, Champion aura and **50% additional HP after ordinary
-modifiers**, accompanied by **two ordinary members of the same species**.
-The leader is never below **tier 3** and has stat floors of **80 max HP,
-13 ATK, 5 DEF, 6 SPD and 3 GRACE** after bonuses; the companions remain
-ordinary species members. These floors prevent a low-tier species from
-creating a trivial Champion while preserving species-specific abilities.
-The group appears 12–28 path steps from the player, outside the viewport or
-underground FOV, away from occupied tiles, traps and transitions, and within
-two tiles of one another. The most-killed currently placeable qualifying
-species is chosen, with alphabetical ties. A species that cannot form a legal
-band in its natural habitat waits for another check; no other species is
-manufactured to fill the gap. Once spawned, all three use ordinary monster
-combat and awareness rules: this is a gathered revenge band rather than
-telepathic tracking. The leader receives one randomly selected name from at least 50 unique entries
-in `content/monster_names.json` when the band actually spawns (for example,
-*Grukhar, Last Survivor*). The selected name is preserved with the enemy in
-save/replay, while its original Bestiary species remains available as
-`baseName` for sprites, kill statistics and abilities. Name selection uses the
-seeded gameplay RNG, not cosmetic randomness or per-frame drawing. The named
-leader is the final survivor of an earlier slaughtered band, *not* literally
-the last member of the species. The group
-counts as **one special threat** under the area's lifetime budget; its
-participants, Champion aura and completion survive normal save and replay
-without a second kill-history ledger. Its threshold, band size, strength and
-spawn distances are configured in `content/adaptive_player_trolling.json`.
+**Last Survivor — Bestiary retaliation:** In Cursed World, killing at least **20
+enemies of one base species** when that species represents **at least 20% of all
+player-credited kills** can qualify a once-per-character retaliation. The game
+reads the existing Bestiary `killsBySpecies` totals, including prefixed variants
+under their base species; trap-only deaths are excluded. Only ordinary hostile
+species with a native habitat at the current surface, cave or dungeon location
+can form a band. At a later **scheduled 500-step check**, a reachable group may
+gather off-screen: **one individually named Last Survivor** with Champion stats,
+Champion aura and **50% additional HP after ordinary modifiers**, accompanied by
+**two ordinary members of the same species**. The leader is never below **tier
+3** and has stat floors of **80 max HP, 13 ATK, 5 DEF, 6 SPD and 3 GRACE** after
+bonuses; the companions remain ordinary species members. These floors prevent a
+low-tier species from creating a trivial Champion while preserving
+species-specific abilities. The group appears 12–28 path steps from the player,
+outside the viewport or underground FOV, away from occupied tiles, traps and
+transitions, and within two tiles of one another. The most-killed currently
+placeable qualifying species is chosen, with alphabetical ties. A species that
+cannot form a legal band in its natural habitat waits for another check; no
+other species is manufactured to fill the gap. Once spawned, all three use
+ordinary monster combat and awareness rules: this is a gathered revenge band
+rather than telepathic tracking. The leader receives one randomly selected name
+from at least 50 unique entries in `content/monster_names.json` when the band
+actually spawns (for example, *Grukhar, Last Survivor*). The selected name is
+preserved with the enemy in save/replay, while its original Bestiary species
+remains available as `baseName` for sprites, kill statistics and abilities. Name
+selection uses the seeded gameplay RNG, not cosmetic randomness or per-frame
+drawing. The named leader is the final survivor of an earlier slaughtered band,
+*not* literally the last member of the species. The group counts as **one
+special threat** under the area's lifetime budget; its participants, Champion
+aura and completion survive normal save and replay without a second kill-history
+ledger. Its threshold, band size, strength and spawn distances are configured in
+`content/adaptive_player_trolling.json`.
 
-**Humanoid Hunter — hesitant beasts:** When at least **30** player-credited kills
-are humanoids and humanoids account for **70% or more** of all the player's
-kills, ordinary living, non-humanoid monsters have a **75% chance to start an
-otherwise valid fight** instead of the normal 100%. This check happens only
-when an unaware, unalarmed beast first has sight of the player inside its
-usual aggression range. A failed attempt costs the beast its action and shows
-a visible *Hesitates* cue if the monster is on screen; the next action may
-check again. Attacking the beast or alarming it through another mechanic
-restores normal retaliation and pursuit. Already-engaged enemies, nonliving
-creatures, special adaptive encounters, and ultra-rare creatures are excluded.
-The condition automatically stops applying if further kills reduce the
-humanoid proportion below 70%. The calculation uses the existing persistent
+**Humanoid Hunter — hesitant beasts:** When at least **30** player-credited
+kills are humanoids and humanoids account for **70% or more** of all the
+player's kills, ordinary living, non-humanoid monsters have a **75% chance to
+start an otherwise valid fight** instead of the normal 100%. This check happens
+only when an unaware, unalarmed beast first has sight of the player inside its
+usual aggression range. A failed attempt costs the beast its action and shows a
+visible *Hesitates* cue if the monster is on screen; the next action may check
+again. Attacking the beast or alarming it through another mechanic restores
+normal retaliation and pursuit. Already-engaged enemies, nonliving creatures,
+special adaptive encounters, and ultra-rare creatures are excluded. The
+condition automatically stops applying if further kills reduce the humanoid
+proportion below 70%. The calculation uses the existing persistent
 `killsBySpecies` record and needs no additional kill counter.
 
 **Strange Green Potion:** Drinking at least **20 real potions** (Life, Speed,
@@ -12336,61 +12792,64 @@ special-threat slot.
 deep water that actually inflicted drowning damage qualify a one-time shore
 reward. Each crossing must move through at least **two deep-water tiles** and
 finish on land at least **three tiles** from its entry shore, with deep water
-between both shores; waiting in water,
-falling through ice alone, or returning immediately to the same shore does not
-count. During a later **scheduled adaptive check** while standing near a
-qualifying stretch of deep water, a **Scroll of Homecoming** may be placed on
-the far shore. The water separates the player from the item, but an existing
-**water-free walking route of at most 50 steps** must reach it, at least four
-steps longer than the direct water crossing. No swimming or drowning is
-required to retrieve the scroll: the player can take the detour, swim, or
-ignore it. If no valid shoreline and safe detour exist, the reward is deferred.
-Both the crossing-in-progress state and completed-crossing counter persist
-through saves and replays. Neither lure consumes a special-threat slot; both
-are disabled outside Cursed World. The item kind, thresholds and safe-route
-limits can be adjusted in `content/adaptive_player_trolling.json`.
+between both shores; waiting in water, falling through ice alone, or returning
+immediately to the same shore does not count. During a later **scheduled
+adaptive check** while standing near a qualifying stretch of deep water, a
+**Scroll of Homecoming** may be placed on the far shore. The water separates the
+player from the item, but an existing **water-free walking route of at most 50
+steps** must reach it, at least four steps longer than the direct water
+crossing. No swimming or drowning is required to retrieve the scroll: the player
+can take the detour, swim, or ignore it. If no valid shoreline and safe detour
+exist, the reward is deferred. Both the crossing-in-progress state and
+completed-crossing counter persist through saves and replays. Neither lure
+consumes a special-threat slot; both are disabled outside Cursed World. The item
+kind, thresholds and safe-route limits can be adjusted in
+`content/adaptive_player_trolling.json`.
 
 **Unsold Equipment — extra ordinary thieves:** In Cursed World, each newly
 visited eligible underground floor (including its cave identity) or surface
 region receives **one dynamic thief encounter check**. The normal chance is
-**10%**, increasing to **30%** while carrying at least **15 unequipped weapons or armor pieces** in the backpack. Equipped items do not count;
-stacked spare equipment is counted by quantity. The probability is chosen at
-the instant the area is first entered, not retroactively when the pack changes.
-Checks are persistent, including failed rolls and regions with no legal spawn,
-so returning to the same floor or stepping across a boundary cannot farm
-extra attempts. The modifier uses only ordinary thief-capable species eligible
-for the current habitat/depth and a player-connected location outside sight,
-at least **10 tiles away**, not on entrances, traps, items, NPCs, occupied
-terrain, or in the Temple sanctuary. A successful roll adds one ordinary
-monster that uses its native movement, gear, theft and escape rules and leaves
-normal loot on death. This is an **ordinary population addition** and neither
-consumes the two-special-threat budget nor completes a once-per-character
-special encounter. The monster and the checked-area ledger survive saves and
-replays. Ordinary worlds do not roll or record these checks.
+**10%**, increasing to **30%** while carrying at least **15 unequipped weapons
+or armor pieces** in the backpack. Equipped items do not count; stacked spare
+equipment is counted by quantity. The probability is chosen at the instant the
+area is first entered, not retroactively when the pack changes. Checks are
+persistent, including failed rolls and regions with no legal spawn, so returning
+to the same floor or stepping across a boundary cannot farm extra attempts. The
+modifier uses only ordinary thief-capable species eligible for the current
+habitat/depth and a player-connected location outside sight, at least **10 tiles
+away**, not on entrances, traps, items, NPCs, occupied terrain, or in the Temple
+sanctuary. A successful roll adds one ordinary monster that uses its native
+movement, gear, theft and escape rules and leaves normal loot on death. This is
+an **ordinary population addition** and neither consumes the two-special-threat
+budget nor completes a once-per-character special encounter. The monster and the
+checked-area ledger survive saves and replays. Ordinary worlds do not roll or
+record these checks.
 
-**Hungry Monster:** Carrying **at least 25 raw Meat or 25 Roasted Meat** qualifies one special
-Hungry Ogre or Hungry Cyclops on matching surface terrain, a Hungry Ogre on
-sufficiently deep dungeon floors (its normal z:-5 minimum), or a Hungry Cave
-Troll on eligible Dwarven Mines floors at its normal z:-12 minimum. The actual
-creature spawns on a **scheduled encounter check in a matching habitat**, not
-when meat is first picked up. Eligible enemies and positions
-are selected from the player's connected terrain, outside the current view,
-10–28 tiles away and clear of entrance approaches, traps, props and other
+**Hungry Monster:** Carrying **at least 25 raw Meat or 25 Roasted Meat**
+qualifies one special Hungry Ogre or Hungry Cyclops on matching surface terrain,
+a Hungry Ogre on sufficiently deep dungeon floors (its normal z:-5 minimum), or
+a Hungry Cave Troll on eligible Dwarven Mines floors at its normal z:-12
+minimum. The actual creature spawns on a **scheduled encounter check in a
+matching habitat**, not when meat is first picked up. Eligible enemies and
+positions are selected from the player's connected terrain, outside the current
+view, 10–28 tiles away and clear of entrance approaches, traps, props and other
 special threats. If no suitable position exists, the event waits; it never
-forces a spawn into the player's path. In the Dwarven Ruins it participates
-in the ordinary depth-weighted event lottery. Elsewhere it uses the next eligible scheduled check, respecting the
-surface-region or underground-floor two-threat limit. It is one encounter per character, ignoring the ordinary
-monster population limit. Spawning is not announced in ordinary
-message logs before the player discovers the threat; checkpoint announcements
-are available only with adaptive debug logging.
+forces a spawn into the player's path. In the Dwarven Ruins it participates in
+the ordinary depth-weighted event lottery. Elsewhere it uses the next eligible
+scheduled check, respecting the surface-region or underground-floor two-threat
+limit. It is one encounter per character, ignoring the ordinary monster
+population limit. Spawning is not announced in ordinary message logs before the
+player discovers the threat; checkpoint announcements are available only with
+adaptive debug logging.
 
-The name uses **Hungry** without granting ordinary monster-prefix powers.
-Its starting HP and DEF are multiplied by **0.8**, and ATK by **1.2**,
-rounded to nearest integer with at least one point of change for positive
-stats. Other natural abilities and attack rules remain those of the species.
-After spawning it actively tracks the player and responds to dropped
-meat using the scent-driven pursuit rules below. It does not attack in the movement action that spawns it, and leaving
-the floor does not create another hunter. The player can fight, escape, hide or sacrifice meat.
+The name uses **Hungry** without granting ordinary monster-prefix powers. Its
+starting HP and DEF are multiplied by **0.8**, and ATK by **1.2**, rounded to
+nearest integer with at least one point of change for positive stats. Other
+natural abilities and attack rules remain those of the species. After spawning
+it actively tracks the player and responds to dropped meat using the
+scent-driven pursuit rules below. It does not attack in the movement action that
+spawns it, and leaving the floor does not create another hunter. The player can
+fight, escape, hide or sacrifice meat.
 
 **Hungry Monster — scent-driven pursuit and meat distraction:**
 
@@ -12425,43 +12884,44 @@ interruption are stored on the actual monster; save/restore and replay keep
 its chosen goal and inventory changes deterministic. Animation timing does
 not affect movement or consumption.
 
-**Beast Hunter:** After the player has killed **at least 40 living,
-non-humanoid beasts**, making up **at least 60% of all credited kills**, one
-ordinary native surface beast becomes eligible for an announced retaliation
-hunt. It is selected from **Spineback or Manticore** (tier 4, natural rarity 0.1–0.3,
-never ultra-rare), only where that species can naturally spawn. All retain
-**normal HP, ATK, DEF, SPD and abilities**. A
-*Hunting [species]* name and the usual prefix glow identify the individual;
-no ordinary prefix stat bonus is applied. At the next scheduled check on the
-surface, the hunter appears off-screen on connected, trap-free ground
-**12–28 tiles away**, in the current surface region and away from protected
-entrances. It starts aware and tries to follow the player beyond its ordinary aggression
-range with the **shared far-wandering cadence**: on every distant hunting
-action 40% idle, 20% attempted non-directed roaming, and 40% pursuit
-pathfinding, configured in `content/enemy_config.json`.
-Only within ordinary aggro range does normal, faster combat AI take over. The player sees a **HUNTED!** cue at activation.
-It **can lose the trail**: out of ordinary aggression range, the standard
-speed-advantage disengagement roll applies (5 percentage points per SPD,
-maximum 50% each pursuing action); invisibility, forest concealment and
-sanctuary also stop its distant tracking through existing monster AI. Once
-unaware, it returns to normal wildlife behavior and can only reacquire the
-player under normal combat rules. The hunter is a genuine, persistent enemy;
-leaving the level doesn't create another. One per character, occupying one
-surface-region special-threat slot. Eligibility uses the player's existing
-saved `killsBySpecies` counter, so no separate persistent counter is needed.
-The selected enemy, its alert state and the completed encounter survive
-save/load and replay. Other beasts and non-Cursed-World runs are unchanged.
+**Beast Hunter:** After the player has killed **at least 40 living, non-humanoid
+beasts**, making up **at least 60% of all credited kills**, one ordinary native
+surface beast becomes eligible for an announced retaliation hunt. It is selected
+from **Spineback or Manticore** (tier 4, natural rarity 0.1–0.3, never
+ultra-rare), only where that species can naturally spawn. All retain **normal
+HP, ATK, DEF, SPD and abilities**. A *Hunting [species]* name and the usual
+prefix glow identify the individual; no ordinary prefix stat bonus is applied.
+At the next scheduled check on the surface, the hunter appears off-screen on
+connected, trap-free ground **12–28 tiles away**, in the current surface region
+and away from protected entrances. It starts aware and tries to follow the
+player beyond its ordinary aggression range with the **shared far-wandering
+cadence**: on every distant hunting action 40% idle, 20% attempted non-directed
+roaming, and 40% pursuit pathfinding, configured in `content/enemy_config.json`.
+Only within ordinary aggro range does normal, faster combat AI take over. The
+player sees a **HUNTED!** cue at activation. It **can lose the trail**: out of
+ordinary aggression range, the standard speed-advantage disengagement roll
+applies (5 percentage points per SPD, maximum 50% each pursuing action);
+invisibility, forest concealment and sanctuary also stop its distant tracking
+through existing monster AI. Once unaware, it returns to normal wildlife
+behavior and can only reacquire the player under normal combat rules. The hunter
+is a genuine, persistent enemy; leaving the level doesn't create another. One
+per character, occupying one surface-region special-threat slot. Eligibility
+uses the player's existing saved `killsBySpecies` counter, so no separate
+persistent counter is needed. The selected enemy, its alert state and the
+completed encounter survive save/load and replay. Other beasts and
+non-Cursed-World runs are unchanged.
 
 **Forest Spirit — overforaging:** In Cursed World, searching **200 distinct
 forest tiles** (including searches that find nothing) makes the Forest Spirit
 eligible for one scheduled encounter on the surface. Previously searched tiles
-do not count again; eligibility uses the already-persisted surface `foragedTiles`
-set rather than a second activity counter. The first manifestation must occupy
-a **forest** tile, 10–32 walking steps from the player, beyond the current
-camera, on connected, safe terrain, clear of entrances and other special
-threats. No suitable forest site or free surface-region slot defers the event
-without consuming it. It takes **one surface-region threat slot** and never
-spawns a second spirit for the same character.
+do not count again; eligibility uses the already-persisted surface
+`foragedTiles` set rather than a second activity counter. The first
+manifestation must occupy a **forest** tile, 10–32 walking steps from the
+player, beyond the current camera, on connected, safe terrain, clear of
+entrances and other special threats. No suitable forest site or free
+surface-region slot defers the event without consuming it. It takes **one
+surface-region threat slot** and never spawns a second spirit for the same
+character.
 
 While the Forest Spirit is alive, ordinary aggressive living beasts standing
 on **forest or ancient-forest surface tiles** become **Agitated**: they detect
@@ -12474,38 +12934,37 @@ individually; leaving forest ends it and killing the spirit calms the forest.
 Concealment and sanctuary still work normally. This makes hunting the spirit
 or avoiding its forests two different counterplays.
 
-The Forest Spirit is a **tier-four undead** with **90 HP, 13 ATK,
-3 DEF, 5 SPD and 4 GRACE**, without the Ethereal ability. It follows ordinary
-monster movement and collision rules, can be struck by mundane weapons and
-receives terrain-hazard effects according to the usual rules. It is not a
-natural spawn. Its green halo and distinct name identify it, including outside
-the forest. Its walking tile uses Dreadling artwork, while inspection and the
-Bestiary use the dedicated Forest Spirit portrait. Its species identity is
-unchanged. At a distance it stalks with the shared **40% idle, 20% roaming,
-40% pathfinding** cadence configured for far wandering in
-`content/enemy_config.json`; ordinary combat AI applies within its aggression range. The
-standard speed-based loss-of-trail roll and existing concealment, invisibility
-and sanctuary rules still offer escapes.
+The Forest Spirit is a **tier-four undead** with **90 HP, 13 ATK, 3 DEF, 5 SPD
+and 4 GRACE**, without the Ethereal ability. It follows ordinary monster
+movement and collision rules, can be struck by mundane weapons and receives
+terrain-hazard effects according to the usual rules. It is not a natural spawn.
+Its green halo and distinct name identify it, including outside the forest. Its
+walking tile uses Dreadling artwork, while inspection and the Bestiary use the
+dedicated Forest Spirit portrait. Its species identity is unchanged. At a
+distance it stalks with the shared **40% idle, 20% roaming, 40% pathfinding**
+cadence configured for far wandering in `content/enemy_config.json`; ordinary
+combat AI applies within its aggression range. The standard speed-based
+loss-of-trail roll and existing concealment, invisibility and sanctuary rules
+still offer escapes.
 
 When the spirit loses the trail (for example, to invisibility or a speed-based
-escape), it **stays physically on the map while within 6 Chebyshev tiles of
-the player**, even when adjacent. While unaware it cannot track or attack an
-invisible player and may wander normally; if invisibility expires nearby,
-normal aggression rules can let it reacquire the player. Only when the player
-and unaware spirit are at least **6 tiles apart** does the **same living
-enemy** retreat into dormancy and disappear from active surface encounters.
-Descending underground still withdraws the spirit immediately, regardless of
-distance. The threshold is configurable at `forest_spirit.minWithdrawDistance`
-in `content/adaptive_player_trolling.json`. The spirit cannot attack during
+escape), it **stays physically on the map while within 6 Chebyshev tiles of the
+player**, even when adjacent. While unaware it cannot track or attack an
+invisible player and may wander normally; if invisibility expires nearby, normal
+aggression rules can let it reacquire the player. Only when the player and
+unaware spirit are at least **6 tiles apart** does the **same living enemy**
+retreat into dormancy and disappear from active surface encounters. Descending
+underground still withdraws the spirit immediately, regardless of distance. The
+threshold is configurable at `forest_spirit.minWithdrawDistance` in
+`content/adaptive_player_trolling.json`. The spirit cannot attack during
 dormancy. After **100 gameplay turns actually spent on the surface**, it may
-reappear at an off-screen reachable location,
-including outside a forest. If no safe spot exists, it retries every 10
-additional surface turns. The spirit retains its remaining HP, unique enemy ID,
-abilities and status; no new threat slot or kill/drop opportunity is created.
-Another descent restarts the surface countdown. Killing it ends the hunt
-permanently. Dormancy, the surface-turn countdown and its last counted turn
-survive saves and deterministic replays; rendering or waiting in menus cannot
-advance the countdown.
+reappear at an off-screen reachable location, including outside a forest. If no
+safe spot exists, it retries every 10 additional surface turns. The spirit
+retains its remaining HP, unique enemy ID, abilities and status; no new threat
+slot or kill/drop opportunity is created. Another descent restarts the surface
+countdown. Killing it ends the hunt permanently. Dormancy, the surface-turn
+countdown and its last counted turn survive saves and deterministic replays;
+rendering or waiting in menus cannot advance the countdown.
 
 **Low HP Carrion:** Staying below **25% of maximum HP for 30 consecutive
 game turns** makes one special hunter eligible, provided the player is still
@@ -12554,25 +13013,24 @@ This is one special threat per character and cannot appear during an active
 Low HP Carrion pursuit on the same level.
 
 **Gold Imp:** In Cursed World, carrying **at least 2,000 gold** makes a single
-Gold Imp encounter eligible at the next scheduled check in a
-suitable habitat. The Imp uses its normal living Imp stats, combat, terrain
-restrictions and thief ability, and appears out of sight on safely reachable
-ground **10–28 tiles away**, at least 3 tiles clear of entrances. On the
-surface it spawns only on natural hill or forest terrain in the player's
-current region; underground it respects the Imp's usual depth restriction.
-It begins an active pursuit even outside ordinary aggro range, but still
-respects invisibility, sanctuary, path blockers and normal defensive behavior.
-It occupies one optional lifetime threat slot; in the Dwarven Ruins it
-competes in the existing equal-weight, depth-weighted event lottery. The
-Gold Imp steals once using the normal adjacent thief opportunity: 10% per
-eligible adjacent turn, only if it has a legal escape step. Successful theft
-removes **10% of the player's current gold, capped at 300 gold**, with the
-amount rounded down and preserved on the enemy. The original amount is
-recoverable from a regular thief bag after it dies; the bag lies on the
-floor and requires a normal forage action. The one-time encounter, stolen
-coins and threat reservation survive saves and replay; ordinary Imp theft
-is unchanged. The Gold Imp has no advance spawn announcement outside debug mode. 
-If no safe spawn site exists the event waits for another eligible scheduled check.
+Gold Imp encounter eligible at the next scheduled check in a suitable habitat.
+The Imp uses its normal living Imp stats, combat, terrain restrictions and thief
+ability, and appears out of sight on safely reachable ground **10–28 tiles
+away**, at least 3 tiles clear of entrances. On the surface it spawns only on
+natural hill or forest terrain in the player's current region; underground it
+respects the Imp's usual depth restriction. It begins an active pursuit even
+outside ordinary aggro range, but still respects invisibility, sanctuary, path
+blockers and normal defensive behavior. It occupies one optional lifetime threat
+slot; in the Dwarven Ruins it competes in the existing equal-weight,
+depth-weighted event lottery. The Gold Imp steals once using the normal adjacent
+thief opportunity: 10% per eligible adjacent turn, only if it has a legal escape
+step. Successful theft removes **10% of the player's current gold, capped at 300
+gold**, with the amount rounded down and preserved on the enemy. The original
+amount is recoverable from a regular thief bag after it dies; the bag lies on
+the floor and requires a normal forage action. The one-time encounter, stolen
+coins and threat reservation survive saves and replay; ordinary Imp theft is
+unchanged. The Gold Imp has no advance spawn announcement outside debug mode. If
+no safe spawn site exists the event waits for another eligible scheduled check.
 
 **Ignored mushroom cleaning:** In Cursed World, three **separate visits to
 Herbalist Services** while carrying untreated Mushrooms, without purifying
@@ -12588,25 +13046,24 @@ monster-threat cost. If a suitable cluster cannot be placed, the event
 waits for a later unvisited eligible floor. Previous floor visits, completed
 visits and in-progress Herbalist interactions persist through saves and replay.
 
-**Mushroom Prophet:** In Cursed World, collecting **30 ordinary Mushrooms**
-from foraging, monster loot or ground pickups makes a unique Prophet eligible
-on a **later suitable underground floor**. Dropping and picking up the same
-mushrooms never advances the threshold again. The candidate floor must contain
-natural fungal growth (cave mushrooms, mine wall mushrooms, or an existing
-Fungus), and the Prophet appears on reachable, safe ground within **3 tiles**
-of the fungus, at least **10 tiles** from the player, outside sight and away
-from stairs. It uses the normal Fungus walking sprite, but has its own
-portrait and combat identity: **tier 3, 100 HP, 14 ATK, 4 DEF, 4 SPD**, with
-ordinary melee attacks. Once seen, it speaks a warning and gives the player
-one full action to escape before pursuing and attacking (described below).
-Its appearance consumes one of the two lifetime threat slots on that
-underground floor; no patch or free slot means defer rather than force a spawn.
-In the Dwarven Ruins it enters the same depth-weighted equal-candidate lottery;
-in other fungal caves and mines it activates on the next qualifying
-scheduled check.
-All collection counts and the Prophet's exact warning-turn marker are saved
-with the corresponding enemy and restored for deterministic replay; a loaded
-Prophet cannot repeat its warning. Ordinary worlds never accumulate this progress.
+**Mushroom Prophet:** In Cursed World, collecting **30 ordinary Mushrooms** from
+foraging, monster loot or ground pickups makes a unique Prophet eligible on a
+**later suitable underground floor**. Dropping and picking up the same mushrooms
+never advances the threshold again. The candidate floor must contain natural
+fungal growth (cave mushrooms, mine wall mushrooms, or an existing Fungus), and
+the Prophet appears on reachable, safe ground within **3 tiles** of the fungus,
+at least **10 tiles** from the player, outside sight and away from stairs. It
+uses the normal Fungus walking sprite, but has its own portrait and combat
+identity: **tier 3, 100 HP, 14 ATK, 4 DEF, 4 SPD**, with ordinary melee attacks.
+Once seen, it speaks a warning and gives the player one full action to escape
+before pursuing and attacking (described below). Its appearance consumes one of
+the two lifetime threat slots on that underground floor; no patch or free slot
+means defer rather than force a spawn. In the Dwarven Ruins it enters the same
+depth-weighted equal-candidate lottery; in other fungal caves and mines it
+activates on the next qualifying scheduled check. All collection counts and the
+Prophet's exact warning-turn marker are saved with the corresponding enemy and
+restored for deterministic replay; a loaded Prophet cannot repeat its warning.
+Ordinary worlds never accumulate this progress.
 
 **Mushroom Prophet — warning action:**
 
@@ -12693,45 +13150,45 @@ are visible through tile feedback, message and enemy tooltip. Encounter
 eligibility, the selected outcome, timing, remaining guest and ground reward
 survive ordinary saves and replay. Ordinary worlds never track the trigger.
 
-**Debt Collector:** Recovering loot from **10 distinct searchable grave objects** across
-the Dwarven Fort and Dwarven Ruins — `dwarvenremains`, Fort `ruinprop`, or
-`skeleton` — makes a unique dwarven Ghost eligible on either of the last two
-Dwarven Ruins floors. Only skeletons on the Fort/Ruins maps count; skeletons
-in caves, the Crypt, mines, and other regions do not. Only searches that actually recover loot or a progression key count. Empty
-searches do not count. Searching
-an already-looted object never increments the counter. All grave types share
-the existing `dwarvenRemainsSearched` save/replay counter; skeleton loot is
-unchanged and is not marked as dwarven loot for the Ghost's payment demand. The encounter uses the same depth-weighted,
-equal-candidate lottery and occupies one of the two optional threat slots.
-It appears on reachable, trap-safe ground, at least 10 tiles away and outside
-sight. It reuses the Ghost walking sprite and combat profile (36 HP, 9 ATK,
-1 DEF, 5 SPD), with its own dwarven-ghost portrait and name. It waits until
-the player sees it before making a demand. The player may avoid it entirely,
-surrender the randomly selected eligible loot or gold, or refuse and fight/flee.
+**Debt Collector:** Recovering loot from **10 distinct searchable grave
+objects** across the Dwarven Fort and Dwarven Ruins — `dwarvenremains`, Fort
+`ruinprop`, or `skeleton` — makes a unique dwarven Ghost eligible on either of
+the last two Dwarven Ruins floors. Only skeletons on the Fort/Ruins maps count;
+skeletons in caves, the Crypt, mines, and other regions do not. Only searches
+that actually recover loot or a progression key count. Empty searches do not
+count. Searching an already-looted object never increments the counter. All
+grave types share the existing `dwarvenRemainsSearched` save/replay counter;
+skeleton loot is unchanged and is not marked as dwarven loot for the Ghost's
+payment demand. The encounter uses the same depth-weighted, equal-candidate
+lottery and occupies one of the two optional threat slots. It appears on
+reachable, trap-safe ground, at least 10 tiles away and outside sight. It reuses
+the Ghost walking sprite and combat profile (36 HP, 9 ATK, 1 DEF, 5 SPD), with
+its own dwarven-ghost portrait and name. It waits until the player sees it
+before making a demand. The player may avoid it entirely, surrender the randomly
+selected eligible loot or gold, or refuse and fight/flee.
 
 The Ghost selects **one random recovered object** among currently carried
 remains items (including equipped gear, gems and ammunition stacks) **and
 affordable purses of gold recovered from those remains** (affordability is
-checked against the minimum demand, not the original purse amount). Each original find
-is one equally weighted candidate, regardless of arrow-stack size or coin
-quantity. The ghost does not target an ordinary item merely because its name
-matches: items carry an origin identifier, and recovered gold is recorded by
-its original find amount. When a purse is selected, the ghost demands
-the greater of the original purse amount and **100g**, payable using any current gold;
-there is no artificial distinction between physical coins after pickup.
-An eligible item stack is surrendered in full. If no recovered items or
-affordable remains purses qualify, the demand is **100 gold** instead. The
-selection resolves once on discovery, never on UI refresh, and stays
-locked until the player responds. Paying removes
-the actual item or gold and peacefully dismisses the Ghost, without loot or
-XP. Refusal makes it hostile using normal Ghost combat. Attacking first also
-makes it hostile, without a payment demand. A single dialog choice is
-recorded for replay and consumes no extra turn; the next player action
-resumes ordinary monster turns. The pending demand, selected loot or gold-purse identity,
-loot provenance, recovered-gold records, searched-remains total and hostility
-state all survive save/restore and replay. When payment is unaffordable, refusal remains
-available; the dialog cannot be dismissed without choosing. Ordinary worlds
-have no such tracking or encounter.
+checked against the minimum demand, not the original purse amount). Each
+original find is one equally weighted candidate, regardless of arrow-stack size
+or coin quantity. The ghost does not target an ordinary item merely because its
+name matches: items carry an origin identifier, and recovered gold is recorded
+by its original find amount. When a purse is selected, the ghost demands the
+greater of the original purse amount and **100g**, payable using any current
+gold; there is no artificial distinction between physical coins after pickup. An
+eligible item stack is surrendered in full. If no recovered items or affordable
+remains purses qualify, the demand is **100 gold** instead. The selection
+resolves once on discovery, never on UI refresh, and stays locked until the
+player responds. Paying removes the actual item or gold and peacefully dismisses
+the Ghost, without loot or XP. Refusal makes it hostile using normal Ghost
+combat. Attacking first also makes it hostile, without a payment demand. A
+single dialog choice is recorded for replay and consumes no extra turn; the next
+player action resumes ordinary monster turns. The pending demand, selected loot
+or gold-purse identity, loot provenance, recovered-gold records,
+searched-remains total and hostility state all survive save/restore and replay.
+When payment is unaffordable, refusal remains available; the dialog cannot be
+dismissed without choosing. Ordinary worlds have no such tracking or encounter.
 
 Each distinct successful search counts toward this encounter. Recovered gear,
 crystals and arrow stacks retain their dwarven-remains origin while carried,
@@ -12759,51 +13216,50 @@ encounter. The Oculus uses the existing **Champion** stat multipliers and
 retains its original **True Sight**, allowing it to see and fight the invisible
 player through normal visibility rules. It spawns once per character.
 
-**Fan Club:** Reaching a scheduled check on a Dwarven Ruins floor while wearing three ordinary
-randomly prefixed pieces of equipment (weapon, shield, and armor) with the
-**same modifier prefix** makes one Fan Club encounter eligible. Its members are
-always exactly one Kobold, one Goblin, and one Skink. Each has a real piece of
-randomly generated enchanted equipment with the copied modifier prefix:
-Kobold carries a weapon, Goblin a shield, and Skink wears armor. Base gear
-quality is bounded by the highest tier of the player's three qualifying items
-(minimum tier 2, maximum tier 5), with ordinary tier-selection and modifier
-rolls. Their displayed monster names echo that prefix (for example, *Mighty
-Kobold*), but **no monster-prefix effects are applied**. Their combat stats
-change only via the existing enemy equipment scaling and applicable item
+**Fan Club:** Reaching a scheduled check on a Dwarven Ruins floor while wearing
+three ordinary randomly prefixed pieces of equipment (weapon, shield, and armor)
+with the **same modifier prefix** makes one Fan Club encounter eligible. Its
+members are always exactly one Kobold, one Goblin, and one Skink. Each has a
+real piece of randomly generated enchanted equipment with the copied modifier
+prefix: Kobold carries a weapon, Goblin a shield, and Skink wears armor. Base
+gear quality is bounded by the highest tier of the player's three qualifying
+items (minimum tier 2, maximum tier 5), with ordinary tier-selection and
+modifier rolls. Their displayed monster names echo that prefix (for example,
+*Mighty Kobold*), but **no monster-prefix effects are applied**. Their combat
+stats change only via the existing enemy equipment scaling and applicable item
 bonuses; effects such as MF or XP bonuses are not converted into artificial
-combat power. They keep their normal species abilities, including shooter
-roles. This is a one-time ambush per character, placed as a group outside the
-player's underground field of view, away from stairs and traps, on connected
-passable terrain. Its defeated members leave their enchanted gear as ground
-items to pick up manually instead of silently adding it to the inventory.
-Each participant's special-encounter identity persists through save and replay
-restoration, so special ground-loot behavior survives loading. The player can
-evade the encounter, engage, or exploit terrain and enemy AI.
+combat power. They keep their normal species abilities, including shooter roles.
+This is a one-time ambush per character, placed as a group outside the player's
+underground field of view, away from stairs and traps, on connected passable
+terrain. Its defeated members leave their enchanted gear as ground items to pick
+up manually instead of silently adding it to the inventory. Each participant's
+special-encounter identity persists through save and replay restoration, so
+special ground-loot behavior survives loading. The player can evade the
+encounter, engage, or exploit terrain and enemy AI.
 
-**Explorer Galleries — reinforced shooter galleries:** Exploring at least **50% of the
-reachable surface** and **actually reaching both the western and eastern
-edges, or both the northern and southern edges**, makes gallery
-reinforcements possible. Opposing sides use the game's existing persistent
-world-edge milestones and their normal boundary settings, so merely revealing
-a distant edge on the map does not count. The explored percentage uses the
-existing surface fog-of-war and terrain flood fill; God Mode reveals do not
-activate this condition. Adjacent edges reached at one corner do not qualify.
-On the **first entry to each Ruins floor after qualification**, each intact
-crossfire gallery independently has an **85% chance** to reinforce. The
-upgrade promotes **one existing ranged guard** to Champion and adds exactly
-**two real archers** (one in each barred bay), making a usual gallery of
-**10 guards become 12**, not 13. Champion bonuses and the *Inspired* aura
-use the ordinary prefix rules; the two extra archers keep normal ammunition,
-humanoid equipment and ranged AI. Their locations must have clear projectile
-lines into the aisle and cannot overlap terrain hazards, other units or items.
-Cleared galleries remain cleared. A gallery's outcome is persistent, never
-rerolled on a return visit, including failed 15% rolls. Temporarily blocked
-placement defers the roll. Reinforcement does **not** consume either of the
-floor's two optional special-threat slots, alter dungeon generation, or
-force the player through this optional branch. Reinforcement is not announced
-in ordinary logs when it occurs out of sight; debug logging retains its check.
-Combat alternatives remain
-fighting through bars, reaching the side cell, or ignoring the gallery.
+**Explorer Galleries — reinforced shooter galleries:** Exploring at least **50%
+of the reachable surface** and **actually reaching both the western and eastern
+edges, or both the northern and southern edges**, makes gallery reinforcements
+possible. Opposing sides use the game's existing persistent world-edge
+milestones and their normal boundary settings, so merely revealing a distant
+edge on the map does not count. The explored percentage uses the existing
+surface fog-of-war and terrain flood fill; God Mode reveals do not activate this
+condition. Adjacent edges reached at one corner do not qualify. On the **first
+entry to each Ruins floor after qualification**, each intact crossfire gallery
+independently has an **85% chance** to reinforce. The upgrade promotes **one
+existing ranged guard** to Champion and adds exactly **two real archers** (one
+in each barred bay), making a usual gallery of **10 guards become 12**, not 13.
+Champion bonuses and the *Inspired* aura use the ordinary prefix rules; the two
+extra archers keep normal ammunition, humanoid equipment and ranged AI. Their
+locations must have clear projectile lines into the aisle and cannot overlap
+terrain hazards, other units or items. Cleared galleries remain cleared. A
+gallery's outcome is persistent, never rerolled on a return visit, including
+failed 15% rolls. Temporarily blocked placement defers the roll. Reinforcement
+does **not** consume either of the floor's two optional special-threat slots,
+alter dungeon generation, or force the player through this optional branch.
+Reinforcement is not announced in ordinary logs when it occurs out of sight;
+debug logging retains its check. Combat alternatives remain fighting through
+bars, reaching the side cell, or ignoring the gallery.
 
 **Fireball self-harm lure:** In Cursed World, two separately cast Fireballs
 that actually damage the player qualify for a single Scroll of Fireball placed
@@ -12832,49 +13288,52 @@ must connect a measurable player behavior to the gameplay hook that resolves
 the world response before they enter an optional encounter pool.
 
 **Tester trigger diagnostics:** Saves and replay snapshots contain
-`adaptivePlayerTrolling.triggerFlags`, with one boolean for each of **39 tracked diagnostic IDs**: the active
-reactions plus an independent Unsold Equipment modifier and a reserved
-Relieved Thief placeholder. Scroll Restock uses its saved completion/counter
-state rather than its own diagnostic trigger flag. A `true` flag means the condition was **observed at
-least once** during this run (or its event has happened), not that it is
-*currently* eligible for an encounter: changing inventory, location, HP or
-equipment can temporarily invalidate eligibility. Future, unimplemented
-reactions remain `false`. Actual one-time consumption is still represented
-by `completed`, while counters, selected events and per-floor threat budgets
-remain in the same `adaptivePlayerTrolling` save object. Cursed World alone
-updates these diagnostic flags; they are historical observations, so an already
-true condition is not repeatedly evaluated. Explorer Galleries separately use
-the saved exploration milestone to retain qualification. Logging never consumes RNG.
+`adaptivePlayerTrolling.triggerFlags`, with one boolean for each of **39 tracked
+diagnostic IDs**: the active reactions plus an independent Unsold Equipment
+modifier and a reserved Relieved Thief placeholder. Scroll Restock uses its
+saved completion/counter state rather than its own diagnostic trigger flag. A
+`true` flag means the condition was **observed at least once** during this run
+(or its event has happened), not that it is *currently* eligible for an
+encounter: changing inventory, location, HP or equipment can temporarily
+invalidate eligibility. Future, unimplemented reactions remain `false`. Actual
+one-time consumption is still represented by `completed`, while counters,
+selected events and per-floor threat budgets remain in the same
+`adaptivePlayerTrolling` save object. Cursed World alone updates these
+diagnostic flags; they are historical observations, so an already true condition
+is not repeatedly evaluated. Explorer Galleries separately use the saved
+exploration milestone to retain qualification. Logging never consumes RNG.
 
 `content/adaptive_player_trolling.json -> debugTrolling` controls diagnostic
-`[TROLLING]` messages (boolean; `false` in the shipped configuration). This is a **game
-configuration setting**, not character progress: it is not stored in saves or
-replay snapshots. Editing the JSON and reloading the game changes logging for
-new and existing characters, regardless of their saved state. For temporary
-in-session testing, use `AdaptivePlayerTrolling.setDebugTrolling(false)` (or
-`true`) in the browser console. The override resets on configuration reload,
-character reset, or save/replay restoration; the JSON setting then applies.
-When enabled, the normal message log reports **the first time each trigger
-condition is observed**, scheduled checkpoint numbers, and successful special
-spawns with location/slot details. Tester messages use **bold white** text in
-the game log (including older entries, which do not fade). Logging does not
-consume RNG or change movement, drops, or encounter probabilities. It is
-inactive in ordinary worlds because Adaptive Player Trolling itself is inactive.
+`[TROLLING]` messages (boolean; `false` in the shipped configuration). This is a
+**game configuration setting**, not character progress: it is not stored in
+saves or replay snapshots. Editing the JSON and reloading the game changes
+logging for new and existing characters, regardless of their saved state. For
+temporary in-session testing, use
+`AdaptivePlayerTrolling.setDebugTrolling(false)` (or `true`) in the browser
+console. The override resets on configuration reload, character reset, or
+save/replay restoration; the JSON setting then applies. When enabled, the normal
+message log reports **the first time each trigger condition is observed**,
+scheduled checkpoint numbers, and successful special spawns with location/slot
+details. Tester messages use **bold white** text in the game log (including
+older entries, which do not fade). Logging does not consume RNG or change
+movement, drops, or encounter probabilities. It is inactive in ordinary worlds
+because Adaptive Player Trolling itself is inactive.
 
 ## Persistence and balance
 
 `buildSaveObject()` stores the full **resolved** `worldTraits` array, including
 numeric rolled offsets, names, and optional flavor. `loadGameFromObject()`
 reapplies these offsets to a fresh base config without drawing RNG again.
-Current-schema data with a single `worldTrait` object is accepted as a one-element
-array, and data with neither trait field uses the base config. A replay
-initial snapshot is taken after world generation and includes the same array.
-Saved map dimensions and terrain are restored from the save; the map is not
-regenerated on load. No additional world-size persistence flag is necessary:
-`mapWidth`, `mapHeight` and the serialized map contain the selected size.
-Replay initial states carry those same dimensions; a permadeath restart
-reuses the existing dimensions rather than changing them. Updating base JSON later can change how a saved offset
-is interpreted, though the saved map itself remains intact.
+Current-schema data with a single `worldTrait` object is accepted as a
+one-element array, and data with neither trait field uses the base config. A
+replay initial snapshot is taken after world generation and includes the same
+array. Saved map dimensions and terrain are restored from the save; the map is
+not regenerated on load. No additional world-size persistence flag is necessary:
+`mapWidth`, `mapHeight` and the serialized map contain the selected size. Replay
+initial states carry those same dimensions; a permadeath restart reuses the
+existing dimensions rather than changing them. Updating base JSON later can
+change how a saved offset is interpreted, though the saved map itself remains
+intact.
 
 These traits are deliberately high variance. At five traits, stacked increases
 to deep monsters and loot may overwhelm a new character or skew progression.

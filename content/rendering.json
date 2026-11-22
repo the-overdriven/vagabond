@@ -749,6 +749,7 @@
   },
   "overlays": {
     "enemyAwareOutline": "rgba(255,106,93,0.95)",
+    "enemyEnragedOutline": "#ffc34f",
     "path": "rgba(255,224,138,0.28)",
     "pathCounterBackground": "rgba(20,14,10,0.9)",
     "pathCounterText": "#ffe08a",

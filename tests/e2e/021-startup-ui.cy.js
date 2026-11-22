@@ -27,11 +27,20 @@ describe('Startup assets and character creation UI', () => {
     cy.then(() => cdp('Emulation.setTouchEmulationEnabled', {enabled: false}))
   })
 
-  it('preloads and decodes the Hauberk armor icon', () => {
+  it('preloads and decodes the Hauberk armor icon, recovering from transient startup request failures', () => {
     cy.intercept('GET', '**/img/icons/Hauberk.svg').as('hauberk')
+    cy.intercept({method:'GET',url:'**/content/adaptive_player_trolling.json',times:1},
+      {forceNetworkError:true}).as('failedContent')
+    cy.intercept({method:'GET',url:'**/img/projectiles/death-bolt.png',times:1},
+      {forceNetworkError:true}).as('failedSprite')
     cy.visit('/')
-    cy.wait('@hauberk', {requestTimeout: 60000}).its('response.statusCode').should('equal', 200)
+    cy.wait('@failedContent', {requestTimeout:60000})
+    cy.wait('@failedSprite', {requestTimeout:60000})
+    cy.get('#loadingOverlay', {timeout:60000}).should('not.be.visible')
+    cy.wait('@hauberk', {requestTimeout:60000}).its('response.statusCode').should('equal', 200)
     cy.window().then(win => {
+      expect(win.eval('AdaptivePlayerTrolling.serialize()')).to.be.an('object')
+      expect(win.eval("preloadedImages.get('img/projectiles/death-bolt.png')?.naturalWidth")).to.be.greaterThan(0)
       const image = new win.Image()
       image.src = 'img/icons/Hauberk.svg'
       return image.decode().then(() => expect(image.naturalWidth).to.equal(24))

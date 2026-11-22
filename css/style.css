@@ -2605,3 +2605,24 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
   #holeJumpOverlay .panelbox { box-sizing: border-box; width: min(380px, calc(100% - 28px)); }
   #holeJumpOverlay .closehint button { min-height: 44px; }
 }
+
+/* Farsight renders real game terrain in a separate read-only viewport. */
+#farsightCanvas, #btnFarsightMap { display: none; }
+#mapOverlay.farsight-view #btnFarsightMap { display: inline-block; }
+#mapOverlay.farsight-view .panelbox { width: min(90vw, 560px); }
+#mapOverlay.farsight-view #farsightCanvas {
+  display: block;
+  width: min(100%, 65vh);
+  height: auto;
+  max-width: 100%;
+  max-height: 65vh;
+  aspect-ratio: 1;
+  margin-inline: auto;
+  image-rendering: pixelated;
+  background: #000;
+  border: 1px solid var(--border);
+}
+#mapOverlay.farsight-view #minimap,
+#mapOverlay.farsight-view .map-toolbar,
+#mapOverlay.farsight-view #mapTravelHint,
+#mapOverlay.farsight-view #btnMapToInv { display: none; }

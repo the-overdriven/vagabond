@@ -56,13 +56,16 @@ describe('Animated terrain rendering', () => {
     cy.window().then(win => {
       const result = win.eval(`(() => {
         function prepared() {
-          return Object.values(RENDER_STYLE.terrainTiles)
-            .filter(visual => visual.frames?.length)
-            .every(visual => visual.frames.every(path => {
+          const missing = []
+          for (const visual of Object.values(RENDER_STYLE.terrainTiles)) {
+            for (const path of visual.frames || []) {
               const image = preloadedImages.get(path)
               const key = TILE_PX + '|' + (visual.scale ?? 1) + '|' + (visual.filter || '') + '|false'
-              return !!image && scaledVisualCache.get(image)?.has(key)
-            }))
+              if (!image || !image.naturalWidth) missing.push(path + ': not decoded')
+              else if (!scaledVisualCache.get(image)?.has(key)) missing.push(path + ': not scaled at ' + key)
+            }
+          }
+          return missing
         }
         const before = prepared()
         const originalSize = requestedTilePx
@@ -73,8 +76,8 @@ describe('Animated terrain rendering', () => {
           setTileSize(originalSize)
         }
       })()`)
-      expect(result.before).to.equal(true)
-      expect(result.after).to.equal(true)
+      expect(result.before, 'unprepared frames at startup').to.deep.equal([])
+      expect(result.after, 'unprepared frames after zoom').to.deep.equal([])
     })
   })
   it('keeps ground blends and diagonal rivers connected without replacing terrain textures', () => {

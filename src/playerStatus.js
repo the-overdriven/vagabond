@@ -4,6 +4,9 @@
 function activePlayerStatuses() {
   if (player.hp <= 0) return []
   const statuses = []
+  const rushSteps = ArtifactWayfaring.rushRemaining()
+  if (rushSteps) statuses.push({id:'artifact-rush',icon:'➤',label:'Rush',counter:`${rushSteps} steps`,tone:'up',
+    detail:'Rush: move normally using the direction keys, D-pad or adjacent tiles. Press T, Enter or Escape, or tap your character to finish early.'})
   const terrain = playerTerrainEffects()
   const terrainChanges = playerEffectiveTerrainStatChanges()
   const terrainBonus = terrainModifierText(terrainChanges)
@@ -16,14 +19,18 @@ function activePlayerStatuses() {
   if (['forest','ancientForest'].includes(terrain.tile) && Campfires.litAt(player.x,player.y))
     statuses.push({id:'firelight',icon:'♨',label:'Exposed by firelight',counter:'',tone:'down',
       detail:'The nearby fire lights this ground and prevents forest concealment.'})
-  if (playerHasForestCover()) {
+  if (ArtifactWayfaring.coverAvailable()) {
     const concealedFrom = playerConcealedFromVisibleEnemies()
     const hidden = concealedFrom.length > 0
-    statuses.push({id:'forest-cover', icon:'♣', label: hidden ? 'Concealed' : 'Forest Cover', counter:'', tone:'up',
+    statuses.push({id:'forest-cover', icon:'♣', label: hidden ? 'Concealed' : playerHasForestCover() ? 'Forest Cover' : 'Cover', counter:'', tone:'up',
       detail: hidden
-        ? `Forest cover conceals you from ${concealedFrom.map(e => e.name).join(', ')}. It lasts at this position until the enemy can detect you; moving allows a new hide check.`
-        : 'Unforaged forest cover offers a chance to hide from unaware enemies at least two tiles away. It does not guarantee concealment against enemies that already noticed you or are adjacent.'})
+        ? `Cover conceals you from ${concealedFrom.map(e => e.name).join(', ')}. It lasts until the enemy can detect you or you lose cover.`
+        : 'Cover offers a chance to hide from unaware enemies at least two tiles away. It does not guarantee concealment against enemies that already noticed you or are adjacent.'})
   }
+  if (playerHasArtifactAbility('forestwalker') && player.wayfaring.stealth.dodgeReady && (playerHasForestCover()||ArtifactWayfaring.forestGap()))
+    statuses.push({id:'forest-dodge',icon:'♣',label:'Dodge ready',counter:'',tone:'up',detail:'Your next direct melee or projectile attack will miss while cover holds.'})
+  if (playerHasArtifactAbility('one_with_the_wild') && ArtifactWayfaring.cooldownRemaining('one_with_the_wild'))
+    statuses.push({id:'wild-truce',icon:'♣',label:'Truce broken',counter:`${ArtifactWayfaring.cooldownRemaining('one_with_the_wild')}t`,tone:'down',detail:'The wild has turned against you.'})
   const gas = DungeonHazards.activeGasStatus()
   if (gas) statuses.push({id:'gas',icon:'☠',label:'Poison gas',counter:`${gas.remainingTurns}t`,
     detail:`The chamber vents in ${gas.remainingTurns} turns. The emergency valve takes two turns; alternatively breach the exit with a weapon.`})
@@ -32,6 +39,11 @@ function activePlayerStatuses() {
     detail:'Stone walls advance inward by one tile per action. Escape beyond the pressure-plate row before they meet.'})
   if (isDrowning()) statuses.push({id: 'drowning', icon: '≈', label: 'Drowning', counter: '',
     detail: 'Drowning: lose 5% of maximum HP (at least 1) each swimming step or wait. Reach shore to recover.'})
+  if (ArtifactWayfaring.walkingOnWater()) {
+    const known=playerKnowsArtifactAbility('water_walking')
+    statuses.push({id:'water-walking',icon:'≈',label:known?'Water Walking':'Magic',counter:`${ArtifactWayfaring.waterRemaining()}t`,
+      detail:'The remaining turns of walking on deep water. Reach land to renew the reserve.'})
+  }
   const turns = n => `${n} turn${n === 1 ? '' : 's'}`
   if (player.freezing?.active) {
     const left = WORLD_GEN_CONFIG.environment.freezingDamageIntervalTurns - player.freezing.turns
@@ -123,6 +135,9 @@ function activePlayerStatuses() {
     ['rhythm_guard', player.artifactRhythmGuardReady, 'Rhythm Guard ready', '⛨', 'Halves the next incoming blow.'],
     ['bulwark_evasion', player.artifactEvasionPrepared, 'Evasion prepared', '◇', 'A 30% chance to dodge the next landed blow.'],
     ['sacred_aegis', turnCount >= (player.artifactSacredReadyTurn || 0), 'Sacred Aegis ready', '⛨', 'Absorbs the next eligible damaging hit.'],
+    ['windwalker', player.wayfaring.windwalkerReady, 'Windwalker step ready', '◇', 'Your next movement can be a free step. Another turn-consuming action forfeits it.'],
+    ['skirmisher', player.wayfaring.skirmisherReady, 'Skirmisher ready', '⚔', '+20 percentage points critical chance on your next bow shot.'],
+    ['tidefang', player.wayfaring.tidefangReady, 'Tidefang ready', '⚔', '+20 percentage points critical chance on your next melee strike.'],
     ['elusive', player.artifactElusiveReady, 'Elusive step ready', '◇', 'Your next movement can be a free step. Another action forfeits it.'],
   ]
   for (const [id, ready, label, icon, detail] of preparedPowers)

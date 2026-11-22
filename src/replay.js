@@ -99,7 +99,7 @@ let replayRngCallers = []
        path (movement/combat/loot/etc.) reproduces the exact same run. */
 // v2 records non-turn NPC service interactions (e.g. opening the Herbalist)
 // because they mutate talkFreezeTurns and therefore affect future RNG consumption.
-const REPLAY_VERSION = 7
+const REPLAY_VERSION = 20
 const REPLAY_ACTION_DELAY_MS = 99
 // const REPLAY_ACTION_DELAY_MS = 169
 
@@ -329,6 +329,12 @@ async function runReplayAction(action) {
           : 'God mode invisibility disabled. Enemies can see you.', 'info')
       } else useGodModeKey(!!action.disable)
       break
+    case 'rushStep':
+      if(!ArtifactWayfaring.rushStep(action.dx,action.dy))return replayDesync('Replay desynchronized: invalid Rush step.')
+      break
+    case 'rushEnd':
+      if(!ArtifactWayfaring.finishRush())return replayDesync('Replay desynchronized: no active Rush.')
+      break
     case 'move':
       await tryMove(action.dx, action.dy)
       break
@@ -453,7 +459,9 @@ async function runReplayAction(action) {
       // otherwise use the recorded id, then a deterministic fallback that does
       // not steal an artifact reserved by a later identification action.
       let idx = -1
-      if (action.action === 'identifyArtifact') {
+      if(action.action==='wayfaringPower') {
+        idx=player.inventory.findIndex(item=>item?.replayId===action.replayId && item.identified && ArtifactWayfaring.activeItem(item))
+      } else if (action.action === 'identifyArtifact') {
         if (Number.isInteger(action.idx)) {
           const indexedItem = player.inventory[action.idx]
           if (indexedItem?.kind === 'artifact' && !indexedItem.identified) idx = action.idx

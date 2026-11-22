@@ -93,18 +93,25 @@ const Campfires = (() => {
       // Advance one ordinary turn, then remove exactly the accelerated ticks.
       player.berryRegenTurns = Math.max(0, before-1-amount*5 + (turnCount%5 === 0 ? 5 : 0))
       if (foodRemaining() === 0) player.berryRegenTurns = 0
-      if (amount > 0) healPlayer(amount)
+      if (amount > 0) healPlayer(ArtifactWayfaring.regenAmount(amount))
       player.campRestProgress = 0
     } else {
       if (before > 0) {
         player.berryRegenTurns--
-        if (turnCount%5 === 0) healPlayer(consumablePower(1))
+        if (turnCount%5 === 0) healPlayer(ArtifactWayfaring.regenAmount(consumablePower(1)))
       }
       if (turnContext?.action === 'rest') {
-        player.campRestProgress = (player.campRestProgress+1)%4
-        if (player.campRestProgress === 0) healPlayer(1)
+        if (++player.campRestProgress >= ArtifactWayfaring.restEvery()) {
+          player.campRestProgress = 0
+          healPlayer(1)
+        }
       }
     }
+  }
+  function extraFoodPulse() {
+    if(foodRemaining()<=0)return
+    player.berryRegenTurns=Math.max(0,player.berryRegenTurns-5)
+    healPlayer(ArtifactWayfaring.regenAmount(consumablePower(1)))
   }
   function beginTurn() {
     if (turnContext?.action !== 'rest') player.campRestProgress = 0
@@ -168,7 +175,7 @@ const Campfires = (() => {
       if (isRest) {
         if (turnContext.healed > 0) log(`You rest and recover ${turnContext.healed} HP.`, 'info')
         else if (!interrupted && !hadFood && player.campRestProgress > 0)
-          log(`You rest (${player.campRestProgress}/4 turns toward 1 HP without food).`, 'info')
+          log(`You rest (${player.campRestProgress}/${ArtifactWayfaring.restEvery()} turns toward 1 HP without food).`, 'info')
         if (hadFood && foodRemaining() === 0) {
           queued = false
           log('Your food recovery is complete.', 'info')
@@ -179,7 +186,7 @@ const Campfires = (() => {
         player.campRestProgress = 0
         log(damaged ? 'Damage interrupts your camping.' :
           isRest && !burning(fire) && !hadFood && turnContext.healed === 0
-            ? 'The fire goes out before you recover. Without food, you need four consecutive rest turns for 1 HP.'
+            ? `The fire goes out before you recover. Without food, you need ${ArtifactWayfaring.restEvery()} consecutive rest turns for 1 HP.`
             : 'Camping stops: the fire, position, or surroundings changed.', 'info')
       }
       if (visitorArrived) close() // Reveal the visitor and return control before any further camping action.
@@ -236,7 +243,7 @@ const Campfires = (() => {
     box.appendChild(status)
     const info = document.createElement('p')
     info.className = 'camp-info'
-    info.textContent = `HP ${player.hp}/${playerMaxHp()} · Food recovery ${foodRemaining()} HP remaining. Rest: ${rate()} HP/turn with food, 1 HP/4 turns without${player.campRestProgress ? ` (${player.campRestProgress}/4 progress)` : ''}.${raceDef()?.id === 'troll' ? ' Your natural regeneration continues separately.' : ''}`
+    info.textContent = `HP ${player.hp}/${playerMaxHp()} · Food recovery ${foodRemaining()} HP remaining. Rest: ${rate()} HP/turn with food, 1 HP/${ArtifactWayfaring.restEvery()} turns without${player.campRestProgress ? ` (${player.campRestProgress}/${ArtifactWayfaring.restEvery()} progress)` : ''}.${raceDef()?.id === 'troll' ? ' Your natural regeneration continues separately.' : ''}`
     box.appendChild(info)
     const danger = unsafe()
     const warning = danger
@@ -317,5 +324,5 @@ const Campfires = (() => {
     return true
   }
   return {isFire,count,remaining,burning,nearby,warm,litAt,gather,findFlint,rate,foodRecovery,foodRemaining,
-    tickFood,beginTurn,noteHealing,eat,perform,open,close,keydown,draw,FUEL_LIMIT}
+    tickFood, extraFoodPulse,beginTurn,noteHealing,eat,perform,open,close,keydown,draw,FUEL_LIMIT}
 })()

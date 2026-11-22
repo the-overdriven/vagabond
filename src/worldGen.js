@@ -215,7 +215,7 @@ function initializeMausoleum({restore = false} = {}) {
 }
 
 let spawnPoint = {x: 0, y: 0}
-let discovered = [] // discovered[y][x] = has the player ever seen this tile on the main screen
+let discovered = [] // discovered[y][x] = has actual player sight or a map hint discovered this tile
 let minimapDirty = true
 let miniPlayerX = -1, miniPlayerY = -1
 
@@ -8361,47 +8361,13 @@ function spawnDeepCaveSpoor(){
 }
 
 // The cosmetic pass uses coordinate hashes, not the combat/world RNG stream.
-// Sharing this hash also keeps surface fissures stable after world rotation.
 function worldDecorationRoll(x, y, level) {
   let n = WORLD_SEED ^ Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(level, 1274126177)
   n = Math.imul(n ^ (n >>> 13), 1274126177)
   return ((n ^ (n >>> 16)) >>> 0) / 4294967296
 }
 
-function spawnSurfaceFissures() {
-  const config = WORLD_GEN_CONFIG.worldDecorations
-  const occupied = new Set([...groundItems, ...enemies.filter(e => e.alive), ...npcs]
-    .filter(e => (e.level ?? 0) === 0).map(e => keyXY(e.x, e.y)))
-  const clearOfLandmarks = (x, y) => {
-    if (Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) < 16) return false
-    if (villageHuts.some(h => Math.max(Math.abs(h.x - x), Math.abs(h.y - y)) < 8)) return false
-    if (tower && x >= tower.x - 5 && x < tower.x + tower.size + 5 &&
-        y >= tower.y - 5 && y < tower.y + tower.size + 5) return false
-    return true
-  }
-  const candidates = []
-  for (let y = 5; y < MAP_H - 5; y++) for (let x = 5; x < MAP_W - 5; x++) {
-    if (!['grass','hill'].includes(surfaceMap[y][x]) || occupied.has(keyXY(x,y)) ||
-        grasslandTrees.has(keyXY(x,y)) || !clearOfLandmarks(x,y)) continue
-    // Avoid chokepoints, mountain passes, water shores and cave landings.
-    if (!DIRS8.every(([dx,dy]) => TILE[surfaceMap[y+dy]?.[x+dx]]?.walk)) continue
-    if (DIRS8.some(([dx,dy]) => ['caveentrance','river','frozenriver','water','dwarvengate'].includes(surfaceMap[y+dy]?.[x+dx]))) continue
-    candidates.push({x,y,score:worldDecorationRoll(x+173,y-293,47)})
-  }
-  candidates.sort((a,b) => a.score-b.score || a.y-b.y || a.x-b.x)
-  const selected = []
-  for (const site of candidates) {
-    if (selected.length >= config.surfaceFissures) break
-    if (selected.some(p => Math.max(Math.abs(site.x-p.x),Math.abs(site.y-p.y)) < config.minFissureSpacing)) continue
-    surfaceMap[site.y][site.x] = 'groundfissure'
-    selected.push(site)
-  }
-  if (selected.length < config.surfaceFissures)
-    throw new Error('No safe sites for the required surface fissures.')
-}
-
 // Keep natural and abandoned-world props on the existing saved decoration layer.
-// The only gameplay-changing feature is the separate groundfissure terrain.
 function spawnNaturalDecorations(roll) {
   const cfg = WORLD_GEN_CONFIG.worldDecorations
   const occupied = new Set([...groundItems, ...enemies.filter(e => e.alive), ...npcs, ...caveSpoor]

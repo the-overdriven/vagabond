@@ -42,11 +42,12 @@ describe('God Mode Highscores confirmation', () => {
       const prompt = cy.stub(win, 'confirm').returns(true)
       const save = win.eval('JSON.parse(JSON.stringify(buildSaveObject()))')
       const characterId = win.eval('player.characterId')
+      const originalFog=win.eval('JSON.stringify([discovered,undergroundDiscoveredL1])')
       win.dispatchEvent(new win.KeyboardEvent('keydown', {key:'g',bubbles:true,cancelable:true}))
       expect(prompt).to.have.been.calledOnce
       expect(win.eval('player.godMode && player.highscoresDisqualified')).to.equal(true)
-      expect(win.eval('discovered.every(row=>row.every(Boolean))')).to.equal(true)
-      expect(win.eval('undergroundDiscoveredL1.every(row=>row.every(Boolean))')).to.equal(true)
+      expect(win.eval('JSON.stringify([discovered,undergroundDiscoveredL1])')).to.equal(originalFog)
+      expect(win.eval('exploredMapLevels().some(level=>level.key==="chain:1")')).to.equal(true)
       expect(win.eval('player.trackingLearned')).to.equal(true)
       expect(win.document.body.classList.contains('hint-collapsed')).to.equal(true)
       expect(win.localStorage.getItem('vagabond_keyboard_hints_collapsed')).to.equal('1')
@@ -56,7 +57,7 @@ describe('God Mode Highscores confirmation', () => {
       expect(win.eval('!player.godMode && player.highscoresDisqualified')).to.equal(true)
       expect(win.eval('discovered.some(row=>row.includes(false))')).to.equal(true)
       expect(win.eval('discovered[player.y][player.x]')).to.equal(true)
-      expect(win.eval('undergroundDiscoveredL1.every(row=>row.every(Boolean))')).to.equal(true)
+      expect(win.eval('JSON.stringify([discovered,undergroundDiscoveredL1])')).to.equal(originalFog)
       expect(win.eval('player.trackingLearned')).to.equal(true)
       expect(win.document.body.classList.contains('hint-collapsed')).to.equal(true)
       win.__godModeEarlierSave = save
@@ -66,30 +67,28 @@ describe('God Mode Highscores confirmation', () => {
     })
   })
 
-  it('forgets only the active underground floor and persists its fog through save/replay', () => {
+  it('preserves genuinely discovered terrain on all floors through God Mode and save/replay', () => {
     cy.window().then(win => {
       cy.stub(win, 'confirm').returns(true)
       win.eval(`(() => {
         const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+        const surfaceBefore=JSON.stringify(discovered)
+        const caveBefore=JSON.stringify(undergroundDiscoveredL1)
         useGodModeKey()
+        check(JSON.stringify(undergroundDiscoveredL1)===caveBefore,'overlay does not mark cave explored')
         const entrance=caves.find(c=>c.entrances?.length)?.entrances[0]
-        check(!!entrance,'generated cave has an entrance')
         currentZ=-1;currentCave=-1;map=undergroundMap
         undergroundDiscovered=undergroundDiscoveredL1
         player.x=entrance.x;player.y=entrance.y
-        invalidateUndergroundFov()
+        invalidateUndergroundFov();discoverPlayerSight()
+        const actualFog=JSON.stringify(undergroundDiscoveredL1)
+        check(undergroundDiscoveredL1[player.y][player.x],'genuine sight discovers cave terrain even in God Mode')
         useGodModeKey(true)
-        check(!player.godMode&&undergroundDiscoveredL1.some(row=>row.includes(false)),
-          'the current cave returns to unexplored fog')
-        check(undergroundDiscoveredL1[player.y][player.x],
-          'ordinary nearby cave visibility returns immediately')
-        check(discovered.every(row=>row.every(Boolean)),
-          'surface discovery remains unchanged when another floor is reset')
+        check(!player.godMode&&JSON.stringify(undergroundDiscoveredL1)===actualFog,'disabling preserves exploration')
+        check(JSON.stringify(discovered)===surfaceBefore,'surface discovery remains unchanged')
         const snapshot=structuredClone(buildSaveObject())
         loadGameFromObject(snapshot,{isReplayInit:true})
-        check(undergroundDiscoveredL1.some(row=>row.includes(false))&&
-          discovered.every(row=>row.every(Boolean)),
-          'floor-specific forgotten discovery survives save and replay initialization')
+        check(JSON.stringify(undergroundDiscoveredL1)===actualFog&&JSON.stringify(discovered)===surfaceBefore,'fog survives save and replay initialization')
       })()`)
     })
   })

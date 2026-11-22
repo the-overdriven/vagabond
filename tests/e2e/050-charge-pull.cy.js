@@ -263,7 +263,7 @@ describe('Charge and Pull terrain rules', () => {
 
   it('sequences web, drag and melee effects without changing Pull outcomes', () => {
     cy.window().then(win => win.eval(`(() => {
-      const oldChance=chance,oldDamage=damageRoll,oldLoop=runAnimationLoop
+      const oldChance=chance,oldDamage=damageRoll,oldLoop=runAnimationLoop,oldRand=randInt
       try {
         chance=p=>p===.70; damageRoll=()=>10; runAnimationLoop=()=>{}
         const outcomes=[]
@@ -287,8 +287,30 @@ describe('Charge and Pull terrain rules', () => {
           } else rushCheck(!projectileAnims.length && !moveAnim,'simulation skips web and drag')
         }
         rushCheck(JSON.stringify(outcomes[0])===JSON.stringify(outcomes[1]),'same rules with and without animation')
+
+        // Escape Artist feedback is queued after the Web! text has fully faded.
+        for(const zero of [false,true]) {
+          stopCameraAnimation(); clearEnemyAnims(); enemies=[]; occupied.clear(); damageAnims=[]; projectileAnims=[]
+          replayAnimationsDisabled=false
+          player.x=40; player.y=40; player.hp=1000
+          player.inventory=[makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(effect=>effect.tier===3),0,'escape_artist')]
+          player.inventory[0].identified=!zero
+          const spider=rushEnemy('Giant Spider',35,40); spider.aggro=6
+          player.baseAtk=enemyAtk(spider)+(zero?20:0)
+          randInt=(a,b)=>50
+          queueEnemyAttackPresentation(500)
+          rushCheck(tryEnemyRush(spider),'resisted Pull connects')
+          rushCheck(player.x===(zero?40:38),'resisted displacement resolves immediately')
+          const web=damageAnims.find(p=>p.amount==='Web!')
+          const resist=damageAnims.find(p=>p.amount===(zero?'Magic!':'Escape Artist'))
+          rushCheck(!!web && !!resist && web.delay>SPIDER_WEB_THROW_MS,'queued web and resistance text')
+          const webEnd=web.start+web.delay+web.duration
+          rushCheck(resist.start+resist.delay>=webEnd,'resistance starts only after Web! fades')
+          rushCheck(resist.x===player.x && resist.y===player.y,'resistance appears at resolved player position')
+        }
+
       } finally {
-        chance=oldChance;damageRoll=oldDamage;runAnimationLoop=oldLoop
+        chance=oldChance;damageRoll=oldDamage;runAnimationLoop=oldLoop;randInt=oldRand
         replayAnimationsDisabled=true;stopCameraAnimation();clearEnemyAnims()
       }
     })()`))

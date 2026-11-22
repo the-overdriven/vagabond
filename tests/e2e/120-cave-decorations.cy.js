@@ -18,19 +18,8 @@ describe('Decorative caves and deep threat rarity', () => {
         applyWorldTraits(traits);WORLD_SEED=${seed};rngState=WORLD_SEED
         await generateNewWorld()
         const decorCfg=WORLD_GEN_CONFIG.worldDecorations
-        const fissures=[]
-        for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++)
-          if(surfaceMap[y][x]==='groundfissure')fissures.push({x,y})
-        check(fissures.length===decorCfg.surfaceFissures,'exactly four permanent open fissures')
-        for(const hole of fissures){
-          check(!TILE.groundfissure.walk,'surface fissures block walking in both render modes')
-          check(fissures.every(other=>other===hole||
-            Math.max(Math.abs(other.x-hole.x),Math.abs(other.y-hole.y))>=decorCfg.minFissureSpacing),
-            'fissures are separated')
-          check(DIRS8.every(([dx,dy])=>
-            TILE[surfaceMap[hole.y+dy]?.[hole.x+dx]]?.walk),
-            'fissures are placed in open terrain, not bottlenecks')
-        }
+        check(surfaceMap.every(row=>row.every(tile=>tile!=='groundfissure')),
+          'new surface contains no open fissures')
         const surfaceProps=caveDecorations.filter(p=>p.level===0)
         const num=(kind,props=surfaceProps)=>props.filter(p=>p.kind===kind).length
         check(num('stone-skull-altar')===1,'one skull altar')
@@ -132,10 +121,12 @@ describe('Decorative caves and deep threat rarity', () => {
         check(saved.version===self.VAGABOND_SAVE_VERSION,'current save schema')
         loadGameFromObject(saved,{isReplayInit:true})
         check(JSON.stringify(caveDecorations)===original,'current save and replay restoration retain props')
-        check(fissures.every(p=>surfaceMap[p.y][p.x]==='groundfissure'),
-          'saved and loaded world retains impassable fissures')
+        check(surfaceMap.every(row=>row.every(tile=>tile!=='groundfissure')),
+          'save and replay restoration keep the surface free of fissures')
         const terrainBefore=JSON.stringify(undergroundMap)
         resetForNewCharacter()
+        check(surfaceMap.every(row=>row.every(tile=>tile!=='groundfissure')),
+          'reused world remains free of fissures')
         check(JSON.stringify(caveDecorations)===original && JSON.stringify(undergroundMap)===terrainBefore,'reused world keeps cosmetic layout')
         const torches = caveDecorations.filter(p => p.kind === 'dwarven-wall-torch')
         check(torches.length > 0 && torches.length <= decorCfg.fortWallTorches &&

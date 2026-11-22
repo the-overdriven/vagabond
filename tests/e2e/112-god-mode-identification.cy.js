@@ -1,5 +1,5 @@
 describe('God Mode artifact identification',()=>{
-  it('grants a missing Pickaxe once, keeps it after disabling and preserves it in saves',()=>{
+  it('grants a missing Pickaxe and all eligible test artifacts once and preserves them in saves',()=>{
     cy.visit('/')
     cy.get('#raceName').clear().type('God Pickaxe Tester')
     cy.get('#btnBegin').click()
@@ -14,6 +14,22 @@ describe('God Mode artifact identification',()=>{
         useGodModeKey()
         check(player.godMode&&player.inventory.filter(i=>i.kind==='pickaxe').length===1,
           'enabling God Mode grants one missing Pickaxe')
+        const testStock=()=>merchantStock.filter(i=>i.godTestArtifact)
+        const expected=new Set()
+        for(const [slot,catalog] of [['weapon',WEAPONS],['shield',SHIELDS],['armor',ARMORS]])
+          for(const base of catalog)
+            for(const id of artifactAbilityPool({...base,kind:'artifact',artifactSlot:slot,base:base.name}))
+              expected.add((slot==='weapon'?(base.rangedAtk?'bow':'melee'):slot)+':'+id)
+        for(const id of ARTIFACT_ABILITIES.domains.wayfaring) expected.add('trinket:'+id)
+        const keys=testStock().map(i=>(i.artifactSlot==='weapon'?(i.rangedAtk?'bow':'melee'):i.artifactSlot)+':'+i.abilityId)
+        check(keys.length===expected.size&&new Set(keys).size===keys.length&&keys.every(k=>expected.has(k)),
+          'one representative per category and power')
+        check(new Set(testStock().map(i=>i.name)).size===keys.length,'test specimen names are distinguishable')
+        check(testStock().every(i=>i.identified&&!i.curse&&Object.keys(i.bonuses).length===0),
+          'test powers visible and isolated from random bonuses and ordinary curses')
+        const purchased=testStock()[0].replayId
+        buyItem(testStock()[0])
+        check(player.inventory.some(i=>i.replayId===purchased),'test artifact can be purchased')
         useGodModeKey()
         check(!player.godMode&&player.inventory.filter(i=>i.kind==='pickaxe').length===1,
           'disabling God Mode keeps the granted Pickaxe')
@@ -21,8 +37,13 @@ describe('God Mode artifact identification',()=>{
         check(player.inventory.filter(i=>i.kind==='pickaxe').length===1,
           're-enabling God Mode does not duplicate the Pickaxe')
         check(turnCount===turn&&rngState===random,'toggling God Mode costs no turn or RNG')
-        const saved=buildSaveObject()
+        check(testStock().length===expected.size-1,'a purchased specimen is not restocked')
+        const saved=structuredClone(buildSaveObject())
         loadGameFromObject(saved,{isReplayInit:true})
+        check(player.godArtifactStockGranted&&testStock().length===expected.size-1&&
+          player.inventory.some(i=>i.replayId===purchased),'stock and grant flag survive save/load')
+        useGodModeKey(true);useGodModeKey()
+        check(testStock().length===expected.size-1,'reload does not permit a second grant')
         check(player.inventory.filter(i=>i.kind==='pickaxe').length===1,
           'the granted Pickaxe survives save and replay initialization')
       })()`)

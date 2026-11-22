@@ -301,7 +301,7 @@ function wanderSurfaceBelowTower() {
   const blocked = new Set(npcs.map(n => keyXY(n.x, n.y)))
   for (const e of enemies) if (e.alive && (e.level ?? 0) === 0) blocked.add(keyXY(e.x, e.y))
   for (const e of enemies) {
-    if (!e.alive || (e.level ?? 0) !== 0 || (e.levelKind && e.levelKind !== 'surface') ||
+    if (!e.alive || Frostwalker.stranded(e) || (e.level ?? 0) !== 0 || (e.levelKind && e.levelKind !== 'surface') ||
         towerContains(e.x, e.y) || e.aware || e.sleeping || e.wallAmbushHidden ||
         e.pendingAbility || enemyWanderMode(e) === false || enemyWanderMode(e) === 'far' ||
         Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > ENEMY_WANDER_ACTIVE_RADIUS) continue

@@ -76,6 +76,230 @@ describe('Gear bases on procedural artifacts', () => {
     })()`))
   })
 
+  it('generates powered trinkets, applies Wayfaring and preserves carried rolls', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      currentZ=0;map=surfaceMap;player.x=40;player.y=40;map[40][40]='grass'
+      player.inventory=[];player.equip={weapon:null,shield:null,armor:null}
+      player.race='human';player.baseDef=20;player.baseSpd=10;player.lvl=1;player.maxHp=100;player.hp=100
+      player.weakenTurns=0;player.stoneSkinTurns=0;player.berserkTurns=0;player.curseDebuffs=[]
+      player.slowTurns=0;player.speedPotionTurns=0;player.gazeTurns=0
+      replayAnimationsDisabled=true;replayRecording=false
+      const wanted=ARTIFACT_ABILITIES.domains.wayfaring
+      const effect=ARTIFACT_EFFECTS.find(e=>e.tier===3)
+      const sample=id=>makeWayfaringTrinket('Feather',effect,0,id)
+      for(let i=0;i<30;i++) {
+        const item=makeArtifactItem(5,0,{nonGearOnly:true})
+        check(eligibleArtifactTrinketNouns(item.tier).includes(item.noun)&&wanted.includes(item.abilityId), 'eligible loot')
+        check(!item.identified&&!Object.keys(item.bonuses).length&&item.maxHpPct===0,'power-only trinket')
+      }
+      const pilgrimText=artifactInspectionText(sample('pilgrim'))
+      const trailblazerText=artifactInspectionText(sample('trailblazer'))
+      check(pilgrimText.includes('700 newly discovered tiles') && pilgrimText.includes('10% of your maximum HP') &&
+        pilgrimText.includes('30 XP per character level'),'Pilgrim inspection explains the reward threshold and amounts')
+      check(trailblazerText.includes('5 newly discovered tiles reduce all active cooldowns of Wayfaring artifacts by 1 turn') &&
+        trailblazerText.includes('Your XP bonus determines the percentage chance of reducing them by an additional turn'),
+        'Trailblazer inspection explains which artifacts recharge and the bonus chance')
+      const def=playerDef(),speed=playerSpd(),mf=playerMf()
+      player.inventory=[sample('highlander')];map[40][40]='hill'
+      check(playerDef()===def+4&&playerSpd()===speed,'Highlander replaces hill penalty and defense')
+      map[40][40]='grass';player.inventory=[sample('adrenaline')];player.hp=25
+      check(playerSpd()===speed,'Adrenaline inactive at exact threshold')
+      player.hp=24;check(playerSpd()===speed+3&&playerSpd(true)===speed,'Adrenaline active below threshold, excluded from permanent SPD')
+      player.baseSpd=30;player.inventory.push(sample('adrenaline'))
+      check(playerSpd()===35&&playerSpd(true)===30,'Adrenaline scales with permanent SPD without stacking')
+      player.speedPotionTurns=1;player.speedPotionBonus=10
+      check(playerSpd()===45,'Adrenaline does not scale from temporary SPD')
+      player.speedPotionTurns=0;player.baseSpd=10
+      player.inventory=[sample('permafrost')];map[40][40]='snow';player.freezing={active:true,turns:1}
+      tickFreezing();check(!player.freezing.active&&playerDef()===def+3,'Permafrost immunity and defense')
+      map[40][40]='sand';check(playerDef()===def-3,'sand penalty')
+      player.inventory=[sample('exile')];player.hp=25;player.poisonTurns=2
+      tryTempleHeal();check(player.hp===25&&player.poisonTurns===0,'Exile blocks healing but not cleansing')
+      player.inventory.push(createItem('homecomingscroll',{count:2}))
+      const exileTurn=turnCount,exileRng=rngState
+      useHomecomingScroll(1)
+      check(player.inventory[1].count===2&&turnCount===exileTurn&&rngState===exileRng,'Exile blocks Homecoming without spending resources')
+      player.inventory[0].identified=false;useHomecomingScroll(1)
+      check(player.inventory[1].count===2&&turnCount===exileTurn&&rngState===exileRng,'unidentified Exile still blocks Homecoming')
+      player.inventory=[sample('drifter'),sample('drifter'),createItem('homecomingscroll')]
+      check(playerMf()===mf+22,'Drifter copies stack')
+      const turn=turnCount,rng=rngState
+      useHomecomingScroll(2);check(turnCount===turn&&rngState===rng&&player.inventory[2].kind==='homecomingscroll','blocked scroll is not consumed')
+      player.inventory=[];player.hp=100;map[40][40]='grass';carryItem(sample('troglodyte'))
+      check(playerMaxHp()===80&&player.hp===80,'Troglodyte acquisition clamps HP')
+      currentZ=-4;markPlayerPositionChanged();check(playerMaxHp()===100&&player.hp===80,'depth does not heal')
+      currentZ=0;map=surfaceMap;markPlayerPositionChanged()
+      const drifter=sample('drifter');drifter.godTestArtifact=false;carryItem(drifter)
+      const saved=structuredClone(buildSaveObject());loadGameFromObject(saved,{isReplayInit:true})
+      check(player.inventory.some(i=>i.abilityId==='drifter'&&i.drifterMf===11)&&playerMaxHp()===80,'save keeps rolls and derived HP')
+      player.inventory=[sample('pilgrim')];player.equip={weapon:null,shield:null,armor:null}
+      player.wayfaring=ArtifactWayfaring.freshState();player.race='human';player.lvl=1
+      player.maxHp=100;player.hp=50;player.xp=0;player.totalXpEarned=0
+      ArtifactWayfaring.discover(699);ArtifactWayfaring.discover(700,'farsight')
+      check(player.wayfaring.pilgrimTiles===699&&player.hp===50&&player.totalXpEarned===0,
+        'Pilgrim waits for the threshold and ignores magical discovery')
+      const originalLog=log,messages=[]
+      try {
+        log=msg=>messages.push(msg)
+        ArtifactWayfaring.discover(1)
+        check(player.wayfaring.pilgrimTiles===0&&player.hp===60&&player.totalXpEarned===30,
+          'Pilgrim grants the unchanged reward at exactly 700 discovered tiles')
+        check(messages[0]==='Pilgrim rewards your exploration: +10 HP.'&&messages[1]==='You gain 30 XP.',
+          'Pilgrim announces the reward before its XP')
+        messages.length=0;player.inventory=[sample('expedition')];currentZ=-1
+        ArtifactWayfaring.visitDepth()
+        check(messages[0]==='Expedition rewards your descent.'&&messages[1]==='You gain 100 XP.'&&
+          messages[2].startsWith('You reached Level 2!'),'Expedition announces the reward before XP and level-up')
+        messages.length=0;player.inventory[0].identified=false;currentZ=-2
+        ArtifactWayfaring.visitDepth()
+        check(messages[0]==='A strange power rewards your descent.'&&messages[1]==='You gain 100 XP.',
+          'Unidentified Expedition announces the reward without revealing its name')
+      } finally {log=originalLog}
+    })()`))
+  })
+
+  it('shares Wayfaring enemy phases and spends stacked free steps separately', () => {
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const originalChance=chance,originalPhase=resolveEnemyPhase
+      try {
+        replayAnimationsDisabled=true;replayRecording=false
+        currentZ=0;map=surfaceMap;player.x=40;player.y=40;player.hp=100;player.maxHp=100
+        player.rootTurns=0;player.godMode=false;player.poisonTurns=0
+        enemies=[];npcs=[];groundItems=[];occupied=new Set()
+        for(let y=38;y<=42;y++)for(let x=37;x<=45;x++)map[y][x]='grass'
+        player.wayfaring=ArtifactWayfaring.freshState()
+        const sample=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
+        player.inventory=[sample('longstrider'),sample('never_look_back'),sample('windwalker')]
+        // Exercise both phase modifiers with presentation enabled, including hidden identity.
+        const originalLog=log,originalPopup=spawnDamageNumber
+        try {
+          const messages=[],popups=[]
+          log=(msg,tone)=>messages.push([msg,tone]);spawnDamageNumber=(x,y,amount)=>popups.push(amount)
+          replayAnimationsDisabled=false;replaySimulationMode=false
+          for(const known of [true,false]) {
+            player.inventory[1].identified=known
+            player.wayfaring.discoveredPrevious=false;chance=p=>p===.25
+            check(ArtifactWayfaring.enemyPhases()===2,'extra phase unchanged')
+            check(messages.pop().join('|')===(known?'Never Look Back':'A strange power')+' gives enemies an additional turn!|bad','explicit extra-turn log')
+            player.wayfaring.discoveredPrevious=true;chance=p=>p===.5
+            check(ArtifactWayfaring.enemyPhases()===0,'skipped phase unchanged')
+            check(messages.pop().join('|')===(known?'Never Look Back':'A strange power')+' quickens your actions!|good','skip log preserved')
+          }
+          check(popups.length===0,'Never Look Back has no popups, including Magic!')
+          artifactAbilityMessage('longstrider','Longstrider grants a swift step!','A strange power quickens your step!')
+          check(popups.length===1&&popups[0]==='Longstrider','other artifact popups remain')
+        } finally {
+          log=originalLog;spawnDamageNumber=originalPopup;replayAnimationsDisabled=true
+          player.inventory[1].identified=true
+        }
+        player.equip={weapon:null,shield:null,armor:{kind:'artifact',artifactSlot:'armor',base:'Tunic',name:'Test',identified:true,abilityId:'elusive',def:1}}
+        player.wayfaring.windwalkerReady=true;player.artifactElusiveReady=true
+        player.wayfaring.longstriderThreshold=5;player.wayfaring.longstriderSteps=4
+        const before=turnCount
+        let phases=0;resolveEnemyPhase=()=>phases++;chance=p=>p===.25
+        await tryMove(1,0);await tryMove(1,0)
+        check(player.x===42&&turnCount===before&&phases===0,'two separate free steps, no world turn')
+        check(player.wayfaring.longstriderSteps===4,'free movement does not charge Longstrider')
+        player.wayfaring.discoveredPrevious=false;player.poisonTurns=2
+        await tryMove(1,0)
+        check(turnCount===before+1&&phases===1&&player.poisonTurns===1,'skip and extra phase cancel, clocks tick once')
+        player.wayfaring.discoveredPrevious=false;enemyTurn()
+        check(phases===3&&player.poisonTurns===0,'extra phase does not double-tick poison')
+        const saved=structuredClone(buildSaveObject());loadGameFromObject(saved,{isReplayInit:true})
+        check(player.wayfaring.longstriderThreshold>=5&&player.wayfaring.longstriderThreshold<=10,'threshold persists')
+      } finally {chance=originalChance;resolveEnemyPhase=originalPhase}
+    })()`))
+  })
+
+  it('charges Water Walking per turn, lava per entered tile and gives Castaway priority', () => {
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      replayAnimationsDisabled=true;replayRecording=false
+      currentZ=0;map=surfaceMap;player.x=40;player.y=40;player.race='human';player.hp=200;player.maxHp=200
+      player.rootTurns=0;player.godMode=false;player.swimming=0;player.poisonTurns=0;player.berserkTurns=0
+      player.equip={weapon:null,shield:null,armor:null};resetSwimming()
+      enemies=[];npcs=[];groundItems=[];occupied=new Set()
+      for(let y=35;y<=45;y++)for(let x=35;x<=50;x++){map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))}
+      player.wayfaring=ArtifactWayfaring.freshState()
+      const sample=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
+      player.inventory=[sample('water_walking'),sample('emberwalker'),sample('castaway'),sample('rush')]
+      map[40][41]='water';map[40][42]='lava';map[40][43]='lava';map[40][44]='lava'
+      await tryMove(1,0);check(!isActuallySwimming()&&canUseItemsWhileSwimming()&&ArtifactWayfaring.waterRemaining()===7,'water walking permits item use')
+      await skipTurn();check(ArtifactWayfaring.waterRemaining()===6,'waiting spends reserve')
+      const hp=player.hp;check(ArtifactWayfaring.activate(3),'Rush available')
+      ArtifactWayfaring.rushStep(1,0);ArtifactWayfaring.rushStep(1,0);ArtifactWayfaring.rushStep(1,0);ArtifactWayfaring.finishRush()
+      check(player.hp===hp-30,'three entered lava tiles charge exactly three times')
+      player.inventory=[sample('castaway')];player.x=41;player.y=40;player.swimming=30;player.hp=0;player.deathShieldReady=true
+      check(absorbPlayerFatalDamage()&&player.hp===7&&player.deathShieldReady&&currentZ===0,'Castaway precedes Death Shield')
+      check(player.wayfaring.castawaySpent&&!isActuallySwimming(),'safe shore and spent rescue')
+      const saved=structuredClone(buildSaveObject());loadGameFromObject(saved,{isReplayInit:true})
+      check(player.wayfaring.castawaySpent,'rescue charge survives reload')
+    })()`))
+  })
+
+  it('activates identified Wayfaring powers and saves a partially completed Rush', () => {
+    cy.window().then(win => win.eval(`(async () => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      replayAnimationsDisabled=true;replayRecording=false
+      currentZ=0;map=surfaceMap;player.x=40;player.y=40;player.hp=100;player.maxHp=100
+      player.rootTurns=0;player.godMode=false;player.berserkTurns=0
+      enemies=[];npcs=[];groundItems=[];occupied=new Set()
+      for(let y=25;y<=55;y++)for(let x=25;x<=55;x++){map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))}
+      player.wayfaring=ArtifactWayfaring.freshState();ArtifactWayfaring.baselinePosition()
+      const sample=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
+      player.inventory=[sample('rush'),sample('backtrack'),sample('blink'),sample('phantom_trail')]
+      player.inventory[0].identified=false
+      check(!ArtifactWayfaring.activate(0),'unidentified power is unavailable')
+      player.inventory[0].identified=true
+      const before=turnCount
+      check(ArtifactWayfaring.activate(0),'start sprint')
+      check(!document.getElementById('wayfaringRushOverlay'),'no separate movement panel')
+      check(activePlayerStatuses().some(s=>s.id==='artifact-rush'&&s.counter==='4 steps'),'remaining steps in status strip')
+      const key=k=>window.dispatchEvent(new KeyboardEvent('keydown',{key:k,cancelable:true}))
+      const clickTile=(x,y)=>{
+        const rect=canvas.getBoundingClientRect()
+        const clientX=rect.left+(x-Math.floor(camX)+0.5)*TILE_PX*rect.width/canvas.width
+        const clientY=rect.top+(y-Math.floor(camY)+0.5)*TILE_PX*rect.height/canvas.height
+        canvas.dispatchEvent(new MouseEvent('click',{clientX,clientY,bubbles:true,cancelable:true}))
+      }
+      key('d')
+      document.querySelector('.dpad button[data-dx="0"][data-dy="1"]').click()
+      check(turnCount===before&&player.x===41&&player.y===41,'normal keyboard and D-pad steps do not advance time')
+      clickTile(43,41)
+      document.getElementById('touchInventory').click()
+      check(!autoPath&&!invOpen&&player.x===41&&player.wayfaring.rush.steps===2,'no distant path or interleaved inventory action')
+      const saved=structuredClone(buildSaveObject());loadGameFromObject(saved,{isReplayInit:true})
+      check(player.wayfaring.rush.steps===2,'in-progress sprint survives save')
+      clickTile(42,41)
+      check(player.x===42&&player.wayfaring.rush.steps===3&&turnCount===before,'adjacent canvas click spends one sprint step')
+      clickTile(42,41)
+      check(!player.wayfaring.rush&&turnCount===before+1,'clicking player finishes early and spends one turn')
+      check(!activePlayerStatuses().some(s=>s.id==='artifact-rush'),'rush status clears')
+      check(ArtifactWayfaring.cooldownRemaining('rush')>0&&!ArtifactWayfaring.activate(0),'cooldown shared')
+      player.rootTurns=2;check(ArtifactWayfaring.activate(2),'Blink can escape while rooted')
+      check(currentZ===0,'Blink never changes Z')
+      const origin={x:player.x,y:player.y,z:currentZ,turn:turnCount}
+      check(ArtifactWayfaring.activate(3),'Phantom activation')
+      const phantom=ArtifactWayfaring.phantomPosition()
+      check(phantom.x===origin.x&&phantom.y===origin.y&&phantom.z===origin.z&&phantom.until===origin.turn+8,'Phantom starts on the player tile and lasts eight turns')
+      player.rootTurns=0
+      const dx=player.x<40?1:-1
+      await tryMove(dx,0)
+      check(player.x===origin.x+dx&&ArtifactWayfaring.phantomPosition().x===origin.x,'Phantom stays behind when the player moves')
+      const fromX=origin.x-dx
+      const foe=addEnemy(Object.assign({},ENEMY_TEMPLATE_BY_NAME.Goblin,{name:'Goblin',baseName:'Goblin',id:'phantom_pursuit_test',x:fromX,y:origin.y,level:0,alive:true,hp:100,maxHp:100,aware:true,alarmed:true,abilities:[],aggro:4,equipment:null,shooterAbility:null,spd:30}))
+      occupied.add(keyXY(foe.x,foe.y))
+      const originalChance=chance
+      try {
+        chance=p=>p===0.5
+        resolveEnemyPhase(null,null,false)
+        check(foe.x===fromX&&ArtifactWayfaring.takeSurprise(foe),'Pursuer attacks the phantom instead of following the player')
+      } finally {chance=originalChance}
+    })()`))
+  })
+
   it('converts exceptional bows and low-tier gear without replacing their original properties', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
@@ -259,8 +483,8 @@ describe('Gear bases on procedural artifacts', () => {
       const previousPick=pick, previousRng=rng
       try {
         rng=()=>.9
-        pick=pool=>pool.includes('Amulet')?'Amulet':previousPick(pool)
-        check(/^The Amulet of /.test(makeArtifactItem(3).name),'non-gear artifacts keep The')
+        pick=pool=>pool.includes('Feather')?'Feather':pool.includes('highlander')?'highlander':previousPick(pool)
+        check(/^The Feather of /.test(makeArtifactItem(3).name),'non-gear artifacts keep The')
       } finally {pick=previousPick;rng=previousRng}
       const eligible=[...WEAPONS,...SHIELDS,...ARMORS].filter(base=>base.tier<=3).map(base=>base.name)
       check(!eligible.includes('Titan Warpick') && eligible.includes('Brigandine'),'tier limit')

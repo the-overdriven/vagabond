@@ -1071,7 +1071,10 @@ const AdaptivePlayerTrolling = (() => {
         log(`You pay the Debt Collector ${demand.gold} gold. The ghost fades away.`, 'info')
       } else {
         const invIdx = player.inventory.findIndex(it => it.dwarvenRemainsLootId === ghost.debtDemandLootId)
-        if (invIdx >= 0) player.inventory.splice(invIdx, 1)
+        if (invIdx >= 0) {
+          const [item] = player.inventory.splice(invIdx, 1)
+          ArtifactWayfaring.inventoryChanged(item)
+        }
         else for (const slot of ['weapon','shield','armor']) {
           if (player.equip?.[slot]?.dwarvenRemainsLootId === ghost.debtDemandLootId) {
             player.equip[slot] = null

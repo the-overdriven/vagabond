@@ -143,6 +143,7 @@ describe('Mine-only encounters and darkness', () => {
           undergroundDiscovered=Array.from({length:25},()=>Array(25).fill(false))
           invalidateUndergroundFov()
           const extended=currentUndergroundFov()
+          discoverPlayerSight()
           check(extended.has('12,10')&&!undergroundDiscovered[10][12] &&
             undergroundDiscovered[10][7],
             'crystal light stays visible without revealing distant map tiles')

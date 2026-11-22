@@ -51,10 +51,10 @@ const Graveyard = (() => {
         identified: false, stat_line: '???'}
     const {kind, base, name, noun, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
       bonuses, curse, artifactSlot, maxHpPct, twoHanded, atk, def, spd, grace,
-      speedPenalty, gracePenalty, rangedAtk, rangedRange, xpBonus, abilityId, berserkerOathRoll, originalGearName} = item
+      speedPenalty, gracePenalty, rangedAtk, rangedRange, xpBonus, abilityId, berserkerOathRoll, drifterMf, originalGearName} = item
     return {kind, base, name, noun, count, inscription, replayId, tier, mod, modAmt, effectId, identified,
       atk, def, spd, grace, speedPenalty, gracePenalty, rangedAtk, rangedRange, xpBonus,
-      abilityId, berserkerOathRoll, originalGearName, stat_line: statLine(item),
+      abilityId, berserkerOathRoll, drifterMf, originalGearName, stat_line: statLine(item),
       bonuses: bonuses ? {...bonuses} : undefined,
       curse: curse ? {...curse, types: curse.types?.slice()} : curse,
       artifactSlot, maxHpPct, twoHanded}

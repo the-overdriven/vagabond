@@ -190,6 +190,8 @@ function buildSaveObject() {
       invisibleTurns: player.invisibleTurns,
       spiderWebSourceId: player.spiderWebSourceId,
       godMode: player.godMode,
+      godArtifactStockGranted: player.godArtifactStockGranted === true,
+      wayfaring: structuredClone(player.wayfaring),
       godInvisible: player.godMode ? player.godInvisible !== false : false,
       lastPositionChangeTurn: player.lastPositionChangeTurn,
       artifactBraveryCharge: player.artifactBraveryCharge === true,
@@ -561,6 +563,7 @@ function loadGameFromObject(data, opts = {}) {
   if (data.version !== SAVE_VERSION) {
     throw new Error('This save uses a different game format. Please start a new world.')
   }
+  ArtifactWayfaring.validate(data.player?.wayfaring)
   if (typeof data.player?.highscoresDisqualified !== 'boolean') {
     throw new Error('Save data is missing Highscores eligibility.')
   }
@@ -965,6 +968,8 @@ function loadGameFromObject(data, opts = {}) {
     }
 
   Object.assign(player, data.player)
+  player.wayfaring = structuredClone(data.player.wayfaring)
+  Frostwalker.restore()
   miningSurfaceProgress = {...data.miningSurfaceProgress}
   miningLastEchoTurn = data.miningLastEchoTurn
   player.mining = data.player.mining
@@ -1079,6 +1084,7 @@ function loadGameFromObject(data, opts = {}) {
   player.spiderWebSourceId = typeof player.spiderWebSourceId === 'string' ? player.spiderWebSourceId : null
   spiderWebOverlayStart = 0
   player.godMode = !!data.player.godMode
+  player.godArtifactStockGranted = data.player.godArtifactStockGranted === true
   player.highscoresDisqualified = data.player.highscoresDisqualified
   Highscores.reconcileExclusion(player, isReplayInit || !!opts.isReplayRestore)
   player.godInvisible = player.godMode && (typeof data.player.godInvisible === 'boolean'
@@ -1095,7 +1101,8 @@ function loadGameFromObject(data, opts = {}) {
   player.berryRegenTurns = Number.isFinite(player.berryRegenTurns) ? Math.max(0, player.berryRegenTurns | 0) : 0
   player.curseDebuffs = Array.isArray(player.curseDebuffs) ? player.curseDebuffs : []
   player.weakenTurns = data.player.weakenTurns
-  artifactAlchemistClamp()
+  if (playerHasArtifactAbility('troglodyte')) ArtifactWayfaring.syncHealth()
+  else artifactAlchemistClamp()
   player.slowTurns = data.player.slowTurns
   player.permadeath = !!player.permadeath
   tombstonesRemaining = Number.isFinite(data.tombstonesRemaining) ? Math.max(0, data.tombstonesRemaining | 0) : TOMBSTONE_INSCRIPTIONS.length
@@ -1396,6 +1403,7 @@ function loadGameFromObject(data, opts = {}) {
   reconcileSwimming()
   // Restored ground items may add or remove death markers even if the
   // player's position (and therefore the side map's origin) is unchanged.
+  rebuildMinimapBases()
   minimapDirty = true
   updateHud()
   render()

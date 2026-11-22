@@ -38,30 +38,30 @@ function playerDisarmSlots() {
 // current position. In particular, never blink into isolated sealed chambers
 // or sacred ground. Stable BFS order and one seeded destination roll ensure
 // current saves and replays choose the same tile.
+function reachableTeleportTiles(startX,startY,maxSteps,canEnter) {
+  const seen=new Set([keyXY(startX,startY)])
+  const queue=[{x:startX,y:startY,steps:0}]
+  for(let i=0;i<queue.length;i++){
+    const pos=queue[i]
+    if(pos.steps>=maxSteps)continue
+    for(const [dx,dy] of DIRS8){
+      const x=pos.x+dx,y=pos.y+dy,key=keyXY(x,y)
+      if(seen.has(key)||!canEnter(x,y))continue
+      seen.add(key);queue.push({x,y,steps:pos.steps+1})
+    }
+  }
+  return queue.slice(1)
+}
+
 function lowHpTeleportDestinations(e) {
   if (!enemyHasAbility(e, 'lowHpTeleport') || e.lowHpTeleportUsed ||
       e.hp >= e.maxHp * LOW_HP_TELEPORT_THRESHOLD) return []
   const minDistance = Math.max(LOW_HP_TELEPORT_MIN_DISTANCE, effectiveAggroRange(e) + 2)
-  const seen = new Set([keyXY(e.x, e.y)])
-  const queue = [{x:e.x, y:e.y, steps:0}]
-  const destinations = []
-  for (let i = 0; i < queue.length; i++) {
-    const pos = queue[i]
-    if (pos.steps > 0 && isWalkable(pos.x, pos.y) &&
-        DungeonTraps.safeSpawn(pos.x, pos.y, currentZ, currentLevelKind()) &&
-        Math.max(Math.abs(player.x-pos.x), Math.abs(player.y-pos.y)) > minDistance) {
-      destinations.push({x:pos.x, y:pos.y})
-    }
-    if (pos.steps >= LOW_HP_TELEPORT_SEARCH_STEPS) continue
-    for (const [dx,dy] of DIRS8) {
-      const x=pos.x+dx, y=pos.y+dy, key=keyXY(x,y)
-      if (seen.has(key) || !enemyTileOpen(e,x,y) ||
-          (currentZ === 0 && npcs.some(n => n.x === x && n.y === y))) continue
-      seen.add(key)
-      queue.push({x,y,steps:pos.steps+1})
-    }
-  }
-  return destinations
+  return reachableTeleportTiles(e.x,e.y,LOW_HP_TELEPORT_SEARCH_STEPS,(x,y)=>
+    enemyTileOpen(e,x,y) && !(currentZ===0 && npcs.some(n=>n.x===x && n.y===y)))
+    .filter(pos=>isWalkable(pos.x,pos.y) && DungeonTraps.safeSpawn(pos.x,pos.y,currentZ,currentLevelKind()) &&
+      Math.max(Math.abs(player.x-pos.x),Math.abs(player.y-pos.y))>minDistance)
+    .map(({x,y})=>({x,y}))
 }
 
 // Sacrifice is neither a player kill nor a source of farmable loot/XP.
@@ -108,13 +108,13 @@ function rollEnemySurvivalSpell(eligible) {
 }
 
 function tryEnemySpell(e) {
-  if (!e.alive || e.hp <= 0 || !onCurrentLevel(e) || enemyIsPassive(e) ||
+  if (Frostwalker.stranded(e) || ArtifactWayfaring.truce(e) || !e.alive || e.hp <= 0 || !onCurrentLevel(e) || enemyIsPassive(e) ||
       e.summonedTurn === turnCount || e.fearTurns > 0 || e.sleeping ||
       player.hp <= 0 || playerHiddenFromEnemy(e) || playerInsideSanctuary() ||
       enemyInsideSanctuary(e) || !enemyHasSight(e)) return false
   const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
   if (distance > effectiveAggroRange(e) || (forestHideChance(e, distance) > 0 &&
-      e.forestConcealX === player.x && e.forestConcealY === player.y)) return false
+      concealCached(e))) return false
   const spells = availableEnemySpells(e)
   // A separate seeded roll assigns fixed 30%/20% low-HP cast chances.
   // If its selected spell has no valid target, normal magic can still fire;
@@ -128,6 +128,7 @@ function tryEnemySpell(e) {
     if (!ordinary.length || !chance(ENEMY_SPELL_CHANCE)) return false
     spell = pick(ordinary.flatMap(name => Array(name === 'deathBolt' ? ENEMY_DEATH_BOLT_WEIGHT : 1).fill(name)))
   }
+  if (['weaken','slow','disarm','dispel'].includes(spell) && ArtifactWayfaring.divert(e,effectiveAggroRange(e),true)) return true
   if (spell === 'weaken') {
     const before = playerMaxHp()
     player.weakenTurns = ENEMY_DEBUFF_TURNS

@@ -1020,6 +1020,7 @@ describe('Dwarven Ruins encounter progression', () => {
           loadGameFromObject(before,{isReplayInit:true})
           activeWorldTraits=[{name:'test curse',effects:[]}]
           AdaptivePlayerTrolling.reset()
+          AdaptivePlayerTrolling.setDebugTrolling(false)
           // Force each branch independently; other optional event rolls stay off.
           let outcomeRolls=0
           chance=p=>{

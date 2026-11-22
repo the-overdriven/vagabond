@@ -125,6 +125,7 @@ async function castFireball(idx, x, y) {
     item.count = (item.count || 1) - 1
     if (item.count <= 0) player.inventory.splice(idx, 1)
     AdaptivePlayerTrolling.onScrollUsed('scrollOfFireball')
+    ArtifactWayfaring.fighting()
     AdaptivePlayerTrolling.onCombatAttack(turnCount)
     const scrollInvisibleCast = !player.godMode && player.invisibleTurns > 0
     const tiles = fireballBlastTiles(x, y), cells = new Set(tiles.map(p => keyXY(p.x, p.y)))
@@ -145,6 +146,7 @@ async function castFireball(idx, x, y) {
     }
     log('You cast a fireball!', 'info')
     for (const {enemy:e, damage} of hits) {
+      ArtifactWayfaring.playerAggression(e)
       AdaptivePlayerTrolling.onHungryMonsterAttacked(e)
       // Spell immunity and one-use death protection still work; armor does not.
       if (enemyImmunityActive(e)) {

@@ -534,7 +534,7 @@ const Mining = (() => {
 
   function visible(deposit, x = deposit.x, y = deposit.y) {
     if (deposit.removed || !inSight(x, y)) return false
-    const skill = player.mining || 0
+    const skill = ArtifactWayfaring.effectiveMining()
     if (skill < deposit.threshold) return false
     const thresholds = config().skill.awarenessThresholds
     let tier = 0
@@ -562,7 +562,7 @@ const Mining = (() => {
     return map[y]?.[x] === 'cavewall' || find(level, x, y)?.kind === 'exposed'
   }
 
-  function cost(hardness, mining = player.mining) {
+  function cost(hardness, mining = ArtifactWayfaring.effectiveMining()) {
     const steps = config().skill.strikes[hardness]
     const rank = config().skill.strikeMilestones.reduce((current, threshold, i) =>
       mining >= threshold ? i : current, 0)
@@ -640,7 +640,7 @@ const Mining = (() => {
       if (progress + 1 >= cost(hardness)) {
         const strainCfg = config().skill.strain
         const strain = Math.max(0, strainCfg[hardness] -
-          Math.floor(player.mining / strainCfg.skillReductionEvery) * strainCfg.skillReductionAmount)
+          Math.floor(ArtifactWayfaring.effectiveMining() / strainCfg.skillReductionEvery) * strainCfg.skillReductionAmount)
         if (strain > 0 && player.hp <= strain) {
           if (currentZ === 0) miningSurfaceProgress[surfaceKey] = progress
           else target.progress = progress

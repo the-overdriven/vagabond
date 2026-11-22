@@ -446,7 +446,7 @@ more difficult:
     </div>
     <div class="overlay" id="mapOverlay">
       <div class="panelbox">
-        <h2>World Map</h2>
+        <h2 id="mapTitle">World Map</h2>
         <button class="slbtn overlay-close" id="btnMapClose" type="button" aria-label="Close map">✕</button>
         <div class="map-toolbar">
           <div class="map-zoom-controls">
@@ -461,9 +461,11 @@ more difficult:
           </div>
         </div>
         <canvas id="minimap" aria-label="Explored map: click or tap a destination to travel"></canvas>
+        <canvas id="farsightCanvas" aria-label="Farsight vision of distant terrain"></canvas>
         <p class="map-travel-hint" id="mapTravelHint">Click or tap a discovered tile to travel. Drag to pan.</p>
         <div class="closehint">
           <button class="slbtn" id="btnMapToInv" type="button">Inventory</button>
+          <button class="slbtn" id="btnFarsightMap" type="button">Show on map</button>
           <button class="slbtn" id="btnMapCloseBottom" type="button">Close</button>
         </div>
       </div>
@@ -941,6 +943,25 @@ more difficult:
   let oldHunterQuestSerial = 0
   let inspectedDungeonLocks = new Set()
 
+  // Startup must not wait forever on a stalled request (including its body).
+  // Retry transient transport failures once; missing or invalid files still fail.
+  async function readStartupResource(path, readBody) {
+    for (let attempt = 0; ; attempt++) {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 15000)
+      try {
+        const response = await fetch(path, {signal: controller.signal})
+        if (!response.ok) throw new Error(`Failed to load ${path} (${response.status})`)
+        return await readBody(response)
+      } catch (err) {
+        if (attempt || (!controller.signal.aborted && err?.name !== 'AbortError' && err?.name !== 'TypeError')) throw err
+        console.warn(`Retrying startup resource ${path}: ${err.message}`)
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+  }
+
   async function loadContent() {
     const files = {
       weapons: 'gear_weapons.json',
@@ -985,9 +1006,7 @@ more difficult:
     }
     const content = {}
     for (const [key, file] of Object.entries(files)) {
-      const response = await fetch('content/' + file)
-      if (!response.ok) throw new Error('Failed to load content/' + file + ' (' + response.status + ')')
-      content[key] = await response.json()
+      content[key] = await readStartupResource('content/' + file, response => response.json())
     }
     WEAPONS = [...content.weapons, ...content.rangedWeapons]
     BASE_WEAPONS = WEAPONS
@@ -1053,6 +1072,7 @@ more difficult:
     ARTIFACT_ABILITIES = content.artifactAbilities
     validateArtifactAbilities(ARTIFACT_ABILITIES)
     validateConvertibleArtifactPools()
+    if (!eligibleArtifactTrinketNouns().length) throw new Error('No enabled trinket artifact powers')
     ARTIFACT_CURSES = Array.isArray(content.artifactCurses) ? content.artifactCurses : []
     ARTIFACT_DESC = content.artifactDesc
     DWARVEN_RUIN_ENTRANCES = content.dwarvenRuinEntrances
@@ -1122,6 +1142,13 @@ more difficult:
   const preloadedImageUrls = new Map()
   const preloadedImages = new Map()
   const failedImagePaths = new Set()
+  const imagePreloadsInFlight = new Map()
+  let imagePreloadingStopped = false
+  window.addEventListener('pagehide', event => {
+    // A reload must not leave hundreds of new background requests queued by
+    // the old page. A page preserved in the back/forward cache may resume.
+    if (!event.persisted) imagePreloadingStopped = true
+  })
 
   // Purely visual toggle: false forces every image-backed visual to fall back
   // to its existing ASCII glyph. No turn is consumed and game state is unchanged.
@@ -1241,24 +1268,43 @@ more difficult:
         if (visual?.image) paths.push(visual.image)
       }
     }
-    await Promise.all([...new Set(paths)].map(async path => {
-      if (preloadedImageUrls.has(path)) return
-      try {
-        const response = await fetch(path)
-        if (!response.ok) throw new Error(`Failed to preload ${path} (${response.status})`)
-        const blob = await response.blob()
-        const url = URL.createObjectURL(blob)
-        const image = new Image()
-        image.src = url
-        await image.decode()
-        preloadedImageUrls.set(path, url)
-        preloadedImages.set(path, image)
-        failedImagePaths.delete(path)
-      } catch (err) {
-        failedImagePaths.add(path)
-        console.warn(err.message)
+    const queue = [...new Set(paths)]
+    let next = 0
+    // Limit background network/decode work; it must not flood the local server
+    // or compete with a subsequent reload. Explicit loads share in-flight work.
+    async function worker() {
+      while (!imagePreloadingStopped && next < queue.length) {
+        const path = queue[next++]
+        if (preloadedImageUrls.has(path)) continue
+        if (!imagePreloadsInFlight.has(path)) {
+          const pending = preloadImage(path).finally(() => imagePreloadsInFlight.delete(path))
+          imagePreloadsInFlight.set(path, pending)
+        }
+        await imagePreloadsInFlight.get(path)
       }
-    }))
+    }
+    await Promise.all(Array.from({length: Math.min(8, queue.length)}, worker))
+  }
+
+  async function preloadImage(path) {
+    let url = null
+    try {
+      const blob = await readStartupResource(path, response => response.blob())
+      url = URL.createObjectURL(blob)
+      const image = new Image()
+      image.src = url
+      await image.decode()
+      preloadedImageUrls.set(path, url)
+      preloadedImages.set(path, image)
+      failedImagePaths.delete(path)
+      // Also prepare late/retried frames at the current zoom, rather than
+      // waiting for another zoom change to prime their scaled canvases.
+      prepareAnimatedVisuals(path)
+    } catch (err) {
+      if (url && !preloadedImageUrls.has(path)) URL.revokeObjectURL(url)
+      failedImagePaths.add(path)
+      console.warn(`Failed to preload ${path}: ${err.message}`)
+    }
   }
 
   function imageSrc(path) {
@@ -1319,9 +1365,14 @@ more difficult:
   function performInspect() {
     const scope = recordReplayAction({type: 'inspect'})
     try {
+      ArtifactWayfaring.describeCave(player.x,player.y)
       const entered = enterCave(true)
       if (entered?.then) return entered.finally(() => finishRecordedReplayAction(scope))
-      if (!entered) describeSurroundings()
+      if (!entered) {
+        const oldZ=currentZ
+        describeSurroundings()
+        if(currentZ!==oldZ) { ArtifactWayfaring.resetEndurance(); ArtifactWayfaring.visitDepth(); discoverPlayerSight(); render() }
+      }
     } catch (error) {
       finishRecordedReplayAction(scope)
       throw error
@@ -1880,6 +1931,9 @@ more difficult:
     return true
     } finally {
       if(currentZ!==departureZ || currentLevelKind()!==departureKind) {
+        ArtifactWayfaring.resetEndurance()
+        ArtifactWayfaring.visitDepth()
+        discoverPlayerSight()
         markPlayerPositionChanged(true)
         Mimics.onLevelChange()
         cancelPreparedEnemyAbilitiesOutsideFloor()
@@ -1888,7 +1942,7 @@ more difficult:
         if (AdaptivePlayerTrolling.onFloorChanged({fromZ:departureZ,fromKind:departureKind,fromCave:departureCave})) render()
         const catchup = updateSurfaceAbsence(departureZ, responsive)
         if (catchup?.then) return catchup.then(() => { render(); updateHud(); return true })
-        if (catchup) render()
+        render()
       }
     }
   }
@@ -2226,8 +2280,9 @@ more difficult:
     if (['towerentrancesealed','mazegatesealed'].includes(map[y][x])) return false
     if (player.godMode) return true
     if (isWalkable(x, y)) return true
-    return (raceHas('swims') || player.swimming > 0 || deepSwimmingWater(player.x, player.y) ||
-      fishermanSupervisedEntry(x, y)) && deepSwimmingWater(x, y)
+    if (map[y][x]==='lava' && ArtifactWayfaring.lavaWalk()) return true
+    return deepSwimmingWater(x,y) && (Frostwalker.canFreeze(x,y) || ArtifactWayfaring.waterRemaining()>0 || raceHas('swims') || player.swimming > 0 ||
+      deepSwimmingWater(player.x, player.y) || fishermanSupervisedEntry(x, y))
   }
 
 </script>
@@ -2256,6 +2311,7 @@ more difficult:
 <script src="src/fov.js"></script>
 <script src="src/replay.js"></script>
 <script src="src/version.js"></script>
+<script src="src/artifactWayfaring.js"></script>
 <script src="src/saveLoad.js"></script>
 <script src="src/supabase.js"></script>
 <script src="src/graveyard.js"></script>
@@ -2557,6 +2613,8 @@ more difficult:
     if (!ability || !item) return false
     // Domains handle equipment-slot eligibility. Only weapon subtypes need a
     // finer filter (e.g. Reaper cannot appear on one-handed melee weapons).
+    if (ability.minTier !== undefined && item.tier !== undefined && item.tier < ability.minTier) return false
+    if (ability.maxTier !== undefined && item.tier !== undefined && item.tier > ability.maxTier) return false
     if (!ability.weaponTypes) return true
     if (item.artifactSlot !== 'weapon') return false
     const type = item.rangedAtk ? 'bow' : item.twoHanded ? 'twoHandedMelee' : 'oneHandedMelee'
@@ -2569,10 +2627,17 @@ more difficult:
         artifactAbilityEligible(item, ARTIFACT_ABILITIES.abilities[id]))
   }
 
+  function eligibleArtifactTrinketNouns(tier) {
+    return ARTIFACT_NOUNS.filter(noun => artifactAbilityPool({kind:'artifact', artifactSlot:'trinket', noun, tier}).length)
+  }
+
+  function artifactIsCursed(item) {
+    return !!item.curse || artifactAbilityDefinition(item)?.intrinsicCurse === true
+  }
+
   function rollArtifactAbility(item) {
     const pool = artifactAbilityPool(item)
-    // Trinkets do not enter the equipment-domain system until configured.
-    if (!pool.length && item.artifactSlot !== 'trinket')
+    if (!pool.length)
       throw new Error('Artifact equipment has no enabled ability pool: ' + (item.base || item.noun))
     return pool.length ? pick(pool) : null
   }
@@ -2628,9 +2693,9 @@ more difficult:
       ? combatSkillValue('oneHanded') * artifactRule('duelist','damagePerSkillPoint') : 0
   }
 
-  function artifactPlayerStrikeMultiplier({ambusher = 0, invisible = false, flurry = false, melee = false} = {}) {
+  function artifactPlayerStrikeMultiplier({ambusher = 0, invisible = false, phantom = false, flurry = false, melee = false} = {}) {
     let multiplier = (1 + ambusher)
-    if (melee && invisible && playerHasArtifactAbility('shadow_strike')) multiplier *= 1.5
+    if (melee && playerHasArtifactAbility('shadow_strike')) multiplier *= invisible ? 1.5 : phantom ? 1+artifactRule('phantom_trail','shadowDamageBonus') : 1
     if (melee && flurry && playerHasArtifactAbility('flurry')) multiplier *= 1.5
     if (melee) multiplier *= 1 + artifactDuelistBonus()
     // Distinct percentages multiply once, and flat prepared damage is added later.
@@ -2641,10 +2706,10 @@ more difficult:
     return multiplier
   }
 
-  function artifactStrikeFeedback(e, {ambusher = 0, melee = true, invisible = false, flurry = false} = {}) {
+  function artifactStrikeFeedback(e, {ambusher = 0, melee = true, invisible = false, phantom = false, flurry = false} = {}) {
     if (ambusher > 0) artifactAbilityMessage('ambusher',
       `Ambusher exploits the ${e.name}'s hesitation!`, `You exploit the ${e.name}'s hesitation!`)
-    if (melee && invisible && playerHasArtifactAbility('shadow_strike'))
+    if (melee && (invisible || phantom) && playerHasArtifactAbility('shadow_strike'))
       artifactAbilityMessage('shadow_strike', `Shadow Strike catches the ${e.name} unawares!`,
         `Your hidden strike hits the ${e.name} harder!`)
     if (melee && flurry && playerHasArtifactAbility('flurry'))
@@ -2750,28 +2815,32 @@ more difficult:
     player.artifactReaperOriginId = null
   }
 
-  function artifactAbilityMessage(id, named, hidden) {
+  function artifactAbilityMessage(id, named, hidden, tone = 'good', popupDelay = 0) {
     const known = playerKnowsArtifactAbility(id)
-    log(known ? named : hidden, 'good')
+    log(known ? named : hidden, tone)
     // The normal damage-text animator is presentation only; it neither rolls
     // RNG nor advances combat time, and concealed powers remain unnamed.
-    if (!replayAnimationsDisabled && !replaySimulationMode)
+    if (!ARTIFACT_ABILITIES.abilities[id]?.logOnly && !replayAnimationsDisabled && !replaySimulationMode)
       spawnDamageNumber(player.x, player.y,
         known ? (ARTIFACT_ABILITIES.abilities[id]?.name || 'Magic!') : 'Magic!',
-        '#e3c589', 0, 1050)
+        tone === 'bad' ? '#e48b86' : '#e3c589', popupDelay, 1050)
   }
 
   function artifactInspectionText(item) {
     const ability = artifactAbilityDefinition(item)
-    const roll = item.abilityId === 'berserkers_oath' && item.berserkerOathRoll
+    const roll = item.abilityId === 'drifter' ? ` (Rolled: MF +${item.drifterMf})` : item.abilityId === 'berserkers_oath' && item.berserkerOathRoll
       ? ` (Rolled: ATK +${item.berserkerOathRoll}, DEF -${item.berserkerOathRoll})` : ''
-    return [item.description, ability && `${ability.name}: ${ability.description}${roll}`].filter(Boolean).join('\n')
+    const rescue = item.identified && item.abilityId==='castaway' ? (player.wayfaring.castawaySpent ? 'Castaway: spent until a Temple visit.' : 'Castaway: ready.') : ''
+    return [item.description, rescue, ability && `${ability.name}: ${ability.description}${roll}`, item.identified && ArtifactWayfaring.activeItem(item) ? `Cooldown remaining: ${ArtifactWayfaring.cooldownRemaining(item.abilityId)} turns.` : ''].filter(Boolean).join('\n')
   }
 
   // Relocation is gameplay state, never tied to camera animation. It covers
   // voluntary moves, forced movement, teleportation, and global-Z changes.
-  function markPlayerPositionChanged(voluntary = false) {
+  function markPlayerPositionChanged(voluntary = false, teleport = false) {
+    ArtifactWayfaring.moved(teleport)
     player.lastPositionChangeTurn = turnCount
+    if (!deepSwimmingWater(player.x,player.y)) ArtifactWayfaring.waterLand()
+    if (playerHasArtifactAbility('troglodyte')) ArtifactWayfaring.syncHealth()
     // Target identity is global, but a foe on another Z level can no longer
     // sustain the current direct-hit series.
     if (player.artifactMaliceTargetId && !enemies.some(e => e.alive && e.hp > 0 &&
@@ -2863,6 +2932,7 @@ more difficult:
   // damage roll. A splash is never another direct weapon hit.
   function artifactSplashDamage(target, strength, cause, message) {
     if (!target.alive || target.hp <= 0 || !onCurrentLevel(target)) return
+    ArtifactWayfaring.playerAggression(target)
     const damage = damageRoll(strength, twoHandedDefence(enemyDef(target)))
     target.hp -= damage
     absorbEnemyFatalHit(target)
@@ -3087,17 +3157,30 @@ more difficult:
     if (!e.alive || e.hp <= 0 || !onCurrentLevel(e)) return false
     const dx=Math.sign(e.x-player.x), dy=Math.sign(e.y-player.y)
     if (!dx && !dy) return false
-    const x=e.x+dx,y=e.y+dy
-    if (!enemyKnockbackTileOpen(e,x,y) ||
-        (dx && dy && (!enemyKnockbackTileOpen(e,e.x+dx,e.y) ||
-          !enemyKnockbackTileOpen(e,e.x,e.y+dy)))) return false
-    const fromX=e.x,fromY=e.y
-    occupied.delete(keyXY(fromX,fromY))
-    e.x=x;e.y=y
-    occupied.add(keyXY(x,y))
-    e.farPath=null
-    log(`Your ${source} knocks the ${e.name} back!`, 'good')
-    finishEnemyMove(e,fromX,fromY)
+    const initialX=e.x, initialY=e.y
+    const extra = ArtifactWayfaring.extraDownhillPush(e, e.x+dx, e.y+dy)
+    let moved = false
+    for (let step=0; step<1+extra; step++) {
+      if (!e.alive || e.hp <= 0 || !onCurrentLevel(e)) break
+      const x=e.x+dx,y=e.y+dy
+      if (!enemyKnockbackTileOpen(e,x,y) ||
+          (dx && dy && (!enemyKnockbackTileOpen(e,e.x+dx,e.y) ||
+            !enemyKnockbackTileOpen(e,e.x,e.y+dy)))) break
+      const fromX=e.x,fromY=e.y
+      occupied.delete(keyXY(fromX,fromY))
+      e.x=x;e.y=y
+      occupied.add(keyXY(x,y))
+      e.farPath=null
+      if (!moved) log(`Your ${source} knocks the ${e.name} back!`, 'good')
+      moved=true
+      finishEnemyMove(e,fromX,fromY,true)
+      if (e.x !== x || e.y !== y || Frostwalker.stranded(e)) break
+    }
+    if (!moved) return false
+    if (extra && e.alive && (Math.abs(e.x-initialX)>1 || Math.abs(e.y-initialY)>1)) {
+      beginEnemyMoveAnim(e,initialX,initialY)
+      artifactAbilityMessage('highlander','Highlander sends your foe farther downhill!','A strange force sends your foe farther downhill!')
+    }
     return true
   }
 
@@ -3237,6 +3320,7 @@ more difficult:
   function artifactRecordHpLoss(previousHp) {
     const lost = Math.min(Math.max(0, previousHp), Math.max(0, previousHp - player.hp))
     if (lost <= 0) return
+    ArtifactWayfaring.damage()
     if (playerHasArtifactAbility('retribution'))
       player.artifactRetributionStored = (player.artifactRetributionStored || 0) + lost
     if (playerHasArtifactAbility('blood_reservoir'))
@@ -3294,6 +3378,7 @@ more difficult:
       if (chance(artifactRule('bulwark_evasion','chance'))) {
         log('You evade the incoming blow!', 'good')
         spawnDamageNumber(player.x,player.y,'Evaded!','#aadbe2')
+        ArtifactWayfaring.onDodge()
         return {damage:0,evaded:true,absorbed:false}
       }
     }
@@ -3318,6 +3403,7 @@ more difficult:
   }
 
   function artifactOnPlayerAttack() {
+    ArtifactWayfaring.clearFreeStep()
     if (playerHasArtifactAbility('bulwark_evasion')) player.artifactEvasionPrepared = true
     player.artifactMartialEvasionPending = false
     player.artifactRhythmHitsThisAction = 0
@@ -3442,8 +3528,8 @@ more difficult:
     return id === CONVERTED_GEAR_EFFECT.id ? CONVERTED_GEAR_EFFECT : ARTIFACT_EFFECTS.find(fx => fx.id === id)
   }
 
-  function rollArtifactIdentity(noun, slot, mf) {
-    const isCursed = chance(Math.max(WORLD_GEN_CONFIG.lootRules.artifactCurseMinChance, WORLD_GEN_CONFIG.lootRules.artifactCurseBaseChance - mf * WORLD_GEN_CONFIG.lootRules.artifactCurseMagicFindReductionPerPoint))
+  function rollArtifactIdentity(noun, slot, mf, intrinsicCurse = false) {
+    const isCursed = intrinsicCurse || chance(Math.max(WORLD_GEN_CONFIG.lootRules.artifactCurseMinChance, WORLD_GEN_CONFIG.lootRules.artifactCurseBaseChance - mf * WORLD_GEN_CONFIG.lootRules.artifactCurseMagicFindReductionPerPoint))
 
     // Every non-cursed artifact gets a named owner. Cursed artifacts use
     // the cursed prefix instead and do not get an "of <dwarf>" name.
@@ -3472,7 +3558,7 @@ more difficult:
     // Preserve the existing curse behaviour as a pool of possible curse
     // templates, but apply one only to the 10% of artifacts that roll cursed.
     let curse = null
-    if (isCursed) {
+    if (isCursed && !intrinsicCurse) {
       const curseSource = pick(ARTIFACT_CURSES)
       if (curseSource) {
         curse = {
@@ -3487,11 +3573,19 @@ more difficult:
     return {name, possessor, ownerLore, curse}
   }
 
-  function initializeArtifactAbility(item) {
-    item.abilityId = rollArtifactAbility(item)
-    if (item.abilityId === 'berserkers_oath')
-      item.berserkerOathRoll = randInt(artifactRule('berserkers_oath','rollMin'),
-        artifactRule('berserkers_oath','rollMax'))
+  function initializeArtifactAbility(item, testAbilityId = null) {
+    if (testAbilityId !== null && !artifactAbilityPool(item).includes(testAbilityId))
+      throw new Error('Ineligible test artifact ability: ' + testAbilityId)
+    item.abilityId = testAbilityId ?? rollArtifactAbility(item)
+    if (item.abilityId === 'berserkers_oath') {
+      const min = artifactRule('berserkers_oath','rollMin')
+      const max = artifactRule('berserkers_oath','rollMax')
+      item.berserkerOathRoll = testAbilityId === null ? randInt(min, max) : Math.floor((min + max) / 2)
+    }
+    if (item.abilityId === 'drifter') {
+      const min = artifactRule('drifter','rollMin'), max = artifactRule('drifter','rollMax')
+      item.drifterMf = testAbilityId === null ? randInt(min, max) : Math.floor((min + max) / 2)
+    }
     return item
   }
 
@@ -3517,11 +3611,16 @@ more difficult:
       .filter(base => base.tier <= effect.tier).map(base => base.name)
     if (gearOnly && !eligibleGearNames.length)
       throw new Error('No eligible equipment bases for artifact tier ' + effect.tier)
-    if (nonGearOnly && !ARTIFACT_NOUNS.length)
+    const trinketNouns = gearOnly ? [] : eligibleArtifactTrinketNouns(effect.tier)
+    if (!gearOnly && !trinketNouns.length)
       throw new Error('No eligible standalone artifact nouns')
-    const noun = pick(gearOnly ? eligibleGearNames : nonGearOnly ? ARTIFACT_NOUNS : [...ARTIFACT_NOUNS, ...eligibleGearNames])
+    // Keep the existing mixed-source gear/trinket odds. Redirect disabled
+    // trinket nouns to the eligible pool, rather than boosting gear drops.
+    let noun = pick(gearOnly ? eligibleGearNames : nonGearOnly ? trinketNouns : [...ARTIFACT_NOUNS, ...eligibleGearNames])
+    if (!eligibleGearNames.includes(noun) && !trinketNouns.includes(noun)) noun = pick(trinketNouns)
     const gear = artifactGearBase(noun)
     const slot = gear?.slot || 'trinket'
+    if (slot === 'trinket') return makeWayfaringTrinket(noun, effect, mf)
     const {name, possessor, ownerLore, curse} = rollArtifactIdentity(noun, slot, mf)
 
     const item = {
@@ -3550,6 +3649,22 @@ more difficult:
     return initializeArtifactAbility(item)
   }
 
+  // Uses the same eligibility and pricing metadata as equipment artifacts.
+  // The effect supplies the tier and base price only; it grants no stats.
+  function makeWayfaringTrinket(noun, effect, mf = 0, testAbilityId = null) {
+    const item = initializeArtifactAbility({kind:'artifact', artifactSlot:'trinket', noun,
+      tier:effect.tier, effectId:effect.id, baseValue:effect.baseValue, identified:false,
+      bonuses:{}, maxHpPct:0, curseTimer:0}, testAbilityId)
+    const ability = artifactAbilityDefinition(item)
+    if (testAbilityId !== null) {
+      return Object.assign(item, {name:`The ${noun} of ${ability.name}`, identified:true,
+        curse:null, possessor:null, ownerLore:null, description:'God Mode test artifact.', godTestArtifact:true})
+    }
+    const identity = rollArtifactIdentity(noun, 'trinket', mf, ability.intrinsicCurse === true)
+    return Object.assign(item, identity, {description:generateArtifactDescription(noun, identity.name,
+      CONVERTED_GEAR_EFFECT, identity.curse, identity.possessor, identity.ownerLore)})
+  }
+
   function isConvertibleArtifactEquipment(item) {
     if (!item || !['weapon','shield','armor'].includes(item.kind) ||
         !Number.isInteger(item.tier) || item.tier < 1 || item.tier > 5 ||
@@ -3561,20 +3676,31 @@ more difficult:
   // Call only after the owning enemy's conversion chance succeeds. Mutate the
   // original instance atomically, so the physical item and its replay ID survive.
   // Ownership, quest exclusions and the once-per-enemy roll belong to the caller.
-  function convertEquipmentToArtifact(item, mf = 0) {
+  function convertEquipmentToArtifact(item, mf = 0, {testAbilityId = null} = {}) {
     if (!isConvertibleArtifactEquipment(item)) return null
     const noun = item.base, slot = item.kind
     const converted = {...item, kind:'artifact', artifactSlot:slot, noun,
       effectId:CONVERTED_GEAR_EFFECT.id, originalGearName:item.name,
       identified:false, bonuses:{}, maxHpPct:0, curseTimer:0}
-    if (!artifactAbilityPool(converted).length) {
+    const pool = artifactAbilityPool(converted)
+    if (!pool.length) {
       console.error('Cannot convert equipment without an enabled artifact ability: ' + noun)
       return null
     }
-    const identity = rollArtifactIdentity(noun, slot, mf)
-    Object.assign(converted, identity, {description:generateArtifactDescription(noun,
-      identity.name, CONVERTED_GEAR_EFFECT, identity.curse, identity.possessor, identity.ownerLore)})
-    initializeArtifactAbility(converted)
+    if (testAbilityId !== null) {
+      if (!pool.includes(testAbilityId))
+        throw new Error('Ineligible test artifact ability: ' + testAbilityId)
+      const ability = ARTIFACT_ABILITIES.abilities[testAbilityId]
+      const ambiguousName = pool.some(id => id !== testAbilityId && ARTIFACT_ABILITIES.abilities[id].name === ability.name)
+      const label = ambiguousName ? `${ability.name} (${testAbilityId})` : ability.name
+      Object.assign(converted, {name:`${noun} of ${label}`, identified:true,
+        curse:null, possessor:null, ownerLore:null, description:'God Mode test artifact.', godTestArtifact:true})
+    } else {
+      const identity = rollArtifactIdentity(noun, slot, mf)
+      Object.assign(converted, identity, {description:generateArtifactDescription(noun,
+        identity.name, CONVERTED_GEAR_EFFECT, identity.curse, identity.possessor, identity.ownerLore)})
+    }
+    initializeArtifactAbility(converted, testAbilityId)
     // No natural-effect bonus, tier boost, equipment reroll or replacement copy.
     return Object.assign(item, converted)
   }
@@ -3691,7 +3817,7 @@ more difficult:
       it.ownerLore = makeDwarfOwnerLore(it.possessor)
     }
     if (!it.description || !it.description.includes(it.ownerLore.text)) {
-      const effect = artifactEffectDefinition(it.effectId)
+      const effect = it.artifactSlot === 'trinket' && it.abilityId ? CONVERTED_GEAR_EFFECT : artifactEffectDefinition(it.effectId)
       if (effect) {
         it.description = generateArtifactDescription(
           it.noun, it.name, effect, it.curse, it.possessor, it.ownerLore
@@ -3918,10 +4044,9 @@ more difficult:
       const ability = artifactAbilityDefinition(it)
       if (it.abilityId === 'berserkers_oath' && it.berserkerOathRoll)
         parts.push(`ATK +${it.berserkerOathRoll}`, `DEF -${it.berserkerOathRoll}`)
+      if (it.abilityId === 'drifter') parts.push(`MF +${it.drifterMf}`)
       if (ability) parts.push(ability.name)
-      // CURSED is an instance property, not an artifact-effect property.
-      // Only artifacts that actually rolled a curse should display it.
-      if (it.curse !== null && it.curse !== undefined) parts.push('CURSED')
+      if (artifactIsCursed(it)) parts.push('CURSED')
       return parts.join(', ')
     }
     return physicalGearStatParts(it).join(', ')
@@ -4014,6 +4139,8 @@ more difficult:
     spiderWebSourceId: null,
     godMode: false,
     godInvisible: false,
+    godArtifactStockGranted: false,
+    wayfaring: ArtifactWayfaring.freshState(),
     speedPotionTurns: 0,
     speedPotionBonus: 0,
     stoneSkinTurns: 0, stoneSkinBonus: 0,
@@ -4091,7 +4218,7 @@ more difficult:
       if (playerGearModifierStat(it) === 'atk') a += it.modAmt
     }
     a += artifactBonusSum('atk') + artifactBerserkerRoll() + (permanent ? 0 : curseDebuffSum('atk'))
-    if (!permanent) a += artifactSoulFedStacks()
+    if (!permanent) a += artifactSoulFedStacks() + ArtifactWayfaring.positionStats()
     if (!permanent && !excludePotions && player.berserkTurns > 0) a += player.berserkBonus
     if (!permanent && player.mummyCurseTurns > 0) a -= 2
     if (!permanent && playerHasArtifactAbility('fear_eater')) {
@@ -4103,7 +4230,7 @@ more difficult:
     return a
   }
 
-  function playerDef(permanent = false, excludePotions = false) {
+  function playerDef(permanent = false, excludePotions = false, ignoreTerrain = false) {
     let d = player.baseDef + raceBonus('def')
     for (const slot of ['weapon', 'shield', 'armor']) {
       const it = player.equip[slot]
@@ -4111,25 +4238,33 @@ more difficult:
       if (it.def) d += it.def
       if (it.mod === 'def') d += it.modAmt
     }
-    if (!permanent) d += playerTerrainEffects().defense
     d += artifactBonusSum('def') - artifactBerserkerRoll() + (permanent ? 0 : curseDebuffSum('def'))
     if (!permanent && !excludePotions) {
       if (player.stoneSkinTurns > 0) d += player.stoneSkinBonus
       if (player.berserkTurns > 0) d -= itemDefinition('berserkPotion').effect.defPenalty
     }
-    if (!permanent) d += playerArtifactDefenseBonus(d)
+    if (!permanent) {
+      d += ArtifactWayfaring.positionStats()
+      // Preserve the normal equipment ability basis, including ordinary terrain.
+      const tile = map?.[player.y]?.[player.x]
+      const ordinary = TERRAIN_DEFENSE[tile] || 0
+      d += playerArtifactDefenseBonus(d + (tile === 'hill' && playerHasArtifactAbility('highlander') ? 0 : ordinary))
+      if (!ignoreTerrain) d += ArtifactWayfaring.terrainDefense(tile, d, ordinary)
+    }
     return d
+  }
+
+  function playerTerrainSpeed(tile = map[player.y]?.[player.x]) {
+    const coldRiver = tile === 'frozenriver' || (tile === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow')
+    const riverOrWater = tile === 'river' || tile === 'water'
+    return ArtifactWayfaring.terrainSpeed(tile, (riverOrWater && raceHas('swims') ? 0 : (TERRAIN_SPEED[tile] || 0)) - (coldRiver ? 1 : 0))
   }
 
   function playerTerrainEffects() {
     const tile = map[player.y]?.[player.x]
-    const coldRiver = tile === 'frozenriver' || (tile === 'river' && tileUnderlays[keyXY(player.x, player.y)] === 'snow')
-    const riverOrWater = tile === 'river' || tile === 'water'
-    return {
-      tile,
-      speed: (riverOrWater && raceHas('swims') ? 0 : (TERRAIN_SPEED[tile] || 0)) - (coldRiver ? 1 : 0),
-      defense: TERRAIN_DEFENSE[tile] || 0,
-    }
+    const baseDefense = tile === 'hill' && playerHasArtifactAbility('highlander') ? playerDef(false, false, true) : 0
+    return {tile, speed:playerTerrainSpeed(tile),
+      defense: ArtifactWayfaring.terrainDefense(tile, baseDefense, TERRAIN_DEFENSE[tile] || 0)}
   }
 
   function terrainDisplayName(tile) {
@@ -4156,8 +4291,10 @@ more difficult:
     }
     for (const slot of ['weapon', 'shield', 'armor']) if (player.equip[slot] && player.equip[slot].mod === 'spd') s += player.equip[slot].modAmt
     if (!permanent) {
+      // Scale the bonus before any temporary or terrain modifiers are applied.
+      s += ArtifactWayfaring.adrenalineSpeed(s)
       if (player.speedPotionTurns > 0) s += player.speedPotionBonus || 3
-      if (!ignoreTerrain) s += playerTerrainEffects().speed
+      if (!ignoreTerrain) s += playerTerrainSpeed()
       s -= player.gazeTurns > 0 ? 3 : 0
       s += curseDebuffSum('spd')
       s += carriedItemStat('spd')
@@ -4266,7 +4403,7 @@ more difficult:
   function playerMf() {
     let mf = player.baseMf + raceBonus('mf')
     for (const slot of ['weapon', 'shield', 'armor']) if (player.equip[slot] && player.equip[slot].mod === 'mf') mf += player.equip[slot].modAmt
-    mf += artifactBonusSum('mf')
+    mf += artifactBonusSum('mf') + ArtifactWayfaring.drifterMagicFind()
     return mf
   }
 
@@ -4275,7 +4412,7 @@ more difficult:
     for (const slot of ['weapon', 'shield', 'armor']) if (player.equip[slot] && player.equip[slot].mod === 'hp') bonus += player.equip[slot].modAmt
     bonus += artifactBonusSum('hp')
     let total = player.maxHp + bonus
-    const pct = artifactMaxHpPct()
+    const pct = artifactMaxHpPct() + ArtifactWayfaring.maxHpPct()
     if (pct) total = Math.max(1, Math.round(total * (1 + pct / 100)))
     if (player.weakenTurns > 0) total = Math.max(1, total - Math.max(1, Math.ceil(total * 0.10)))
     return total
@@ -5769,7 +5906,7 @@ more difficult:
         lootLog(`${enemyLootSubject(e)} dropped ${label}.`, art, label)
         showRareDrop(true)
         if (onGround) placeEnemyLootOnGround(e, art)
-        else player.inventory.push(art)
+        else carryItem(art)
       }
     }
     if (e.humanoid && e.equipment) {
@@ -5788,7 +5925,7 @@ more difficult:
         return
       }
       if (item.kind === 'weapon' && maybeAutoEquipWeapon(item, true)) return
-      player.inventory.push(item)
+      carryItem(item)
       return
     }
     if (e.humanoid) {
@@ -5992,6 +6129,7 @@ more difficult:
       stolen.item.count--
       e.stolenItem.count = 1
     } else player.inventory.splice(stolen.index, 1)
+    ArtifactWayfaring.inventoryChanged(stolen.item)
     e.theftUsed = true
     e.theftEscapeSteps = 0
     e.attackStart = undefined
@@ -6043,9 +6181,9 @@ more difficult:
       log(`${e.name}'s rage subsides.`, 'info')
   }
 
-  function playerCriticalHitChance(e, {meleeStrike = false, vengefulBonus = 0} = {}) {
+  function playerCriticalHitChance(e, {meleeStrike = false, vengefulBonus = 0, phantom = false} = {}) {
     let crit = BASE_CRIT_CHANCE + (playerIsInvisible() && !e.alarmed &&
-      !enemyHasAbility(e, 'trueSight') && !enemyHasAbility(e, 'blind') ? 0.20 : 0)
+      !enemyHasAbility(e, 'trueSight') && !enemyHasAbility(e, 'blind') ? 0.20 : phantom ? artifactRule('phantom_trail','surpriseCritPP')/100 : 0)
     if (artifactEquippedInSlot('weapon','fortunes_fang') && isBreachWeapon(player.equip.weapon))
       crit += Math.min(artifactRule('fortunes_fang','maxCritBonusPP'),
         Math.floor(Math.max(0,playerMf()) / artifactRule('fortunes_fang','mfPerPoint'))) / 100
@@ -6089,11 +6227,14 @@ more difficult:
     if (rareFleeBlocksAttack(e)) return false
     artifactGrowingMaliceTarget(e)
     const vengefulBonus = artifactTakeVengefulPrecision()
+    const tidefangBonus = ArtifactWayfaring.takeCritBonus('tidefang')
+    const phantomOpening = ArtifactWayfaring.takeSurprise(e)
     if (vengefulBonus) artifactAbilityMessage('vengeful_precision',
       'Vengeful Precision drives your next melee strike!', 'Your blocked blow charges your strike!')
     if (!isExtraAttack) artifactOnPlayerAttack()
     AdaptivePlayerTrolling.onCombatAttack(turnCount)
     if (!isExtraAttack) AdaptivePlayerTrolling.onPlayerInitiatedStrongFight(e)
+    ArtifactWayfaring.playerAggression(e)
     AdaptivePlayerTrolling.onHungryMonsterAttacked(e)
     const scrollInvisibleAttack = !player.godMode && player.invisibleTurns > 0
     const artifactInvisibleAttack = playerIsInvisible()
@@ -6139,19 +6280,19 @@ more difficult:
     const armor = equippedArmor(e.equipment)
     const glancing = armor && chance(missChance(playerSpd(), enemySpd(e)))
     let dmg = damageRoll(playerAtk() * artifactMeleeDamageMultiplier(e), twoHandedDefence(enemyDef(e)))
-    const criticalRoll = chance(playerCriticalHitChance(e,{meleeStrike:true,vengefulBonus}))
+    const criticalRoll = chance(playerCriticalHitChance(e,{meleeStrike:true,vengefulBonus,phantom:phantomOpening}) + tidefangBonus)
     const critical = !glancing && criticalRoll
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     // Each direct strike evaluates its own awareness, including GRACE follow-ups.
     // Percentage bonuses share one rounding point before the prepared flat damage.
     const strikeMultiplier = artifactPlayerStrikeMultiplier({ambusher:ambusherOpeningBonus,
-      invisible:artifactInvisibleAttack,flurry:extraAttackKind==='grace',melee:true})
+      invisible:artifactInvisibleAttack,phantom:phantomOpening,flurry:extraAttackKind==='grace',melee:true})
     const beforePercent = dmg
     dmg = Math.round(dmg * strikeMultiplier)
     if (strikeMultiplier > 1 && beforePercent > 0)
       artifactStrikeFeedback(e,{ambusher:ambusherOpeningBonus,melee:true,
-        invisible:artifactInvisibleAttack,flurry:extraAttackKind==='grace'})
+        invisible:artifactInvisibleAttack,phantom:phantomOpening,flurry:extraAttackKind==='grace'})
     const consumeBulwarkBravery = dmg > 0 && player.artifactBraveryCharge &&
       playerHasArtifactAbility('bulwark_bravery')
     if (consumeBulwarkBravery) dmg = Math.round(dmg * (1 + artifactRule('bulwark_bravery','damageBonus')))
@@ -6281,9 +6422,12 @@ more difficult:
   }
 
   function enemyAttackPlayer(e, isExtraAttack = false, hitMultiplier = 1, charge = null, options = null) {
+    if (Frostwalker.stranded(e) || ArtifactWayfaring.truce(e)) return false
     if (e.summonedTurn === turnCount || enemyInsideSanctuary(e) || playerInsideSanctuary()) return false
     if (enemyIsPassive(e)) return false
     if (!isExtraAttack && switchEnemyShooterMode(e, 'melee')) return false
+    const phantom = ArtifactWayfaring.divert(e,1,false,false)
+    if (phantom) {ArtifactWayfaring.attackPhantomMelee(e,phantom);return false}
     AdaptivePlayerTrolling.onCombatAttack(turnCount)
     revealEnemyInvisibility(e)
     clearAutoPath()
@@ -6292,11 +6436,12 @@ more difficult:
     const weaponText = enemyWeapon ? ` with their ${enemyWeapon.base}` : ''
     const attackPresentation = beginEnemyAttackAnim(e)
     exposeEnemyAfterMelee(e)
-    if (chance(options?.fixedHitChance != null ? 1 - options.fixedHitChance
+    if (ArtifactWayfaring.takeForestDodge() || chance(options?.fixedHitChance != null ? 1 - options.fixedHitChance
       : charge ? missChance(enemySpd(e), playerSpd()) / 2
       : 1 - (1 - missChance(enemySpd(e), playerSpd())) * hitMultiplier)) {
       spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss, attackPresentation.delay + 100)
       log(`The ${e.name} attacks${weaponText} but misses you.`, 'good')
+      ArtifactWayfaring.onDodge()
       if (playerHasArtifactAbility('elusive') && !player.artifactElusiveReady) {
         player.artifactElusiveReady = true
         artifactAbilityMessage('elusive', 'Elusive: a free step is ready!',
@@ -6365,9 +6510,11 @@ more difficult:
     }
     // Report the lethal hit first, then its Death Shield resolution.
     // Both occur synchronously before poison, knockback, death or a bonus hit.
+    const hitX=player.x, hitY=player.y
     absorbPlayerFatalDamage()
     checkPlayerHealthWarning()
     applyEnemyLifesteal(e, effectiveDamage)
+    if(player.x!==hitX||player.y!==hitY){updateHud();return false}
     if (dmg > 0 && player.hp > 0) {
       if (!glancing) applyEnemyPoison(e)
       applyEnemyContactStatuses(e)
@@ -6470,6 +6617,7 @@ more difficult:
       if (venomArrow) bow.venomCoated = false
       AdaptivePlayerTrolling.onCombatAttack(turnCount)
       AdaptivePlayerTrolling.onPlayerInitiatedStrongFight(e)
+      ArtifactWayfaring.playerAggression(e)
       AdaptivePlayerTrolling.onHungryMonsterAttacked(e)
       const scrollInvisibleShot = !player.godMode && player.invisibleTurns > 0
       const wasHidden = playerHiddenFromEnemy(e)
@@ -6477,7 +6625,7 @@ more difficult:
       const targetWasInvisible = enemyInvisibleActive(e)
       const wasEnraged = enemyIsEnraged(e)
       const wasFleeing = enemyIsFleeing(e)
-      const shotCriticalChance = playerCriticalHitChance(e)
+      const shotCriticalChance = playerCriticalHitChance(e,{phantom:ArtifactWayfaring.takeSurprise(e)}) + ArtifactWayfaring.takeCritBonus('skirmisher')
       const ambusherOpeningBonus = artifactAmbusherDamageBonus(e)
       // Preserve rare creatures' two-sighting escape rules. Ordinary targets
       // become alerted on being shot at, even when the arrow misses.
@@ -6582,6 +6730,7 @@ more difficult:
   }
 
   function enemyRangedAttackPlayer(e, path = null, spellAttack = null) {
+    if (Frostwalker.stranded(e) || ArtifactWayfaring.truce(e)) return false
     if (e.summonedTurn === turnCount || enemyInsideSanctuary(e) || playerInsideSanctuary()) return false
     const shot = spellAttack || shooterDefinition(e)
     if (playerHiddenFromEnemy(e) || enemyIsPassive(e) || !shot || (!spellAttack && !enemyIsShooter(e))) return false
@@ -6596,8 +6745,10 @@ more difficult:
     const projectile = shot.projectile
     const possessive = `${e.name}'s ${shot.label || projectile}`
     const animationDelay = spellAttack ? shot.animationMs : RANGED_CONFIG.projectileAnimationMs
+    const diverted=ArtifactWayfaring.divert(e,shot.range || effectiveAggroRange(e),true,false)
+    if(diverted){ArtifactWayfaring.attackPhantomRanged(e,diverted,projectile,animationDelay,!spellAttack);return false}
 
-    if (chance(rangedDodgeChance(e))) {
+    if (ArtifactWayfaring.takeForestDodge() || chance(rangedDodgeChance(e))) {
       // Recoil must lead the impact: beginning it after the shot arrived reads
       // as knockback from a hit rather than an intentional dodge.
       const dodgeLead = Math.min(PROJECTILE_DODGE_LEAD_MS, animationDelay * 0.45)
@@ -6606,6 +6757,7 @@ more difficult:
       spawnPlayerProjectileDodge(e, presentation.start + animationDelay - dodgeLead)
       spawnDamageNumber(player.x, player.y, 'Miss!', RENDER_STYLE.damage.miss, presentation.delay + animationDelay)
       log(`You dodge the ${possessive}.`, 'good')
+      ArtifactWayfaring.onDodge()
       return false
     }
 
@@ -6689,6 +6841,8 @@ more difficult:
   }
 
   function killEnemy(e, playerCredit = true, cause = 'trap', deathFxDelay = 0) {
+    ArtifactWayfaring.forgetEnemy(e)
+    Frostwalker.forget(e)
     const visibleAtDeath = enemyIsVisibleOnMainView(e)
     const inspiredNearby = e.prefix === 'Champion' && enemies.some(other => other !== e && other.alive && other.hp > 0 && other.prefix !== 'Champion' && onCurrentLevel(other) && onCurrentLevel(e) && Math.max(Math.abs(other.x-e.x), Math.abs(other.y-e.y)) <= INSPIRED_RADIUS)
     if (!e.alive) return
@@ -6762,7 +6916,7 @@ more difficult:
     }
     if (!e.artifactSoulGhost && cause !== 'sacrifice' && !Mimics.deathLoot(e)) {
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-      lootFromEnemy(e, playerCredit && ['arrow', 'fireball', 'poison'].includes(cause) && distance > ATTACK_RANGE,
+      lootFromEnemy(e, cause === 'drowning' || (playerCredit && ['arrow', 'fireball', 'poison'].includes(cause) && distance > ATTACK_RANGE),
         visibleAtDeath, deathFxDelay, deathContext)
     }
     if (mobileInfoPanel?._inspectedEnemy === e) updateMobileInfoPanel(e.x, e.y)
@@ -6771,9 +6925,14 @@ more difficult:
 
   // Temple blessings are separate from full-HP recovery after a normal death.
   function tryTempleHeal() {
+    ArtifactWayfaring.rechargeCastaway()
     curePlayerPoison()
-    const cap = Math.min(70, playerMaxHp())
+    const cap = ArtifactWayfaring.templeCap()
     if (player.hp >= cap) return
+    if (playerHasArtifactAbility('exile')) {
+      log(playerKnowsArtifactAbility('exile') ? 'Exile denies you the Temple blessing.' : 'A strange power denies you the Temple blessing.', 'info')
+      return
+    }
     if (player.lvl > 1 && player.totalXpEarned <= player.lastTempleHealXp) {
       log('The temple remains silent. Its blessing awaits proof of your growth.', 'info')
       return
@@ -6788,6 +6947,8 @@ more difficult:
     resetSwimming()
     cancelAllPreparedEnemyAbilities()
     const wasDead = player.hp <= 0
+    ArtifactWayfaring.rechargeCastaway()
+    ArtifactWayfaring.waterLand()
     if (wasDead) {
       player.artifactBraveryCharge = false
       player.artifactRiposteReady = false
@@ -6798,6 +6959,7 @@ more difficult:
       player.artifactEvasionPrepared = false
       player.artifactMartialEvasionPending = false
       player.artifactElusiveReady = false
+      ArtifactWayfaring.clearCombat()
       player.artifactBoneplateExpiries = []
       player.artifactSoulFedExpiries = []
       player.artifactDancerUntilTurn = 0
@@ -6820,10 +6982,16 @@ more difficult:
     const finish = () => {
       clearSpiderWeb()
       if (wasDead) {
+        ArtifactWayfaring.resetEndurance()
+        player.wayfaring.discoveredPending=0
+        player.wayfaring.discoveredPrevious=false
+        player.wayfaring.lastVisitedZ=0
         player.hp = playerMaxHp()
         checkPlayerHealthWarning()
         player.lastTempleHealXp = player.totalXpEarned
       } else tryTempleHeal()
+      ArtifactWayfaring.visitDepth()
+      discoverPlayerSight(wasDead ? 'arrival' : 'sight')
       pendingMove = null
       clearAutoPath()
       stopCameraAnimation()
@@ -6836,7 +7004,7 @@ more difficult:
   }
 
   function createPermadeathBody(killer, place = true) {
-    const gear = ['weapon', 'shield', 'armor'].map(slot => player.equip[slot]).filter(Boolean)
+    const gear = ['weapon', 'shield', 'armor'].map(slot => player.equip[slot]).filter(item => item && !item.godTestArtifact)
     const bestTier = gear.length ? Math.max(...gear.map(i => i.tier || 0)) : -1
     const best = gear.filter(i => (i.tier || 0) === bestTier)
     const bodyGear = best.length ? pick(best) : null
@@ -6878,6 +7046,7 @@ more difficult:
       item.count = 1
     } else {
       player.inventory.splice(dropped.index, 1)
+      ArtifactWayfaring.inventoryChanged(item)
     }
     const remains = {
       x: player.x,
@@ -6894,6 +7063,12 @@ more difficult:
 
   function resetForNewCharacter() {
     AdaptivePlayerTrolling.reset()
+    // The next character shares this world, but not the debug-only stock.
+    merchantStock = merchantStock.filter(item => !item.godTestArtifact)
+    groundItems = groundItems.filter(entry => !entry.item?.godTestArtifact)
+    for (const enemy of enemies) {
+      if (enemy.stolenItem?.godTestArtifact) enemy.stolenItem = null
+    }
     const departureZ = currentZ
     clearLevelUpPopup()
     closeNpcMenu()
@@ -6936,6 +7111,8 @@ more difficult:
     spiderWebSourceId: null,
       godMode: false,
       godInvisible: false,
+      godArtifactStockGranted: false,
+      wayfaring: ArtifactWayfaring.freshState(player.wayfaring),
       lastPositionChangeTurn: turnCount,
       artifactBraveryCharge: false,
       artifactRiposteReady: false, artifactRetributionStored: 0,
@@ -7265,46 +7442,58 @@ more difficult:
 
   function forestHideChance(e, dist) {
     const halfling = raceDef()?.id === 'halfling'
-    if (!playerHasForestCover() || e.aware || dist <= ATTACK_RANGE || (e.alarmed && !halfling)) return 0
-    return Math.min(1, 0.33 + 0.05 * dist + (halfling ? 0.20 : 0))
+    if (!ArtifactWayfaring.coverAvailable() || ArtifactWayfaring.ignoresCover(e) || e.aware || dist <= ATTACK_RANGE || (e.alarmed && !halfling)) return 0
+    return Math.min(1, 0.33 + 0.05 * dist + (halfling ? 0.20 : 0) + ArtifactWayfaring.forestBonus())
   }
 
+  function forestCached(e) {
+    return (playerHasForestCover() || ArtifactWayfaring.forestGap()) && e.forestConcealX===player.x && e.forestConcealY===player.y
+  }
+  function concealCached(e) {
+    return forestCached(e) || ArtifactWayfaring.cachedUnseen(e)?.hidden === true
+  }
   function visibleForestConcealmentEnemies() {
-    if (!playerHasForestCover()) return []
+    if (!ArtifactWayfaring.coverAvailable()) return []
     const visible = enemies.filter(e => e.alive && onCurrentLevel(e) && !enemyIsPassive(e) && enemyIsVisibleOnMainView(e))
     visible.sort((a,b) => Math.max(Math.abs(a.x-player.x),Math.abs(a.y-player.y)) -
       Math.max(Math.abs(b.x-player.x),Math.abs(b.y-player.y)))
     return visible
   }
-
   function playerConcealedFromVisibleEnemies(visible = visibleForestConcealmentEnemies()) {
-    return visible.filter(other => {
-      const dist = Math.max(Math.abs(other.x-player.x),Math.abs(other.y-player.y))
-      return forestHideChance(other,dist)>0 && other.forestConcealX===player.x && other.forestConcealY===player.y
-    })
+    return visible.filter(e => forestHideChance(e,Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y)))>0 && concealCached(e))
   }
-
   function playerConcealmentInfo() {
-    if (!playerHasForestCover()) return ''
-    const visible = visibleForestConcealmentEnemies()
-    const e = visible[0]
-    if (!e) return '<div class="pfx">Forest cover · no visible monster nearby</div>'
-    const dist = Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))
-    const hidden = forestHideChance(e, dist) > 0 && e.forestConcealX === player.x && e.forestConcealY === player.y
-    const concealed = playerConcealedFromVisibleEnemies(visible)
-    const statuses = concealed.map(other => `<div class="pfx">Concealed from ${other.name}</div>`).join('')
-    const odds = Math.round(100 * forestHideChance(e,dist))
-    return statuses + `<div class="pfx">Hide chance vs ${e.name}: ${odds}%${hidden ? ' (new check; current cover holds)' : dist > effectiveAggroRange(e) ? ' (if it checks from this distance)' : ''}</div>`
+    if (!ArtifactWayfaring.coverAvailable()) return ''
+    const visible = visibleForestConcealmentEnemies(), e = visible[0]
+    if (!e) return '<div class="pfx">Cover · no visible monster nearby</div>'
+    const dist=Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))
+    const statuses=playerConcealedFromVisibleEnemies(visible).map(other=>`<div class="pfx">Concealed from ${other.name}</div>`).join('')
+    const cached=ArtifactWayfaring.cachedUnseen(e)
+    const odds=Math.round(100*forestHideChance(e,dist))
+    const note=concealCached(e)&&odds?' (current cover holds)':cached&&!cached.hidden?' (already checked)':ArtifactWayfaring.forestGap()&&!ArtifactWayfaring.unseenActive()?' (no new check in open ground)':''
+    return statuses+`<div class="pfx">Hide chance vs ${e.name}: ${odds}%${note}</div>`
   }
-
   function forestConcealsPlayer(e, dist) {
-    const probability = forestHideChance(e, dist)
-    if (!probability) return false
-    if (e.forestConcealX === player.x && e.forestConcealY === player.y) return true
-    if (!chance(probability)) return false
-    e.forestConcealX = player.x
-    e.forestConcealY = player.y
-    if (enemyIsVisibleOnMainView(e)) log(`The trees conceal you from the ${e.name}.`, 'info')
+    const probability=forestHideChance(e,dist)
+    if(!probability) {ArtifactWayfaring.exposedTo(e);ArtifactWayfaring.rememberUnseen(e,false);return false}
+    if(forestCached(e)){ArtifactWayfaring.rememberUnseen(e,true);return true}
+    const cached=ArtifactWayfaring.cachedUnseen(e)
+    if(cached) {
+      if(cached.hidden&&playerHasForestCover()) {
+        e.forestConcealX=player.x;e.forestConcealY=player.y
+        ArtifactWayfaring.forestSuccess()
+      }
+      return cached.hidden
+    }
+    if(!playerHasForestCover()&&!ArtifactWayfaring.unseenActive())return false
+    const hidden=chance(probability)
+    ArtifactWayfaring.rememberUnseen(e,hidden)
+    if(!hidden)return false
+    if(playerHasForestCover()) {
+      e.forestConcealX=player.x;e.forestConcealY=player.y
+      ArtifactWayfaring.forestSuccess()
+    }
+    if(enemyIsVisibleOnMainView(e))log(playerHasForestCover()?`The trees conceal you from the ${e.name}.`:`The cover conceals you from the ${e.name}.`,'info')
     return true
   }
 
@@ -8201,7 +8390,7 @@ more difficult:
     // Resolve the same seeded far-wander decision for each missed surface
     // turn, in turn order. Only these travelers are paused off-floor; other
     // monsters retain their existing nearby off-floor wandering behavior.
-    const travelers = enemies.filter(e => e.alive && (e.level ?? 0) === 0 &&
+    const travelers = enemies.filter(e => e.alive && !Frostwalker.stranded(e) && (e.level ?? 0) === 0 &&
       (!e.levelKind || e.levelKind === 'surface') && enemyWanderMode(e) === 'far')
     if (!travelers.length) return
     surfaceFarCatchupTerrain = prepareSurfaceFarCatchupTerrain()
@@ -8333,7 +8522,7 @@ more difficult:
     const adjacent=new Set([currentZ-1,currentZ+1])
     for(const e of enemies) {
       const z=e.level??0
-      if(!e.alive||!adjacent.has(z)||e.aware||e.sleeping||e.pendingAbility||
+      if(!e.alive||Frostwalker.stranded(e)||!adjacent.has(z)||e.aware||e.sleeping||e.pendingAbility||
           e.wallAmbushHidden||enemyWanderMode(e)===false||
           (z===0&&enemyWanderMode(e)==='far')||
           Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))>ENEMY_WANDER_ACTIVE_RADIUS) continue
@@ -8600,7 +8789,7 @@ more difficult:
         regenEvery - Math.floor(player.lvl / race.regenLevelStep))
     }
     if (turnCount % regenEvery !== 0) return
-    healPlayer(1)
+    healPlayer(ArtifactWayfaring.regenAmount(1))
   }
 
   function tickBerryRegen() {
@@ -8609,11 +8798,13 @@ more difficult:
 
   function tickFreezing() {
     // Surface ice and the water exposed beneath it remain cold, just as snow
-    // and taiga do. Only leaving cold terrain clears the exposure counter.
-    const tile = currentZ === 0 && map[player.y] ? map[player.y][player.x] : null
-    const cold = tile === 'snow' || tile === 'taiga' || isLakeIce(tile) || tile === 'frozenriver' ||
-      ((tile === 'river' || tile === 'water') && tileUnderlays[keyXY(player.x, player.y)] === 'snow')
+    // and taiga do. Leaving the cold, warmth or Permafrost clears exposure.
+    const cold = ArtifactWayfaring.coldTerrain()
     if (!player.freezing) player.freezing = {active: false, turns: 0}
+    if (playerHasArtifactAbility('permafrost')) {
+      ArtifactWayfaring.clearFreezing()
+      return
+    }
     if (!cold || Campfires.warm()) {
       if (player.freezing.active) {
         player.freezing.active = false
@@ -8648,26 +8839,35 @@ more difficult:
     return Math.min(0.50, Math.max(0, speedAdvantage) * 0.05)
   }
 
-  function enemyTurn(reactedEnemy = null, playerMovement = null, bowShotTarget = null) {
+  function enemyTurn(reactedEnemy = null, playerMovement = null, bowShotTarget = null, preserveWindwalker = false) {
     if (player.hp <= 0 || deathTransition) return
     // A pending Elusive step is available only for the player's next action.
     // Clear the previous opportunity BEFORE enemies can create a new one.
     player.artifactElusiveReady = false
+    // An immediate surprise/ambush reaction can already have earned a step during this action.
+    if (!reactedEnemy && !preserveWindwalker) ArtifactWayfaring.clearFreeStep()
+    ArtifactWayfaring.beginStealthTurn()
+    const phases = ArtifactWayfaring.enemyPhases()
     updateAlarmedEnemies()
     turnCount++
-    artifactAlchemistClamp()
+    ArtifactWayfaring.visitDepth()
+    discoverPlayerSight()
+    if (playerHasArtifactAbility('troglodyte')) ArtifactWayfaring.syncHealth()
+    else artifactAlchemistClamp()
     // Keep independent temporary ATK boosts compact without resetting later stacks.
     player.artifactSoulFedExpiries = player.artifactSoulFedExpiries.filter(expiry => expiry > turnCount)
     Mimics.update()
     const trollingActive = AdaptivePlayerTrolling.active()
     if (trollingActive) AdaptivePlayerTrolling.onWorldTurn()
     Campfires.beginTurn()
+    Frostwalker.tick()
+    if (player.hp <= 0 || deathTransition) { ArtifactWayfaring.finishTurn(); return }
     DungeonHazards.onPlayerTurnConsumed(turnCount)
-    if (player.hp <= 0 || deathTransition) return
+    if (player.hp <= 0 || deathTransition) { ArtifactWayfaring.finishTurn(); return }
     const previousTraversal = turnSurfaceTraversal
     turnSurfaceTraversal = new Map()
     try {
-      return resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget, trollingActive)
+      return resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget, trollingActive, phases)
     } finally {
       turnSurfaceTraversal = previousTraversal
       // Fear stays active through its last action and damage can cancel it
@@ -8675,14 +8875,18 @@ more difficult:
       for (const e of enemies) if (e.fearTurns > 0) e.fearTurns--
       tickEnemyDefensiveTimers()
       tickEnemyAbilityCooldowns()
+      discoverPlayerSight()
+      ArtifactWayfaring.finishTurn()
     }
   }
 
-  function resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget = null, trollingActive = AdaptivePlayerTrolling.active()) {
+  function resolveEnemyTurn(reactedEnemy, playerMovement, bowShotTarget = null, trollingActive = AdaptivePlayerTrolling.active(), phases = 1) {
     ageBeastTracks()
+    ArtifactWayfaring.environmentalTurn()
+    if (player.hp <= 0 || deathTransition) return
     tickPlayerPoison()
     if (player.hp <= 0 || deathTransition) return
-    tickLakeIce(playerMovement)
+    if(!playerMovement?.iceAlreadyChecked) tickLakeIce(playerMovement)
     if (player.hp <= 0 || deathTransition) return
     tickFreezing()
     if (player.hp <= 0 || deathTransition) return
@@ -8704,6 +8908,7 @@ more difficult:
     // Occupancy is derived from living actors. Repair ghost blockers before
     // pursuit when a death, burrow or forced move left a stale occupied tile.
     rebuildActiveLevelOccupancy()
+    Frostwalker.tickStranded()
     // Changing away from the bow ends every ranged-cover standoff, including
     // monsters on nearby but currently inactive floors.
     if (!equippedShortBow()) for (const e of enemies) {
@@ -8713,18 +8918,33 @@ more difficult:
     }
     // The surface stays alive under elevated floors, but its creatures never
     // acquire the upstairs player or execute cross-floor combat abilities.
-    wanderSurfaceBelowTower()
-    wanderAdjacentLevelEnemies()
+    if (phases > 0) {
+      wanderSurfaceBelowTower()
+      wanderAdjacentLevelEnemies()
+    }
     const playerHidden = playerIsInvisible()
     if (playerHidden) {
       if (!player.godMode) player.invisibleTurns--
       if (!player.godMode && player.invisibleTurns === 0) log('The invisibility fades.', 'info')
     }
     const turnMap = map
+    for (let phase=0; phase<phases; phase++) {
+      if (map !== turnMap || player.hp <= 0 || deathTransition) return
+      if (phase > 0) { wanderSurfaceBelowTower(); wanderAdjacentLevelEnemies() }
+      resolveEnemyPhase(phase===0?reactedEnemy:null, phase===0?bowShotTarget:null, trollingActive)
+    }
+  }
+
+  function resolveEnemyPhase(reactedEnemy, bowShotTarget, trollingActive) {
+    const turnMap = map
     for (const e of enemies.slice()) {
       if (map !== turnMap || player.hp <= 0 || deathTransition) return
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
+      if (Frostwalker.enemyAction(e)) continue
+      ArtifactWayfaring.stopTrucePursuit(e)
       if (e.mimicSkipTurn === turnCount) continue
+      // An extra enemy phase cannot bypass a prepared ability’s player-response window.
+      if (e.pendingAbility?.preparedTurn === turnCount) continue
       if (e.artifactPetrified) {
         e.artifactPetrified = false
         if (enemyIsVisibleOnMainView(e)) log(`The ${e.name} is unable to act!`, 'good')
@@ -8779,6 +8999,8 @@ more difficult:
         if (takeFearTurn(e)) return
         continue
       }
+      if (ArtifactWayfaring.truce(e) && sleepingEnemyTurn(e,true,Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y)))) continue
+      if (ArtifactWayfaring.peace(e)) continue
       if (artifactConfusedEnemyAction(e)) continue
       if (collectiveMindSearchingScout(e) && takeCollectiveMindRetreatTurn(e)) continue
       const hiddenFromEnemy = playerHiddenFromEnemy(e)
@@ -8804,6 +9026,7 @@ more difficult:
       if (e.miningInvestigation && (hiddenFromEnemy || (!e.aware && !enemyHasSight(e))) &&
           Mining.investigate(e)) continue
       if (hiddenFromEnemy) {
+        if ((e.aware || e.alarmed) && ArtifactWayfaring.distractPursuer(e)) continue
         // Invisible attackers provoke only their target's immediate reaction;
         // other monsters still wander, but never pursue the hidden player.
         e.aware = false
@@ -8905,7 +9128,7 @@ more difficult:
           continue
         }
       }
-      if (!playerHasForestCover() ||
+      if (!(playerHasForestCover() || ArtifactWayfaring.forestGap()) ||
           (e.forestConcealX != null && (e.forestConcealX !== player.x || e.forestConcealY !== player.y))) {
         e.forestConcealX = null
         e.forestConcealY = null
@@ -8916,6 +9139,7 @@ more difficult:
         // never went through the "spotted you" branch below.
         if (!e.aware) {
           e.aware = true
+          ArtifactWayfaring.exposedTo(e)
           e.forestConcealX = null
           e.forestConcealY = null
           alarmEnemy(e)
@@ -8975,6 +9199,7 @@ more difficult:
         }
         if (!e.aware) {
           e.aware = true
+          ArtifactWayfaring.exposedTo(e)
           e.forestConcealX = null
           e.forestConcealY = null
           alarmEnemy(e)
@@ -9008,11 +9233,13 @@ more difficult:
               break
             }
           }
+          if (ArtifactWayfaring.distractPursuer(e)) break
           if (!enemyStepTowardPlayer(e)) break
           if (player.hp <= 0 || deathTransition) return
           pursuitActions--
         }
       } else {
+        if ((e.aware || e.alarmed) && dist > ATTACK_RANGE && ArtifactWayfaring.distractPursuer(e)) continue
         e.aware = false
         // A wander step can carry the enemy into its own aggro range, so re-check
         // straight away instead of leaving it oblivious until the next turn.
@@ -9040,6 +9267,7 @@ more difficult:
   /* ============================== ITEM PICKUP ============================== */
   // Catalog data never becomes executable code. These handlers are shared with replay.
   const ITEM_ACTION_HANDLERS_BASE = {
+    wayfaringPower: idx => ArtifactWayfaring.activate(idx),
     potion: idx => usePotion(idx),
     speedpotion: idx => useSpeedPotion(idx),
     strangeGreenPotion: idx => useStrangeGreenPotion(idx),
@@ -9082,15 +9310,17 @@ more difficult:
     }
   }
 
-  const FRENZY_ITEM_ACTIONS = new Set(['potion','speedpotion','strangeGreenPotion','scrollOfFear','scrollOfDeathShield',
+  const FRENZY_ITEM_ACTIONS = new Set(['wayfaringPower','potion','speedpotion','strangeGreenPotion','scrollOfFear','scrollOfDeathShield',
     'scrollOfChaos','stoneSkinPotion','berserkPotion','herb','mushroom','ediblemushroom',
     'berries','fish','cookedFood','scrollOfInvisibility','homecomingscroll','wayfaringscroll','echoBlightHorn','venomGland'])
   const ITEM_ACTION_HANDLERS = Object.fromEntries(Object.entries(ITEM_ACTION_HANDLERS_BASE).map(([action, fn]) => [action,
     async idx => {
       const item = player.inventory[idx]
       const frenzyEligible = FRENZY_ITEM_ACTIONS.has(action) && item &&
+        !(action === 'homecomingscroll' && ArtifactWayfaring.homecomingBlocker()) &&
         canUseItemsWhileSwimming() && player.berserkTurns > 0 && frenzyTargets().length > 0 &&
         !(action === 'scrollOfDeathShield' && player.deathShieldReady) &&
+        (action !== 'wayfaringPower' || ArtifactWayfaring.canActivate(idx)) &&
         (action !== 'venomGland' || (player.equip.weapon && !player.equip.weapon.venomCoated &&
           (!equippedShortBow() || player.inventory.some(entry => entry.kind === 'arrows' && entry.count > 0))))
       if (frenzyEligible) {
@@ -9151,6 +9381,11 @@ more difficult:
     return Object.assign(item, structuredClone(overrides), {kind})
   }
 
+  function carryItem(item) {
+    player.inventory.push(item)
+    ArtifactWayfaring.inventoryChanged(item)
+  }
+
   function addInventoryItem(kind, overrides = {}) {
     const item = createItem(kind, overrides)
     if (kind === 'mushroom') AdaptivePlayerTrolling.onMushroomsCollected(item.count || 1)
@@ -9160,7 +9395,7 @@ more difficult:
       existing.count = (existing.count || 1) + item.count
       return existing
     }
-    player.inventory.push(item)
+    carryItem(item)
     return item
   }
 
@@ -9204,6 +9439,7 @@ more difficult:
       if (item.kind === 'blackkey' && (player.equip.blackkey === item ||
         !player.inventory.some(other => other.kind === 'blackkey'))) player.equip.blackkey = null
     }
+    ArtifactWayfaring.inventoryChanged(item)
     AdaptivePlayerTrolling.onScrollInventoryChanged()
     log(`You place ${artifactDisplayName(item)} on the ground.`, 'info')
     consumeItemTurn()
@@ -9590,7 +9826,7 @@ more difficult:
       if (item) {
         const displayName = item.kind === 'artifact' ? artifactDisplayName(item) : item.name
         lootLog(`Your shovel strikes something buried. You unearth ${displayName}.`, item, displayName)
-        if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))) player.inventory.push(item)
+        if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))) carryItem(item)
       } else {
         log('Your shovel finds the outline of something long since ruined.', 'loot')
       }
@@ -9736,8 +9972,8 @@ more difficult:
         const existing = player.inventory.find(it => it.kind === item.kind &&
           !it.dwarvenRemainsLootId && !item.dwarvenRemainsLootId)
         if (existing) existing.count = (existing.count || 1) + (item.count || 1)
-        else player.inventory.push(item)
-      } else player.inventory.push(item)
+        else carryItem(item)
+      } else carryItem(item)
       groundItems.splice(groundItems.indexOf(dropped), 1)
       log(`You pick up ${item.count > 1 ? item.count + ' × ' : ''}${artifactDisplayName(item)}.`, 'loot')
       spawnPickupAnim(dropped)
@@ -9823,7 +10059,7 @@ more difficult:
         player.gold += stolenLoot.gold
         log(`You recover ${stolenLoot.gold} stolen gold from the thief's bag.`, 'loot')
       } else {
-        player.inventory.push(stolenLoot.item)
+        carryItem(stolenLoot.item)
         lootLog(`You recover ${artifactDisplayName(stolenLoot.item)} from the thief's bag.`, stolenLoot.item, artifactDisplayName(stolenLoot.item))
       }
       spawnPickupAnim(stolenLoot)
@@ -9833,7 +10069,7 @@ more difficult:
       return
     }
     if (playerRemains) {
-      if (playerRemains.item) player.inventory.push(playerRemains.item)
+      if (playerRemains.item) carryItem(playerRemains.item)
       if (playerRemains.item) lootLog(`You recover ${artifactDisplayName(playerRemains.item)} from your remains.`, playerRemains.item)
       else log('Nothing remains to recover.', 'loot')
       spawnPickupAnim(playerRemains)
@@ -10010,7 +10246,7 @@ more difficult:
       lastLootResult = `${item.name}.`
       lastLootHighlights = itemLogHighlight(item)
       if (!suppressLootLog) lootLog(`You open a chest and find a ${item.name}.`, item)
-      if (!maybeAutoEquipWeapon(item, true)) player.inventory.push(item)
+      if (!maybeAutoEquipWeapon(item, true)) carryItem(item)
     },
     chitin: (chestTier, mf, entry) => {
       const count = randInt(entry.countMin, entry.countMax)
@@ -10030,7 +10266,7 @@ more difficult:
       lastLootHighlights = itemLogHighlight(item)
       if (!suppressLootLog) lootLog(`You open a chest and find ${item.name}.`, item)
       if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))) {
-        player.inventory.push(item)
+        carryItem(item)
       }
     },
     potion: () => {
@@ -10093,7 +10329,7 @@ more difficult:
           lastLootResult=`${name}, ${gold} gold and ${bonuses.join(', ')}.`
           lastLootHighlights=itemLogHighlight(item,name)
           if(!suppressLootLog)lootLog(`You open the labyrinth chest: ${name}, ${gold} gold, and ${bonuses.join(' and ')}.`,item,name)
-          if(!(item.kind==='weapon'&&maybeAutoEquipWeapon(item,true)))player.inventory.push(item)
+          if(!(item.kind==='weapon'&&maybeAutoEquipWeapon(item,true)))carryItem(item)
           spawnPickupAnim(g)
           groundItems.splice(i,1)
           continue
@@ -10123,7 +10359,7 @@ more difficult:
           lastLootResult = `${name} and ${gold} gold.`
           lastLootHighlights = itemLogHighlight(item,name)
           if (!suppressLootLog) lootLog(`You open the royal treasury chest and find ${name} and ${gold} gold!`,item,name)
-          if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item,true))) player.inventory.push(item)
+          if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item,true))) carryItem(item)
           Campfires.findFlint(0.005)
           spawnPickupAnim(g)
           groundItems.splice(i,1)
@@ -10131,7 +10367,7 @@ more difficult:
         }
         if (g.artifactGuaranteed) {
           const art = makeArtifactItem(chestTier, mf)
-          player.inventory.push(art)
+          carryItem(art)
           lastLootResult = `${artifactDisplayName(art)}.`
           lastLootHighlights = itemLogHighlight(art, artifactDisplayName(art))
           if (!suppressLootLog) lootLog(`You open the chest. Inside rests ${artifactDisplayName(art)}.`, art, artifactDisplayName(art))
@@ -10144,7 +10380,7 @@ more difficult:
         if (reward.result === 'artifact') {
           const item = reward.item
           const label = artifactDisplayName(item)
-          player.inventory.push(item)
+          carryItem(item)
           lastLootResult = `${label}.`
           lastLootHighlights = itemLogHighlight(item, label)
           if (!suppressLootLog) lootLog(`You open a chest and find ${label}.`, item, label)
@@ -10207,6 +10443,7 @@ more difficult:
 
   /* ============================== MOVEMENT ============================== */
   let mapOpen = false, invOpen = false, tradeOpen = false, bestiaryOpen = false
+  let farsightViewOpen = false
   let npcMenuOpen = false, npcMenuNpc = null
   let raceOpen = true // block play input from startup through character creation
   let worldGenerating = false
@@ -10602,8 +10839,10 @@ more difficult:
     // A boulder is a deliberate mining interaction, never a travel shortcut.
     // Keep it blocked with a Pickaxe and even when God Mode permits manual entry.
     if (map[y]?.[x] === 'boulder') return false
+    if (map[y]?.[x] === 'lava' && !ArtifactWayfaring.lavaImmune() && (!player.godMode || ArtifactWayfaring.lavaWalk())) return false
     if (DungeonTraps.isTrigger(map[y]?.[x]) || DungeonHazards.knownDanger(x,y)) return false
     if (Mining.blocksPathAt(x, y)) return false
+    if (deepSwimmingWater(x,y) && (playerHasArtifactAbility('water_walking') || Frostwalker.has())) return true
     if (isWalkableForPlayer(x, y) || isClosedDungeonDoorTile(map[y]?.[x])) return true
     // Auto-travel may spend a key it already carries, but it never starts
     // noisy weapon breaching on the player's behalf.
@@ -10614,9 +10853,11 @@ more difficult:
   // budget; rivers and intact ice are not deep water. A swimmer already in
   // water must use their remaining endurance rather than start a fresh count.
   function autoPathHasSafeSwim(path) {
-    if (player.godMode || raceHas('swims')) return true
-    let waterRun = deepSwimmingWater(player.x, player.y) ? (player.swimTurns || 0) : 0
-    const limit = Math.max(0, player.swimming || 0)
+    if (!Frostwalker.safePath(path)) return false
+    if (Frostwalker.has() || player.godMode || raceHas('swims')) return true
+    let waterRun = deepSwimmingWater(player.x, player.y) ?
+      ArtifactWayfaring.ruleWaterDuration()-ArtifactWayfaring.waterRemaining()+(player.swimTurns || 0) : 0
+    const limit = Math.max(0, player.swimming || 0) + ArtifactWayfaring.ruleWaterDuration()
     for (const step of path) {
       waterRun = deepSwimmingWater(step.x, step.y) ? waterRun + 1 : 0
       if (waterRun > limit) return false
@@ -10627,7 +10868,7 @@ more difficult:
   function findPlayerPath(targetX, targetY, discoveredOnly = false) {
     if (targetX < 0 || targetY < 0 || targetX >= MAP_W || targetY >= MAP_H) return null
     const knownTiles = currentZ === 0 ? discovered : undergroundDiscovered
-    if ((discoveredOnly || currentZ < 0) && !knownTiles?.[targetY]?.[targetX]) return null
+    if (!player.godMode && (discoveredOnly || currentZ < 0) && !knownTiles?.[targetY]?.[targetX]) return null
     // The same tile is examined from up to eight neighbours. Memoize terrain
     // checks within this synchronous search, never across game turns.
     const traversableCache = new Map()
@@ -10639,10 +10880,12 @@ more difficult:
     }
     if (!canTraverse(targetX, targetY)) return null
     if (targetX === player.x && targetY === player.y) return []
-    const unlimitedSwim = player.godMode || raceHas('swims')
-    const swimLimit = Math.max(0, player.swimming || 0)
-    const startInWater = deepSwimmingWater(player.x, player.y)
-    const initialRun = !unlimitedSwim && startInWater ? (player.swimTurns || 0) : 0
+    const frost = Frostwalker.has()
+    const unlimitedSwim = !frost && (player.godMode || raceHas('swims'))
+    const swimLimit = frost ? artifactRule('frostwalker','meltAfter')-1 : Math.max(0, player.swimming || 0) + ArtifactWayfaring.ruleWaterDuration()
+    const inCrossing = (x,y) => deepSwimmingWater(x,y) || (frost && (map[y]?.[x]==='river'||!!Frostwalker.at(x,y)))
+    const startInWater = inCrossing(player.x, player.y)
+    const initialRun = startInWater && !unlimitedSwim ? (frost ? Frostwalker.crossingAge() : ArtifactWayfaring.ruleWaterDuration()-ArtifactWayfaring.waterRemaining()+(player.swimTurns || 0)) : 0
     // Breadth-first search still finds the shortest safe route. Water tiles
     // remember the lowest consecutive swim count seen at an equal or shorter
     // distance. A higher count cannot improve any continuation, so discard it
@@ -10665,12 +10908,12 @@ more difficult:
       for (const [dx, dy] of DIRS8) {
         const nx = cur.x + dx, ny = cur.y + dy
         if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue
-        if ((discoveredOnly || currentZ < 0) && !knownTiles?.[ny]?.[nx]) continue
+        if (!player.godMode && (discoveredOnly || currentZ < 0) && !knownTiles?.[ny]?.[nx]) continue
         if (!canTraverse(nx, ny)) continue
         const nk = keyXY(nx, ny)
         if ((nx !== targetX || ny !== targetY) && occupied.has(nk)) continue
         if ((nx !== targetX || ny !== targetY) && npcs.some(n => n.x === nx && n.y === ny)) continue
-        const inWater = deepSwimmingWater(nx, ny)
+        const inWater = inCrossing(nx, ny)
         const nextRun = inWater && !unlimitedSwim ? cur.waterRun + 1 : 0
         if (inWater && !unlimitedSwim && nextRun > swimLimit) continue
         const tileId = ny * MAP_W + nx
@@ -10696,7 +10939,7 @@ more difficult:
       fromX = tile.x
       fromY = tile.y
     }
-    return steps
+    return autoPathHasSafeSwim(steps) ? steps : null
   }
 
   function refreshAutoChasePath() {
@@ -10723,7 +10966,7 @@ more difficult:
   }
 
   function startPlannedAutoPath(path, targetEnemy = null) {
-    if (!path?.length) return false
+    if (player.wayfaring.rush || !path?.length) return false
     clearAutoPath()
     autoPath = path
     autoPathTargetEnemy = targetEnemy
@@ -10748,7 +10991,7 @@ more difficult:
     if (currentZ === 0 && Math.max(Math.abs(x - spawnPoint.x), Math.abs(y - spawnPoint.y)) <= FLEE_DISTANCE) return
     const ancient = map[y][x] === 'ancientForest'
     if (map[y][x] !== 'forest' && !ancient) return
-    if (!chance(WORLD_GEN_CONFIG.surfaceEnemies.forestAmbushChance)) return
+    if (!chance(ArtifactWayfaring.ambushChance(WORLD_GEN_CONFIG.surfaceEnemies.forestAmbushChance))) return
     const candidates = []
     for (const [dx, dy] of DIRS8) {
       const nx = x + dx, ny = y + dy
@@ -10763,6 +11006,9 @@ more difficult:
     const templates = ENEMY_TEMPLATES.filter(t => t.aggro !== 0 && t.name !== 'Ghost' && (ancient ? t.tier >= 3 : (t.tier === 1 || t.tier === 2)) && enemyBiomes(t).includes('forest') && naturalSpawnEligible(t))
     if (!templates.length) return
     const tmpl = pickWeighted(templates, t => t.rarity ?? 1)
+    // A peaceful beast's ambush is cancelled, not replaced by a humanoid.
+    // This preserves every other species' original ambush probability.
+    if (ArtifactWayfaring.truce({...tmpl,x,y,alive:true})) return
     const spot = pick(candidates)
     const variance = WORLD_GEN_CONFIG.surfaceEnemies.statVarianceMin + rng() * WORLD_GEN_CONFIG.surfaceEnemies.statVarianceSpan
     const e = {
@@ -10798,12 +11044,14 @@ more difficult:
   // The shared, fully resolved player tile-entry path also serves free
   // steps from artifacts. It runs hazards, swimming, pickups, tracking
   // and discovery exactly once; its caller owns whether time advances.
-  function finishPlayerStep(nx,ny, {voluntary = true} = {}) {
+  function finishPlayerStep(nx,ny, {voluntary = true, teleport = false} = {}) {
     const fromPos={x:player.x,y:player.y}
+    const wayfaringStep = ArtifactWayfaring.stepContext(fromPos.x,fromPos.y)
     player.miningArmedTarget = null
     player.x = nx
     player.y = ny
-    markPlayerPositionChanged(voluntary)
+    markPlayerPositionChanged(voluntary,teleport)
+    ArtifactWayfaring.reconcileTruce()
     if (player.spiderWebSourceId) {
       clearSpiderWeb()
       log('You tear free of the spider web!', 'good')
@@ -10814,16 +11062,20 @@ more difficult:
     alarmGalleryShootersAt(player.x, player.y)
     if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return false
     completeFishermanLesson(fromPos)
-    advanceSwimming(true, fromPos)
-    if (player.hp <= 0 || deathTransition || player.x !== nx || player.y !== ny) return false
+    ArtifactWayfaring.lavaEntry(fromPos)
+    if (player.hp <= 0 || deathTransition) return false
+    Frostwalker.enter(fromPos,teleport)
+    advanceSwimming(!teleport, fromPos)
+    if (player.hp <= 0 || deathTransition) return false
+    if (player.x !== nx || player.y !== ny) return true
     checkOldHunterInvestigation()
-    player.steps++
+    if (!teleport) player.steps++
     Mimics.revealAdjacent()
     if (player.hp <= 0 || deathTransition) return false
     checkGroundAt(nx, ny)
     checkWorldEdge()
     if (isTempleGround(map[ny][nx])) {
-      const canHeal = player.lvl === 1 || player.totalXpEarned > player.lastTempleHealXp
+      const canHeal = !playerHasArtifactAbility('exile') && (player.lvl === 1 || player.totalXpEarned > player.lastTempleHealXp)
       if (player.poisonTurns > 0 || canHeal || !isTempleGround(map[fromPos.y][fromPos.x])) tryTempleHeal()
     }
     if (currentZ === 0 && map[ny][nx] === 'ancientForest' && map[fromPos.y][fromPos.x] !== 'ancientForest') {
@@ -10884,9 +11136,12 @@ more difficult:
         log('The old stone staircase leads back up. Press "inspect" to climb up.', 'info')
       }
     }
+    ArtifactWayfaring.describeCave(nx,ny)
     if (currentZ === -2 && cryptLevel2 && map[ny][nx] === 'crypttrap') {
       log(CRYPT2_TRAP_DISCOVER, 'info')
     }
+    if (!teleport) ArtifactWayfaring.onStep(wayfaringStep)
+    discoverPlayerSight()
     AdaptivePlayerTrolling.onPlayerMoved()
     maybeSpawnForestAmbush(nx, ny)
     consecutiveWaitTurns = 0
@@ -10896,7 +11151,11 @@ more difficult:
   }
 
   function artifactFreeStepTileOpen(x,y) {
+    const tile=map[y]?.[x]
     return isWalkableForPlayer(x,y) && !occupied.has(keyXY(x,y)) &&
+      !isClosedDungeonDoorTile(tile) && !isLockedDungeonDoorTile(tile) &&
+      !['dwarvenlever','dwarvenleverpulled','dwarvengasvalve','dwarvencrate','dwarvenrubble','cryptrubble'].includes(tile) &&
+      !TowerMaze.atLever(x,y) && !Mining.canTarget(x,y) && !Mimics.hiddenAt(x,y) &&
       !enemies.some(e => e.alive && onCurrentLevel(e) && e.x === x && e.y === y) &&
       !(currentZ === 0 && npcs.some(n => n.x === x && n.y === y))
   }
@@ -10917,6 +11176,7 @@ more difficult:
   }
 
   async function tryMove(dx, dy, autoTravel = false) {
+    if (player.wayfaring.rush) return ArtifactWayfaring.rushStep(dx,dy)
     if (fireballAim || holeJumpOpen) return false
     if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (!replayAnimationsDisabled && (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending())) {
@@ -10939,19 +11199,6 @@ more difficult:
     const nx = player.x + dx, ny = player.y + dy
     const ek = keyXY(nx, ny)
     const target = enemies.find(e => onCurrentLevel(e) && e.x === nx && e.y === ny && e.alive)
-    if (player.artifactElusiveReady && playerHasArtifactAbility('elusive') &&
-        player.rootTurns <= 0 && !target && artifactFreeStepTileOpen(nx,ny)) {
-      player.artifactElusiveReady = false
-      clearAutoPath()
-      const fromPos = {x:player.x,y:player.y}
-      const moved = finishPlayerStep(nx,ny)
-      if (moved) {
-        artifactAbilityMessage('elusive','Elusive grants a free step!', 'You slip through the opening!')
-        animateCameraToPlayer(fromPos, {walking: player.x === nx && player.y === ny, duration: autoTravel ? AUTO_MOVE_ANIM_MS : MOVE_ANIM_MS})
-      } else render()
-      updateHud(); updateTooltip(); flushPendingMove()
-      return
-    }
     if (target) {
       clearAutoPath()
       if (target.wallAmbushHidden || target.pendingAbility?.type === 'burrow') {
@@ -11201,13 +11448,34 @@ more difficult:
       updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
       return
     }
-    if (Mimics.revealBump(nx,ny)) {
+    if (Mimics.hiddenAt(nx,ny)) {
+      ArtifactWayfaring.clearFreeStep()
+      Mimics.revealBump(nx,ny)
       clearAutoPath(); consecutiveWaitTurns=0
-      enemyTurn();npcTurn();updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
+      enemyTurn(null,null,null,true);npcTurn();updateHud();render();runAnimationLoop();updateTooltip();flushPendingMove()
+      return
+    }
+    // Consume Windwalker before Elusive so that each source keeps its own
+    // opportunity and using both produces two deliberate, zero-turn steps.
+    const freeStep = player.wayfaring.windwalkerReady && playerHasArtifactAbility('windwalker') ? 'windwalker' :
+      player.artifactElusiveReady && playerHasArtifactAbility('elusive') ? 'elusive' : null
+    if (freeStep && (dx || dy) && player.rootTurns <= 0 && !target && artifactFreeStepTileOpen(nx,ny)) {
+      if (freeStep==='windwalker') ArtifactWayfaring.clearFreeStep()
+      else player.artifactElusiveReady = false
+      clearAutoPath()
+      const fromPos = {x:player.x,y:player.y}
+      const moved = finishPlayerStep(nx,ny)
+      if (moved) {
+        artifactAbilityMessage(freeStep,`${ARTIFACT_ABILITIES.abilities[freeStep].name} grants a free step!`, 'You slip through the opening!')
+        animateCameraToPlayer(fromPos, {walking: player.x === nx && player.y === ny, duration: autoTravel ? AUTO_MOVE_ANIM_MS : MOVE_ANIM_MS})
+      } else render()
+      updateHud(); updateTooltip(); flushPendingMove()
       return
     }
     if (isWalkableForPlayer(nx, ny)) {
-      if (!finishPlayerStep(nx,ny)) return
+      ArtifactWayfaring.ordinaryStep()
+      if (!finishPlayerStep(nx,ny)) { ArtifactWayfaring.resetEndurance(); return }
+      if (nx !== fromPos.x || ny !== fromPos.y) ArtifactWayfaring.countOrdinaryStep()
       moved = true
     } else if (autoPath) {
       clearAutoPath()
@@ -11222,7 +11490,7 @@ more difficult:
       updateTooltip()
       return
     }
-    enemyTurn(null, {fromTile})
+    enemyTurn(null, {fromTile}, null, true)
     npcTurn()
     updateHud()
     // A successful Pull has its own web-then-drag camera animation. Do not
@@ -11241,6 +11509,7 @@ more difficult:
   }
 
   async function skipTurn() {
+    if (player.wayfaring.rush) return ArtifactWayfaring.finishRush()
     if (fireballAim) return
     if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
     if (cameraAnimating || attackAnim || chargeAnimationPending() || enemyAttackPresentationPending()) return
@@ -11365,6 +11634,7 @@ more difficult:
         undergroundDiscovered = undergroundDiscoveredL1
         rebuildActiveLevelOccupancy()
         updateSurfaceAbsence(departureZ)
+        if (playerHasArtifactAbility('troglodyte')) ArtifactWayfaring.syncHealth()
         log('You descend into the crypt.', 'info')
         resetSwimming()
         stopCameraAnimation()
@@ -11407,7 +11677,7 @@ more difficult:
         const item = makeImprovisedWeapon(name)
         hut.startingWeaponTaken = true
         lootLog(`This thatched hut belongs to a human peasant ${hut.name}. Inside, you found a ${name}. Sturdy enough to be used as a weapon. Better than bare hands, at least.`, item, name)
-        if (!maybeAutoEquipWeapon(item)) player.inventory.push(item)
+        if (!maybeAutoEquipWeapon(item)) carryItem(item)
         updateHud()
         return
       }
@@ -11451,9 +11721,9 @@ more difficult:
     }
     const hereTile = map[player.y][player.x]
     // Floor appearance is chosen per cave, not by the shared terrain key.
-    const here = (hereTile === 'cavefloor' || hereTile === 'cavefloor2')
+    const here = Frostwalker.description(player.x,player.y) || ((hereTile === 'cavefloor' || hereTile === 'cavefloor2')
       ? (brownDeepCaveAt(player.x, player.y) ? 'the brown dirt floor of a cave' : 'the cold stone floor of a cave')
-      : (TILE_DESC[hereTile] || 'unfamiliar ground')
+      : (TILE_DESC[hereTile] || 'unfamiliar ground'))
     log(`You are standing on ${here}.`, 'info')
     // Standalone lore-item tiles (bell, pillar) are themselves the point of
     // interest - unlike a biome tile, they shouldn't also report on the
@@ -11634,7 +11904,7 @@ more difficult:
           t === 'village' ||
           inspectableTerrain.has(t)
         ) {
-          const label = TILE_DESC[t]
+          const label = Frostwalker.description(nx,ny) || TILE_DESC[t]
           if (label) addNote(label, direction)
         }
       }
@@ -11692,8 +11962,8 @@ more difficult:
 
   /* ============================== RENDERING ============================== */
 
-  const canvas = document.getElementById('game')
-  const ctx = canvas.getContext('2d')
+  let canvas = document.getElementById('game')
+  let ctx = canvas.getContext('2d')
   const MIN_VIEW_TILES = 7, MAX_VIEW_TILES = 50
   const TILE_ZOOM_MIN = 20, TILE_ZOOM_MAX = 96, TILE_ZOOM_STEP = 4
   const MOBILE_VIEW_W = 16
@@ -11943,10 +12213,11 @@ more difficult:
   // the tile-sized version once per decoded image and reuse it.
   let scaledVisualCache = new WeakMap()
 
-  function prepareAnimatedVisuals() {
+  function prepareAnimatedVisuals(onlyPath = null) {
     for (const visual of Object.values(RENDER_STYLE?.terrainTiles || {})) {
       if (!Array.isArray(visual.frames)) continue
       for (const path of visual.frames) {
+        if (onlyPath && path !== onlyPath) continue
         const image = preloadedImages.get(path)
         if (image) scaledVisualCanvas(image, visual.scale ?? 1, visual.filter || '')
       }
@@ -12678,6 +12949,28 @@ more difficult:
     drawCreature(px, py, enemyGlyph(enemy), shimmers ? '#d8caef' : enemyColor(enemy))
   }
 
+  function drawEnemyStatusOutlines(e, px, py) {
+    if (e.aware) {
+      ctx.save()
+      ctx.strokeStyle = RENDER_STYLE.overlays.enemyAwareOutline
+      ctx.lineWidth = 2
+      ctx.setLineDash([])
+      ctx.strokeRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4)
+      ctx.restore()
+    }
+    if (enemyIsEnraged(e)) {
+      // Enrage is independent of pursuit. Keep its dashed marker inside the
+      // solid awareness outline and the optional range-owner border.
+      ctx.save()
+      ctx.strokeStyle = RENDER_STYLE.overlays.enemyEnragedOutline
+      ctx.lineWidth = TILE_PX < 24 ? 1.5 : 2
+      const inset = TILE_PX < 24 ? 4 : 5
+      ctx.setLineDash([Math.max(2, TILE_PX * 0.10), Math.max(2, TILE_PX * 0.065)])
+      ctx.strokeRect(px + inset, py + inset, TILE_PX - 2 * inset, TILE_PX - 2 * inset)
+      ctx.restore()
+    }
+  }
+
   function drawPlayerVisual(px, py, color, alpha) {
     const image = playerRaceImagePath()
     const visual = image === RENDER_STYLE.player.image
@@ -12687,11 +12980,11 @@ more difficult:
     drawCreature(px, py, RENDER_STYLE.player.glyph, color, alpha)
   }
 
-  function drawSwimmingCreature(px, py, draw, visibleFraction = 1 / 2) {
+  function drawSwimmingCreature(px, py, draw, visibleFraction = 1 / 2, fullHeight = false) {
     const tileX = Math.floor((px + TILE_PX / 2) / TILE_PX + camX)
     const tileY = Math.floor((py + TILE_PX / 2) / TILE_PX + camY)
     const tile = map[tileY]?.[tileX]
-    if (tile !== 'water' && tile !== 'river') {
+    if (fullHeight || (tile !== 'water' && tile !== 'river')) {
       draw()
       return
     }
@@ -12985,10 +13278,11 @@ more difficult:
 
   // Enemies slide between tiles using the same easing/duration as the player's
   // camera pan, so a turn reads as one continuous motion rather than a snap.
-  function finishEnemyMove(e, fromX, fromY) {
+  function finishEnemyMove(e, fromX, fromY, forced = false) {
     DungeonTraps.onEntry(e, fromX, fromY)
     DungeonHazards.onActorEntered(e, fromX, fromY)
     if (!e.alive) return
+    if (forced) Frostwalker.forcedEntry(e)
     // Passive swimming is announced only when entering deep water, not on
     // each subsequent water tile. No RNG or persistent entry flag is needed.
     if (enemyHasAbility(e, 'swim') && map[fromY]?.[fromX] !== 'water' &&
@@ -13093,7 +13387,7 @@ more difficult:
     runAnimationLoop()
   }
 
-  function beginEnemyAttackAnim(e) {
+  function beginEnemyAttackAnim(e, target = null) {
     if (replayAnimationsDisabled || replaySimulationMode) {
       e.attackStart = undefined
       return {start: 0, delay: 0}
@@ -13102,6 +13396,10 @@ more difficult:
     // Preserve both visual strikes when the same creature earns an extra hit.
     if (!e.attackVisualQueue) e.attackVisualQueue = []
     e.attackVisualQueue.push(presentation.start)
+    if (target) {
+      if (!e.attackVisualTargets) e.attackVisualTargets = new Map()
+      e.attackVisualTargets.set(presentation.start, {x:target.x,y:target.y})
+    }
     return presentation
   }
 
@@ -13114,6 +13412,7 @@ more difficult:
       e.animStart = undefined
       e.attackStart = undefined
       e.attackVisualQueue = undefined
+      e.attackVisualTargets = undefined
       e.chargeAnim = undefined
     }
     for (const n of npcs) n.animStart = undefined
@@ -13126,6 +13425,7 @@ more difficult:
         e.animStart = undefined
         e.attackStart = undefined
         e.attackVisualQueue = undefined
+        e.attackVisualTargets = undefined
         e.chargeAnim = undefined
         continue
       }
@@ -13887,22 +14187,26 @@ more difficult:
   }
 
 
-  function renderScene(now, terrainCells = null) {
+  function renderScene(now, terrainCells = null, vision = null) {
     if (!map.length || worldGenerating) return
-    updateAlarmedEnemies()
-    const undergroundVisible = currentUndergroundFov()
-    // Keep the ordinary surface discovery rules outside the tower. Only the
-    // enclosed ground floor uses dungeon FOV, including closed-door occlusion.
-    currentSurfaceTowerFov()
+    // A remote view uses the same scene layers, but never changes local sight,
+    // actor awareness, or the animation/interaction state of the main view.
+    if (!vision) updateAlarmedEnemies()
+    const undergroundVisible = vision ? new Set() : currentUndergroundFov()
+    if (vision) {
+      for (let y=vision.y;y<vision.y+vision.size;y++)
+        for (let x=vision.x;x<vision.x+vision.size;x++) undergroundVisible.add(keyXY(x,y))
+    } else currentSurfaceTowerFov()
+    const visibleAt = vision ? (x,y)=>undergroundVisible.has(keyXY(x,y)) : undergroundTileVisible
     const distantTowerRoof = towerShowsSummit()
-    const mineRadialTerrain = USE_TILE_IMAGES && !!Mining.activeLevel()
+    const mineRadialTerrain = !vision && USE_TILE_IMAGES && !!Mining.activeLevel()
     const mountainSpringTiles = USE_TILE_IMAGES && currentZ>=0 &&
       resolveVisualImage(RENDER_STYLE.caveDecorations['mountain-water'])
       ? new Set(caveDecorations.filter(prop=>prop.level===0&&prop.kind==='mountain-water')
         .map(prop=>keyXY(prop.x,prop.y))) : null
     // ASCII fills light per cell; resolve sources once per frame instead of
     // rescanning cave exits and ground crystals for every visible tile.
-    const asciiLights = currentZ < 0 && !USE_TILE_IMAGES
+    const asciiLights = !vision && currentZ < 0 && !USE_TILE_IMAGES
       ? renderLightSources().map(source => {
         const light = Mining.lightInfo(source)
         const hex = light?.color || MINING_CONFIG.minerals[source.mineral]?.glow
@@ -13913,10 +14217,10 @@ more difficult:
     let walkingLift = 0
     let viewPlayerX = player.x
     let viewPlayerY = player.y
-    if (moveAnim) {
+    if (!vision && moveAnim) {
       const t = Math.max(0, Math.min(1, (now - moveAnim.start) / moveAnim.duration))
       const p = 1 - Math.pow(1 - t, 3)
-      if (moveAnim.walking && USE_TILE_IMAGES && !deathTransition)
+      if (moveAnim.walking && USE_TILE_IMAGES && !deathTransition && !isActuallySwimming())
         walkingLift = Math.round(Math.sin(Math.PI * t) * TILE_PX / 48)
       viewPlayerX = moveAnim.fromX + (moveAnim.toX - moveAnim.fromX) * p
       viewPlayerY = moveAnim.fromY + (moveAnim.toY - moveAnim.fromY) * p
@@ -13926,8 +14230,8 @@ more difficult:
         viewPlayerY = player.y
       }
     }
-    camX = targetCamX(viewPlayerX)
-    camY = targetCamY(viewPlayerY)
+    camX = vision ? vision.x : targetCamX(viewPlayerX)
+    camY = vision ? vision.y : targetCamY(viewPlayerY)
     ctx.fillStyle = currentZ < 0 ? '#000' : RENDER_STYLE.canvas.background
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
@@ -13949,14 +14253,14 @@ more difficult:
         if (terrainCells && !terrainCells.has(vy * VIEW_W + vx)) continue
         const mx = baseMapX + vx, my = baseMapY + vy
         const projectedSurface = currentZ > 0 && map[my]?.[mx] === 'towervoid'
-        if (projectedSurface && !discovered[my]?.[mx]) continue
+        if (projectedSurface && !player.godMode && !discovered[my]?.[mx]) continue
         const terrainSource = projectedSurface ? surfaceMap : map
-        if (!projectedSurface && undergroundVisible && !mineRadialTerrain && !undergroundVisible.has(keyXY(mx, my)) &&
+        if (!player.godMode && !projectedSurface && undergroundVisible && !mineRadialTerrain && !undergroundVisible.has(keyXY(mx, my)) &&
           !undergroundDiscovered?.[my]?.[mx]) continue
         const surfaceTowerCell = currentZ === 0 && towerContains(mx, my)
         const towerRoom = surfaceTowerCell && towerInterior(mx, my)
-        const towerRoomVisible = towerRoom && surfaceTowerTileVisible(mx, my)
-        if (towerRoom && !distantTowerRoof && !towerRoomVisible &&
+        const towerRoomVisible = towerRoom && (vision || surfaceTowerTileVisible(mx, my))
+        if (!player.godMode && towerRoom && !distantTowerRoof && !towerRoomVisible &&
             (!towerPlayerInside() || !discovered[my]?.[mx])) {
           // Closed stonework hides unvisited rooms entirely. Surface exploration
           // and previous visits cannot leak rooms through the roof or walls.
@@ -13974,7 +14278,7 @@ more difficult:
         const t = TILE[tileKey] || TILE.cavewall || TILE.grass
         const px = Math.round((mx - camX) * TILE_PX)
         const py = Math.round((my - camY) * TILE_PX)
-        const hasBeastTrack = currentZ === 0 && beastTracks.has(keyXY(mx, my))
+        const hasBeastTrack = !vision && currentZ === 0 && beastTracks.has(keyXY(mx, my))
         const tree = terrainSource === surfaceMap && tileKey === 'grass' && grasslandTrees.has(keyXY(mx, my))
         const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(mx, my))
         const glyph = tileKey === 'coffin' ? RENDER_STYLE.specialTiles.coffin.glyph : t.ch
@@ -14006,7 +14310,7 @@ more difficult:
               }
               if (!hasBeastTrack) drawImageVisual(px, py, overlayVisual)
             } else {
-              const playerBehindAncientTree = tileKey === 'ancientForest' &&
+              const playerBehindAncientTree = !vision && tileKey === 'ancientForest' &&
                 Math.abs(viewPlayerX - mx) < 0.5 && Math.abs(viewPlayerY - my) < 0.5
               const trackBeneathTree = hasBeastTrack &&
                 ['forest', 'ancientForest', 'taiga'].includes(tileKey)
@@ -14058,7 +14362,7 @@ more difficult:
                 ctx.restore()
               }
           }
-          if (miningLevel) {
+          if (miningLevel && !vision) {
             const mineralTile = Mining.clue(miningLevel, mx, my)
             if (mineralTile) {
               const mineral = mineralTile.mineral && MINING_CONFIG.minerals[mineralTile.mineral]
@@ -14071,7 +14375,7 @@ more difficult:
                 else picture = `mining-crack-${mineralTile.progress > 1 ? 'large' : mineralTile.progress ? 'medium' : 'small'}.png`
                 const miningImage = preloadedImages.get('img/tiles/' + picture)
                 if (miningImage) ctx.drawImage(miningImage, px, py, TILE_PX, TILE_PX)
-                if (mineralTile.pocketId && player.mining >= 25 && mineralTile.kind === 'wall' &&
+                if (mineralTile.pocketId && ArtifactWayfaring.effectiveMining() >= 25 && mineralTile.kind === 'wall' &&
                     preloadedImages.has('img/tiles/mining-hollow-wall-clue.png'))
                   ctx.drawImage(preloadedImages.get('img/tiles/mining-hollow-wall-clue.png'), px, py, TILE_PX, TILE_PX)
               } else {
@@ -14101,16 +14405,18 @@ more difficult:
               : UndergroundFov.EXPLORED_OVERLAY
             ctx.fillRect(px, py, TILE_PX, TILE_PX)
           }
-        } else if (!towerRoom) markDiscovered(mx, my) // tower rooms use their FOV
+        }
       }
     }
     // Ground-level wanderers are visible below the tower without becoming
     // targetable actors. Shade the outside world after drawing them, but before
     // drawing any playable-floor entities; the summit remains sunlit.
-    drawTowerSurfaceMonsters(now)
-    shadeTowerExterior()
-    drawBeastTracks()
-    drawCaveSpoor(undergroundVisible)
+    if (!vision) {
+      drawTowerSurfaceMonsters(now)
+      shadeTowerExterior()
+      drawBeastTracks()
+      drawCaveSpoor(undergroundVisible)
+    }
     // Decorative overlays never enter the loot, collision or inspection systems.
     for (const prop of renderLevelObjects('decorations')) {
       // Old saves can still carry props placed on a tree or hill. Never draw
@@ -14121,7 +14427,7 @@ more difficult:
       if (undergroundVisible && !undergroundVisible.has(keyXY(prop.x, prop.y))) continue
       const vx = Math.round((prop.x - camX) * TILE_PX), vy = Math.round((prop.y - camY) * TILE_PX)
       if (vx < -TILE_PX || vy < -TILE_PX || vx > canvas.width || vy > canvas.height) continue
-      if (prop.kind === 'dwarven-wall-torch' &&
+      if (!vision && prop.kind === 'dwarven-wall-torch' &&
           !Mining.torchFaceVisible(map,prop.x,prop.y,player.x,player.y)) continue
       const visual = RENDER_STYLE.caveDecorations[prop.kind]
       if (!visual) continue
@@ -14139,7 +14445,7 @@ more difficult:
     }
     // ground items
     for (const g of renderLevelObjects('ground')) {
-      if (!undergroundTileVisible(g.x, g.y)) continue
+      if (!visibleAt(g.x, g.y)) continue
       if (g.kind === 'gear' || g.kind === 'buriedgear' || g.kind === 'buriedartifact') continue
       const vx = Math.round((g.x - camX) * TILE_PX)
       const vy = Math.round((g.y - camY) * TILE_PX)
@@ -14195,6 +14501,23 @@ more difficult:
           }
         }
       }
+    }
+    if (vision) {
+      for (const e of ArtifactWayfaring.farsightEnemies()) {
+        const px=(e.x-camX)*TILE_PX, py=(e.y-camY)*TILE_PX
+        if (USE_TILE_IMAGES) {
+          ctx.save()
+          ctx.fillStyle=enemyBackingColor(e)
+          ctx.beginPath()
+          ctx.arc(px+TILE_PX/2,py+TILE_PX/2,TILE_PX*.48,0,Math.PI*2)
+          ctx.fill()
+          ctx.restore()
+        }
+        const draw=()=>drawEnemyVisual(px,py,e,enemyInvisibleShimmer(e))
+        if (enemyHasAbility(e,'fly')) draw()
+        else drawSwimmingCreature(px,py,draw)
+      }
+      return
     }
     drawEnemyTelegraphWarnings(undergroundVisible)
     // fx animations: symbol bumps up/down, shrinks, and fades out
@@ -14297,14 +14620,17 @@ more difficult:
         }
       }
       if (e.attackVisualQueue?.length && !charging) {
-        while (e.attackVisualQueue.length && now >= e.attackVisualQueue[0] + ENEMY_MELEE_ANIM_MS)
+        while (e.attackVisualQueue.length && now >= e.attackVisualQueue[0] + ENEMY_MELEE_ANIM_MS) {
+          e.attackVisualTargets?.delete(e.attackVisualQueue[0])
           e.attackVisualQueue.shift()
+        }
         const start = e.attackVisualQueue[0]
         if (start !== undefined && now >= start) {
           const t = Math.max(0, Math.min(1, (now - start) / ENEMY_MELEE_ANIM_MS))
           const lunge = t < 0.5 ? (t / 0.5) * 0.35 : (1 - ((t - 0.5) / 0.5)) * 0.35
-          ex = e.x + ((charge?.targetX ?? player.x) - e.x) * lunge
-          ey = e.y + ((charge?.targetY ?? player.y) - e.y) * lunge
+          const target = e.attackVisualTargets?.get(start)
+          ex = e.x + ((target?.x ?? charge?.targetX ?? player.x) - e.x) * lunge
+          ey = e.y + ((target?.y ?? charge?.targetY ?? player.y) - e.y) * lunge
         }
       }
       if (charge && now >= charge.start + charge.duration + 220) e.chargeAnim = undefined
@@ -14430,18 +14756,7 @@ more difficult:
       }
 
       if (shimmers) ctx.restore()
-      if (!shimmers && e.aware) {
-        ctx.strokeStyle = RENDER_STYLE.overlays.enemyAwareOutline
-        ctx.lineWidth = 2
-        ctx.strokeRect(vx + 2, vy + 2, TILE_PX - 4, TILE_PX - 4)
-      }
-      if (!shimmers && enemyIsEnraged(e)) {
-        ctx.save()
-        ctx.strokeStyle = '#e0473f'
-        ctx.lineWidth = 3
-        ctx.strokeRect(vx + 3, vy + 3, TILE_PX - 6, TILE_PX - 6)
-        ctx.restore()
-      }
+      if (!shimmers) drawEnemyStatusOutlines(e, vx, vy)
     }
     for (const visibleEnemy of visibleEnemies) {
       if (!enemyHasAbility(visibleEnemy.e, 'fly')) drawVisibleEnemy(visibleEnemy)
@@ -14530,6 +14845,14 @@ more difficult:
       }
       ctx.restore()
     }
+    // Spectral double is a presentation of the current resolved world state.
+    {
+      const phantom=ArtifactWayfaring.phantomPosition()
+      if(phantom && (phantom.x!==player.x || phantom.y!==player.y) && undergroundTileVisible(phantom.x,phantom.y) && phantom.x>=camX-1 && phantom.x<camX+VIEW_W && phantom.y>=camY-1 && phantom.y<camY+VIEW_H){
+        const px=Math.round((phantom.x-camX)*TILE_PX),py=Math.round((phantom.y-camY)*TILE_PX)
+        ctx.save();ctx.globalAlpha=.45;drawPlayerVisual(px,py,'#c7a5f6',.45);ctx.restore()
+      }
+    }
     // player
     {
       let px = viewPlayerX
@@ -14563,7 +14886,7 @@ more difficult:
       const playerTerrain = map[player.y]?.[player.x]
       drawSwimmingCreature(vx, vy, () => {
         ctx.save()
-        if (USE_TILE_IMAGES && playerTerrain === 'water' && !deathTransition) {
+        if (USE_TILE_IMAGES && isActuallySwimming() && !deathTransition) {
           const {dx, dy} = swimmingPlayerBobOffset(now, playerTerrain)
           ctx.translate(dx, dy)
         }
@@ -14577,7 +14900,7 @@ more difficult:
           drawPlayerVisual(vx, vy - Math.min(walkingLift, Math.max(0, vy)), playerColor, playerAlpha)
         }
         ctx.restore()
-      }, isDrowning() ? 1 / 3.8 : 1 / 2.5)
+      }, isDrowning() ? 1 / 3.8 : 1 / 2.5, ArtifactWayfaring.walkingOnWater())
     }
     // Ground creatures appear behind tree canopies; flying enemies are drawn
     // afterward so the trees cannot cover them.
@@ -15040,7 +15363,7 @@ more difficult:
         miningClue.kind === 'embedded' ? 'Mineral-bearing Wall' : 'Cracked Wall'
       const note = exposed ? 'An exposed crystal formation glows in the darkness.' :
         miningClue.kind === 'embedded' ? 'A vein runs through this rock. The Pickaxe may extract it.' :
-        miningClue.pocketId && player.mining >= 25
+        miningClue.pocketId && ArtifactWayfaring.effectiveMining() >= 25
           ? 'These fractures sound hollow. There may be a cavity beyond.' :
           'The stone has a weak seam. Strike it with a Pickaxe to excavate.'
       return {mini: true, enemy: null,
@@ -15173,7 +15496,7 @@ more difficult:
       canvas.style.cursor = ''
       return
     }
-    if (!e) { canvas.style.cursor = ''; return }
+    if (player.wayfaring.rush || !e) { canvas.style.cursor = ''; return }
     if (!equippedShortBow()) {
       canvas.style.cursor = `url("${desktopSwordCursor || imageSrc(DESKTOP_ENEMY_CURSOR_IMAGE)}") 5 4, crosshair`
       return
@@ -15181,7 +15504,7 @@ more difficult:
     const canShoot = !campOpen && !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen &&
       !onlineRecordsBlockActions() && !deathTransition && !cameraAnimating && !attackAnim &&
       !enemyAttackPresentationPending() && !playerInsideSanctuary() &&
-      (!deepSwimmingWater(player.x, player.y) || raceHas('swims')) &&
+      (!isActuallySwimming() || raceHas('swims')) &&
       player.inventory.some(item => item.kind === 'arrows' && item.count > 0) &&
       !!playerBowShotPath(e)
     canvas.style.cursor = canShoot
@@ -15258,7 +15581,7 @@ more difficult:
     lastMousePx = p.px
     lastMousePy = p.py
     updateTooltip()
-    if (!window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim) {
+    if (!player.wayfaring.rush && !window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim) {
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
       const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
       const enemy = enemies.find(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my &&
@@ -15307,6 +15630,13 @@ more difficult:
     const p = canvasEventToBufferXY(clientX, clientY)
     const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
     const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
+    if (player.wayfaring.rush) {
+      const dx = mx - player.x, dy = my - player.y
+      const distance = Math.max(Math.abs(dx), Math.abs(dy))
+      if (distance === 0) skipTurn()
+      else if (distance === 1) void tryMove(dx, dy)
+      return
+    }
     // A new tap can redirect movement during the last step's camera pan.
     // No gameplay step runs until that animation finishes.
     if (cameraAnimating) {
@@ -15381,7 +15711,7 @@ more difficult:
   }
 
   canvas.addEventListener('click', (ev) => {
-    if (fireballAim) { handleCanvasTap(ev.clientX, ev.clientY); return }
+    if (player.wayfaring.rush || fireballAim) { handleCanvasTap(ev.clientX, ev.clientY); return }
     if (!window.matchMedia('(pointer: coarse)').matches && !campOpen && !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen && !cameraAnimating && !attackAnim && !enemyAttackPresentationPending() && !replayPlaying) {
       const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
       const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
@@ -15637,7 +15967,7 @@ more difficult:
     }
     for (let i = 0; i < towerLevels.length; i++) levels.unshift({key: `tower:${i+1}`,
       label: `Tower (+${i+1})`, z: i+1, terrain: towerLevels[i].map, seen: towerLevels[i].discovered})
-    return levels.filter(level => level.terrain && level.seen?.some(row => row?.some(Boolean)))
+    return levels.filter(level => level.terrain && (player.godMode || level.key===currentMapViewKey() || level.seen?.some(row => row?.some(Boolean))))
   }
 
   function selectedMapLevel() {
@@ -15737,7 +16067,7 @@ more difficult:
     const underKey = tileUnderlays[keyXY(x, y)] || tileKey
     const under = TILE[underKey] || t
     const foraged = tileKey === 'forest' && foragedTiles.has(keyXY(x, y))
-    const visible = view ? view.seen[y]?.[x] : currentZ !== 0 ? undergroundDiscovered[y]?.[x] : discovered[y]?.[x]
+    const visible = player.godMode || (view ? view.seen[y]?.[x] : currentZ !== 0 ? undergroundDiscovered?.[y]?.[x] : discovered[y]?.[x])
     // Only ordinary floor pixels use the cave tint. The caveup exit keeps
     // its dedicated bright minimap color so the way out stays visible.
     const brownCave = tileKey === 'cavefloor2' && (view
@@ -15778,11 +16108,37 @@ more difficult:
   function markDiscovered(x, y) {
     const seen = currentZ === 0 ? discovered : undergroundDiscovered
     if (!seen || !seen[y] || x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return
-    if (seen[y][x]) return
+    if (seen[y][x]) return false
     seen[y][x] = true
     ensureMiniBases()
     for (const scale of MINI_SCALES) paintMiniTile(miniBases[scale], x, y)
     minimapDirty = true
+    return true
+  }
+
+  // Simulation-owned discovery. Surface uses a fixed circular radius, not
+  // camera bounds; underground preserves normal geometry and light rules.
+  function discoverPlayerSight(source = 'sight') {
+    if (!map?.[player.y]?.[player.x] || player.hp<=0 || (deathTransition && source !== 'arrival')) return 0
+    let count=0
+    const mark=(x,y)=>{ if(map[y]?.[x] && map[y][x]!=='towervoid' && markDiscovered(x,y)) count++ }
+    if(currentZ===0) {
+      const radius=UndergroundFov.RADIUS, towerSight=tower && !towerShowsSummit()
+        ? UndergroundFov.compute(surfaceMap,player.x,player.y,radius) : null
+      for(let dy=-radius;dy<=radius;dy++) for(let dx=-radius;dx<=radius;dx++) {
+        if(dx*dx+dy*dy>radius*radius)continue
+        const x=player.x+dx,y=player.y+dy
+        if(towerContains(x,y) && (towerShowsSummit() || (towerInterior(x,y) && !towerSight?.has(keyXY(x,y))))) continue
+        mark(x,y)
+      }
+    } else {
+      for(const point of ordinaryUndergroundSight()) {
+        const [x,y]=point.split(',').map(Number);mark(x,y)
+      }
+    }
+    ArtifactWayfaring.discover(count,source)
+    if(source==='arrival') ArtifactWayfaring.baselinePosition()
+    return count
   }
 
   let undergroundFovCache = null
@@ -15797,11 +16153,6 @@ more difficult:
         surfaceTowerFovCache.x !== player.x || surfaceTowerFovCache.y !== player.y) {
       const visible = UndergroundFov.compute(surfaceMap, player.x, player.y)
       surfaceTowerFovCache = {map: surfaceMap, x: player.x, y: player.y, visible}
-      // Unexplored tower interiors stay hidden on the map until truly seen.
-      for (const point of visible) {
-        const [x, y] = point.split(',').map(Number)
-        if (towerContains(x, y)) markDiscovered(x, y)
-      }
     }
     return surfaceTowerFovCache.visible
   }
@@ -15813,39 +16164,39 @@ more difficult:
     if (!towerPlayerInside() && !towerInterior(x, y)) return true
     return !!currentSurfaceTowerFov()?.has(keyXY(x, y))
   }
+  function ordinaryUndergroundSight() {
+    const radius = deepLevels[chainDepthForZ(currentZ)-2]?.kind === 'dwarvenMines'
+      ? (WORLD_GEN_CONFIG.dungeons?.dwarvenMines?.visibilityRadius ?? UndergroundFov.RADIUS)
+      : UndergroundFov.RADIUS
+    // The exposed summit has no roof or enclosing rooms: all battlements,
+    // defenders and treasure are visible, even beyond dungeon sight radius.
+    // Outside scenery still uses the surface's already-explored state.
+    let ordinaryVisible
+    if (currentZ === 4 && tower) {
+      ordinaryVisible = new Set()
+      for (let dy = 0; dy < tower.size; dy++) {
+        for (let dx = 0; dx < tower.size; dx++) {
+          const x = tower.x + dx, y = tower.y + dy
+          if (map[y]?.[x] && map[y][x] !== 'towervoid') ordinaryVisible.add(keyXY(x, y))
+        }
+      }
+    } else {
+      ordinaryVisible = UndergroundFov.compute(map, player.x, player.y, radius)
+    }
+    return ordinaryVisible
+  }
   function currentUndergroundFov() {
     if (currentZ === 0 || !map?.[player.y]?.[player.x]) return null
     if (!undergroundFovCache || undergroundFovCache.map !== map ||
       undergroundFovCache.discovered !== undergroundDiscovered ||
       undergroundFovCache.x !== player.x || undergroundFovCache.y !== player.y) {
-      const radius = deepLevels[chainDepthForZ(currentZ)-2]?.kind === 'dwarvenMines'
-        ? (WORLD_GEN_CONFIG.dungeons?.dwarvenMines?.visibilityRadius ?? UndergroundFov.RADIUS)
-        : UndergroundFov.RADIUS
-      // The exposed summit has no roof or enclosing rooms: all battlements,
-      // defenders and treasure are visible, even beyond dungeon sight radius.
-      // Outside scenery still uses the surface's already-explored state.
-      let ordinaryVisible
-      if (currentZ === 4 && tower) {
-        ordinaryVisible = new Set()
-        for (let dy = 0; dy < tower.size; dy++) {
-          for (let dx = 0; dx < tower.size; dx++) {
-            const x = tower.x + dx, y = tower.y + dy
-            if (map[y]?.[x] && map[y][x] !== 'towervoid') ordinaryVisible.add(keyXY(x, y))
-          }
-        }
-      } else {
-        ordinaryVisible = UndergroundFov.compute(map, player.x, player.y, radius)
-      }
+      const ordinaryVisible = ordinaryUndergroundSight()
       // Distant crystal light may be visible down an open corridor, but it
       // must not reveal unseen deposit locations on the map.
       const visible = currentZ === 4 && tower ? ordinaryVisible :
         Mining.lightVisible(map, player.x, player.y, ordinaryVisible)
       undergroundFovCache = {map, discovered: undergroundDiscovered,
         x: player.x, y: player.y, visible}
-      for (const pos of ordinaryVisible) {
-        const [x, y] = pos.split(',').map(Number)
-        if (map[y]?.[x] !== 'towervoid') markDiscovered(x, y)
-      }
     }
     return undergroundFovCache.visible
   }
@@ -15915,7 +16266,7 @@ more difficult:
       if (!shortcut) continue
       for (const endpoint of [shortcut.upper, shortcut.lower]) {
         if (!endpoint || viewKey !== `chain:${chainDepthForZ(endpoint.z)}` ||
-            !seen?.[endpoint.y]?.[endpoint.x]) continue
+            (!player.godMode && !seen?.[endpoint.y]?.[endpoint.x])) continue
         const x = (endpoint.x - ox + 0.5) * scale * zoom
         const y = (endpoint.y - oy + 0.5) * scale * zoom
         const left = Math.round(x - size / 2), top = Math.round(y - size / 2)
@@ -15943,13 +16294,13 @@ more difficult:
       if (view.z === 0) ctx.fillStyle = RENDER_STYLE.minimap.cave
       for (const cave of view.z === 0 ? caves : []) {
         for (const entrance of cave.entrances || [{x: cave.x, y: cave.y}]) {
-          if (!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue
+          if (!player.godMode && !discovered[entrance.y]?.[entrance.x]) continue
           const cx = (entrance.x - ox) * scale * zoom + scale * zoom / 2
           const cy = (entrance.y - oy) * scale * zoom + scale * zoom / 2
           if (cx >= 0 && cy >= 0 && cx < w && cy < h) ctx.fillRect(cx - 2 * zoom, cy - 2 * zoom, 4 * zoom, 4 * zoom)
         }
       }
-      if (view.z === 0 && dwarvenRuin && discovered[dwarvenRuin.y]?.[dwarvenRuin.x]) {
+      if (view.z === 0 && dwarvenRuin && (player.godMode || discovered[dwarvenRuin.y]?.[dwarvenRuin.x])) {
         const tx = (dwarvenRuin.x - ox) * scale * zoom + scale * zoom / 2,
           ty = (dwarvenRuin.y - oy) * scale * zoom + scale * zoom / 2
         ctx.fillStyle = RENDER_STYLE.minimap.dwarvenFort.color
@@ -15958,7 +16309,7 @@ more difficult:
         ctx.textBaseline = 'middle'
         ctx.fillText(RENDER_STYLE.minimap.dwarvenFort.glyph, tx, ty)
       }
-      if (view.z === 0 && discovered[spawnPoint.y] && discovered[spawnPoint.y][spawnPoint.x]) {
+      if (view.z === 0 && (player.godMode || discovered[spawnPoint.y]?.[spawnPoint.x])) {
         const tx = (spawnPoint.x - ox) * scale * zoom + scale * zoom / 2
         const ty = (spawnPoint.y - oy) * scale * zoom + scale * zoom / 2
         ctx.fillStyle = RENDER_STYLE.minimap.temple.color
@@ -15970,6 +16321,19 @@ more difficult:
       drawDungeonShortcutMarkers(ctx, scale, ox, oy, zoom, view.key, view.seen)
       drawDeathRemainsMarkers(ctx, scale, ox, oy, zoom, view.key)
       if (!onPlayerLevel) return
+      const vision=ArtifactWayfaring.farsightRegion()
+      if(vision) {
+        const unit=scale*zoom
+        ctx.save()
+        ctx.strokeStyle='#b8a5ff';ctx.lineWidth=Math.max(1,zoom)
+        ctx.strokeRect((vision.x-ox)*unit,(vision.y-oy)*unit,vision.size*unit,vision.size*unit)
+        ctx.fillStyle='#ee6c73'
+        for(const e of ArtifactWayfaring.farsightEnemies()) {
+          const x=(e.x-ox+.5)*unit,y=(e.y-oy+.5)*unit
+          ctx.beginPath();ctx.arc(x,y,Math.max(2,unit*.4),0,Math.PI*2);ctx.fill()
+        }
+        ctx.restore()
+      }
       const px = (player.x - ox) * scale * zoom + scale * zoom / 2
       const py = (player.y - oy) * scale * zoom + scale * zoom / 2
       const pulse = 1 + Math.sin(performance.now() / 180) * 0.18
@@ -15988,13 +16352,13 @@ more difficult:
     ctx.fillStyle = RENDER_STYLE.minimap.cave
     for (const cave of currentZ === 0 ? caves : []) {
       for (const entrance of cave.entrances || [{x: cave.x, y: cave.y}]) {
-        if (!discovered[entrance.y] || !discovered[entrance.y][entrance.x]) continue
+        if (!player.godMode && !discovered[entrance.y]?.[entrance.x]) continue
         const cx = (entrance.x - ox) * scale + scale / 2
         const cy = (entrance.y - oy) * scale + scale / 2
         if (cx >= 0 && cy >= 0 && cx < w && cy < h) ctx.fillRect(cx - 2, cy - 2, 4, 4)
       }
     }
-    if (currentZ === 0 && dwarvenRuin && discovered[dwarvenRuin.y]?.[dwarvenRuin.x]) {
+    if (currentZ === 0 && dwarvenRuin && (player.godMode || discovered[dwarvenRuin.y]?.[dwarvenRuin.x])) {
       const tx = (dwarvenRuin.x - ox) * scale + scale / 2, ty = (dwarvenRuin.y - oy) * scale + scale / 2
       ctx.fillStyle = RENDER_STYLE.minimap.dwarvenFort.color
       ctx.font = `${Math.max(12, scale * 5)}px serif`
@@ -16096,7 +16460,7 @@ more difficult:
   let mapPulseFrame = null
 
   function animateMapPlayer() {
-    if (!mapOpen || mapViewKey !== currentMapViewKey()) {
+    if (!mapOpen || farsightViewOpen || mapViewKey !== currentMapViewKey()) {
       mapPulseFrame = null
       return
     }
@@ -16109,8 +16473,14 @@ more difficult:
     if (!mapOpen && !sideVisible) return
     ensureMinimapCanvasSize()
     if (mapOpen) {
-      renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true)
-      if (mapViewKey === currentMapViewKey() && !mapPulseFrame) mapPulseFrame = requestAnimationFrame(animateMapPlayer)
+      if (farsightViewOpen) {
+        const vision=ArtifactWayfaring.farsightRegion()
+        if (vision) renderFarsightView(vision)
+        else toggleMap(false)
+      } else {
+        renderMinimapCanvas(mctx, MAP_SCALE, 0, 0, true)
+        if (mapViewKey === currentMapViewKey() && !mapPulseFrame) mapPulseFrame = requestAnimationFrame(animateMapPlayer)
+      }
     }
     if (sideVisible) {
       const o = sideMiniOrigin()
@@ -16325,7 +16695,7 @@ more difficult:
       ['🤺 GRACE penalties', gracePenalty ? '−' + gracePenalty : '0'],
       ['🤺 Effective GRACE', equippedCombatGrace === null ? '—' : equippedCombatGrace.toFixed(1)],
       ['🏊 Swimming', raceHas('swims') ? 'Natural' : (player.swimming || 'Unknown')],
-      ['⛏️ Mining', `${player.mining || 0} / ${MINING_CONFIG.skill.max}`],
+      ['⛏️ Mining', `${player.mining || 0} / ${MINING_CONFIG.skill.max}${ArtifactWayfaring.effectiveMining()>player.mining ? ` (+${ArtifactWayfaring.effectiveMining()-player.mining} temporary)` : ''}`],
       ['⚔️ One-Handed', combatSkillLabel('oneHanded'), 'oneHanded'],
       ['🪓 Two-Handed', combatSkillLabel('twoHanded'), 'twoHanded'],
       ['🛡️ Shielding', combatSkillLabel('shielding'), 'shielding'],
@@ -16487,6 +16857,13 @@ more difficult:
             inspectArtifact(idx)
           }
           row.appendChild(inspectBtn)
+          if(ArtifactWayfaring.activeItem(it)) {
+            const useBtn=document.createElement('button'), remaining=ArtifactWayfaring.cooldownRemaining(it.abilityId)
+            useBtn.textContent=remaining ? `Use (${remaining})` : 'Use'
+            useBtn.disabled=remaining>0
+            useBtn.onclick=()=>ITEM_ACTION_HANDLERS.wayfaringPower(idx)
+            row.appendChild(useBtn)
+          }
 
           // Equippable artifacts also get an Equip button.
           if (it.artifactSlot && it.artifactSlot !== 'trinket') {
@@ -16545,6 +16922,44 @@ more difficult:
     return item
   }
 
+  // The testing assortment uses the actual equipment domains and conversion
+  // path, without touching gameplay RNG or rolling unrelated bonuses/curses.
+  function grantGodArtifactStock() {
+    if (player.godArtifactStockGranted) return
+    const stock = []
+    const represented = new Set()
+    for (const [slot, catalog] of [['weapon', WEAPONS], ['shield', SHIELDS], ['armor', ARMORS]]) {
+      for (const base of catalog) {
+        const ordinary = {...base, kind:slot, base:base.name}
+        const sample = {...ordinary, kind:'artifact', artifactSlot:slot}
+        const category = slot === 'weapon' ? (base.rangedAtk ? 'bow' : 'melee') : slot
+        for (const id of artifactAbilityPool(sample)) {
+          const key = `${category}:${id}`
+          if (represented.has(key)) continue
+          const item = convertEquipmentToArtifact({...ordinary}, 0, {testAbilityId:id})
+          if (!item) throw new Error('Invalid test artifact base: ' + base.name)
+          item.replayId = `god_artifact:${slot}:${base.name}:${id}`
+          stock.push(item)
+          represented.add(key)
+        }
+      }
+    }
+    const effect = ARTIFACT_EFFECTS.reduce((lowest, next) => next.tier < lowest.tier ? next : lowest)
+    for (const noun of eligibleArtifactTrinketNouns(effect.tier)) {
+      for (const id of artifactAbilityPool({kind:'artifact',artifactSlot:'trinket',noun,tier:effect.tier})) {
+        const key = `trinket:${id}`
+        if (represented.has(key)) continue
+        const item = makeWayfaringTrinket(noun,effect,0,id)
+        item.replayId = `god_artifact:trinket:${noun}:${id}`
+        stock.push(item)
+        represented.add(key)
+      }
+    }
+    merchantStock.push(...stock)
+    player.godArtifactStockGranted = true
+    log(`The Merchant now stocks ${stock.length} identified test artifacts.`, 'info')
+  }
+
   function ensureMerchantStock() {
     for (const fixedItem of MERCHANT_STOCK_CONFIG.fixedItems) {
       const existing = merchantStock.find(it => it.kind === fixedItem.kind && it.base === fixedItem.base)
@@ -16587,7 +17002,7 @@ more difficult:
       armor.merchantPrice = itemBaseValue(armor) * gear.armor.priceMultiplier / 2
       merchantStock.push(armor)
     }
-    if (!merchantStock.some(it => it.kind === 'artifact')) {
+    if (!merchantStock.some(it => it.kind === 'artifact' && !it.godTestArtifact)) {
       const art = makeArtifactItem(gear.artifact.tier, 0, {gearOnly:true})
       if (art) {
         art.merchantPrice = itemBaseValue(art) * gear.artifact.priceMultiplier / 2
@@ -16642,7 +17057,7 @@ more difficult:
       if (it.mod) v += (it.modAmt || 1) * 5
       if (it.kind === 'artifact') {
         if (!it.identified) v = Math.floor(v / 2)
-        else if (it.curse) v = Math.floor(v / 4)
+        else if (artifactIsCursed(it)) v = Math.floor(v / 4)
         if (it.identified) v += Math.floor(artifactPriceBonus(it) *
           ARTIFACT_ABILITIES.pricing.identifiedSellPremiumFraction)
       }
@@ -16859,7 +17274,7 @@ more difficult:
       delete bought.merchantPrice
       delete bought.merchantNew
       delete bought.merchantSold
-      player.inventory.push(bought)
+      carryItem(bought)
     }
     player.gold -= value
     recordReplayAction({type:'buy', replayId, fallbackIndex: merchantStock.findIndex(stock => stock?.replayId === replayId), kind:it.kind, name:it.name})
@@ -16894,6 +17309,7 @@ more difficult:
       player.inventory.splice(idx, 1)
       merchantStock.push({...it, merchantSold:true})
     }
+    ArtifactWayfaring.inventoryChanged(it)
     player.gold += value
     recordReplayAction({type:'sell', replayId, fallbackIndex:idx, kind:it.kind, name:it.name, all:!!all})
     AdaptivePlayerTrolling.onMerchantTransaction('sell', value)
@@ -17151,7 +17567,7 @@ more difficult:
       player.artifactAlchemistGuardDef = 0
       player.artifactAlchemistGuardUntilTurn = 0
     }
-    player.inventory.push(item)
+    carryItem(item)
     equipmentLog(`You unequip the ${artifactDisplayName(item)}.${statDeltaText(before)}`, [item])
     artifactAlchemistClamp()
     consumeItemTurn()
@@ -17162,8 +17578,8 @@ more difficult:
 
   // Inventory actions are player actions: they advance the world once even
   // though the inventory overlay remains open.
-  function consumeItemTurn() {
-    enemyTurn()
+  function consumeItemTurn(playerMovement = null) {
+    enemyTurn(null,playerMovement)
     npcTurn()
     updateHud()
     render()
@@ -17234,6 +17650,12 @@ more difficult:
     if (surfaceCatchupBusy) return
     const it = player.inventory[idx]
     if (!it || it.kind !== 'homecomingscroll') return
+    const blocker = ArtifactWayfaring.homecomingBlocker()
+    if (blocker) {
+      const source = playerKnowsArtifactAbility(blocker) ? ARTIFACT_ABILITIES.abilities[blocker].name : 'A strange power'
+      log(`${source} prevents you from reading the Scroll of Homecoming.`, 'info')
+      return
+    }
     if (!canUseItemsWhileSwimming()) return
     ensureReplayItemIds(); const scope = recordReplayAction({type:'useItem', action:'homecomingscroll', idx, replayId:player.inventory[idx]?.replayId})
     const destination = {x:player.x, y:player.y, z:currentZ,
@@ -17304,7 +17726,7 @@ more difficult:
     AdaptivePlayerTrolling.onScrollUsed('wayfaringscroll')
     currentZ=d.z;currentCave=d.caveIndex;map=terrain;undergroundDiscovered=seen
     player.x=d.x;player.y=d.y
-    markPlayerPositionChanged()
+    markPlayerPositionChanged(false,true)
     resetSwimming();clearSpiderWeb();player.miningArmedTarget=null
     pendingMove=null;clearAutoPath();hoveredEnemy=null;bowAimTarget=null
     stopCameraAnimation();stopAttackAnimation();clearEnemyAnims();snapCameraToPlayer()
@@ -17538,6 +17960,14 @@ more difficult:
   document.getElementById('btnInvCloseBottom').addEventListener('click', () => {
     toggleInv(false)
   })
+  document.getElementById('btnFarsightMap').addEventListener('click', () => {
+    const vision=ArtifactWayfaring.farsightRegion()
+    if (!farsightViewOpen || !vision) return
+    toggleMap(true)
+    mapZoomIndex=MAP_ZOOMS.length-1
+    mapPanX=vision.x+vision.size/2;mapPanY=vision.y+vision.size/2
+    renderMinimap()
+  })
   document.getElementById('btnMapClose').addEventListener('click', () => {
     toggleMap(false)
   })
@@ -17630,7 +18060,7 @@ more difficult:
       mapViewKey !== currentMapViewKey() || replayPlaying || replaySimulationMode ||
       deathTransition || onlineRecordsBlockActions()) return
     const target = fullMapTileAt(ev.clientX, ev.clientY)
-    if (!target || !selectedMapLevel()?.seen?.[target.y]?.[target.x]) return
+    if (!target || (!player.godMode && !selectedMapLevel()?.seen?.[target.y]?.[target.x])) return
     // World-map travel can use only known terrain. It must not calculate a
     // shortcut through unrevealed squares using hidden map information.
     const path = findPlayerPath(target.x, target.y, true)
@@ -17952,20 +18382,51 @@ more difficult:
     updateTouchControlsVisibility()
   }
 
-  function toggleMap(force) {
+  function renderFarsightView(vision) {
+    // Use the normal tile/ASCII scene renderer with a separate read-only camera.
+    // Scope every render binding synchronously so input and combat always use
+    // the real game canvas and player-centered camera.
+    const remote=document.getElementById('farsightCanvas')
+    const oldCanvas=canvas,oldCtx=ctx,oldX=camX,oldY=camY,oldW=VIEW_W,oldH=VIEW_H
+    const size=vision.size*TILE_PX
+    if (remote.width!==size || remote.height!==size) remote.width=remote.height=size
+    try {
+      canvas=remote;ctx=remote.getContext('2d');VIEW_W=VIEW_H=vision.size
+      ctx.imageSmoothingEnabled=false
+      ctx.font=(TILE_PX-4)+"px Consolas, 'Courier New', monospace"
+      ctx.textAlign='center';ctx.textBaseline='top'
+      renderScene(visualFrameTime ?? performance.now(),null,vision)
+    } finally {
+      canvas=oldCanvas;ctx=oldCtx;camX=oldX;camY=oldY;VIEW_W=oldW;VIEW_H=oldH
+    }
+  }
+
+  function openFarsightView(vision) {
+    if (vision) toggleMap(true,true)
+  }
+
+  function toggleMap(force,visionMode=false) {
     const next = (force !== undefined) ? force : !mapOpen
     if (next) cancelFireballTargeting()
     if (next) closeNpcMenu()
     if (next && invOpen) toggleInv(false)
     if (next && bestiaryOpen) toggleBestiary(false)
     mapOpen = next
-    document.getElementById('mapOverlay').classList.toggle('show', mapOpen)
+    farsightViewOpen=next&&visionMode
+    const overlay=document.getElementById('mapOverlay')
+    overlay.classList.toggle('show',mapOpen)
+    overlay.classList.toggle('farsight-view',farsightViewOpen)
+    document.getElementById('mapTitle').textContent=farsightViewOpen?'Farsight':'World Map'
+    document.getElementById('btnMapClose').setAttribute('aria-label',farsightViewOpen?'Close vision':'Close map')
+    document.getElementById('btnMapCloseBottom').textContent=farsightViewOpen?'Return to character':'Close'
     if (mapOpen) {
-      mapViewKey = currentMapViewKey()
-      mapPreviewBase = null
-      mapPanX = player.x
-      mapPanY = player.y
-      updateMapLevelControls()
+      if (!farsightViewOpen) {
+        mapViewKey = currentMapViewKey()
+        mapPreviewBase = null
+        mapPanX = player.x
+        mapPanY = player.y
+        updateMapLevelControls()
+      }
       renderMinimap()
     }
     updateTouchControlsVisibility()
@@ -18101,18 +18562,9 @@ more difficult:
         !window.confirm('Enable God Mode?\n\nThis will PERMANENTLY disqualify this character from Highscores, even if you turn God Mode off or reload an earlier save.\n\nThis cannot be undone.')) return
     recordReplayAction({type: 'godMode', disable: turningOff})
     if (turningOff) {
-      const playerWasInGodMode = player.godMode
       player.godMode = false
       player.godInvisible = false
-      // God Mode reveals every generated floor, but leaving it forgets only
-      // the currently active map. Keep each discovery grid's identity so
-      // save/replay and distinct maps at the same depth stay synchronized.
-      if (playerWasInGodMode) {
-        const seen = currentZ === 0 ? discovered : undergroundDiscovered
-        if (seen) for (const row of seen) row.fill(false)
-        invalidateUndergroundFov()
-        rebuildMinimapBases()
-      }
+      rebuildMinimapBases()
       player.swimming = 0
       player.swimmingPractice = 0
       player.fishermanLessonPending = false
@@ -18120,19 +18572,10 @@ more difficult:
       resetSwimming()
       updateHud()
       render()
-      log('God mode disabled. Current floor unexplored. Swimming unlearned. Normal terrain restrictions restored.', 'info')
+      log('God mode disabled. Your exploration is preserved. Swimming unlearned. Normal terrain restrictions restored.', 'info')
       return
     }
     Highscores.markDisqualified(player)
-    // God mode reveals every generated level, including the shared cave
-    // layer and any deeper maps, so the minimap never hides content.
-    const reveal = grid => {
-      if (grid) for (const row of grid) row.fill(true)
-    }
-    reveal(discovered)
-    reveal(undergroundDiscoveredL1)
-    for (const level of deepLevels) reveal(level.discovered)
-    if (cryptLevel2) reveal(cryptLevel2.discovered)
     player.hp = 500
     checkPlayerHealthWarning()
     player.maxHp = 500
@@ -18147,12 +18590,12 @@ more difficult:
     resetSwimming()
     player.godInvisible = true
     player.gold = 5000
-    // The minimap is cached for performance; filling the discovery grids
-    // alone leaves the old fog-painted pixels in those canvases.
+    grantGodArtifactStock()
+    // Repaint the visual reveal overlay, without modifying discovery.
     rebuildMinimapBases()
     updateHud()
     render()
-    log('God mode: every map revealed. SPD 50. MF 25. 5000 gold.', 'good')
+    log('God mode: map reveal overlay. SPD 50. MF 25. 5000 gold.', 'good')
   }
 
   // Hidden debug navigation changes only the active layer. It deliberately
@@ -18178,7 +18621,9 @@ more difficult:
     const departureZ = currentZ
     currentZ = destination
     currentCave = -1
+    ArtifactWayfaring.resetEndurance()
     map = nextMap
+    if (playerHasArtifactAbility('troglodyte')) ArtifactWayfaring.syncHealth()
     Mimics.onLevelChange()
     undergroundDiscovered = destination === 0 ? null : destination > 0
       ? towerLevels[destination-1].discovered : depthUndergroundDiscovered(chainDepthForZ(destination))
@@ -18247,6 +18692,19 @@ more difficult:
       return
     }
     const k = ev.key
+    const moves = {
+      w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
+      q: [-1, -1], e: [1, -1], z: [-1, 1], c: [1, 1],
+      ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+    }
+    const key = k.length === 1 ? k.toLowerCase() : k
+    // Sprint uses the ordinary movement input; other actions must wait until
+    // the single multi-step turn is committed or cancelled.
+    if (player.wayfaring.rush && (!moves[key] || ev.repeat)) {
+      ev.preventDefault()
+      if (!ev.repeat && (k === 'Escape' || k === 'Enter' || key === 't')) skipTurn()
+      return
+    }
     if (campOpen) { Campfires.keydown(ev); return }
     if (fireballAim) {
       ev.preventDefault()
@@ -18382,13 +18840,6 @@ more difficult:
       skipTurn()
       return
     }
-    const moves = {
-
-      w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
-      q: [-1, -1], e: [1, -1], z: [-1, 1], c: [1, 1],
-      ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
-    }
-    const key = k.length === 1 ? k.toLowerCase() : k
     if (moves[key]) {
       ev.preventDefault()
       bowAimTarget = null
@@ -18420,6 +18871,17 @@ more difficult:
        has zero effect on mouse/keyboard play. The block sits in normal document flow below
        the log, and is hidden while an overlay (inventory/map/trade) is open - see
        updateTouchControlsVisibility(). */
+  // A Rush is still one unfinished action. Let ordinary movement and the
+  // status strip receive input, but don't let another UI action interleave.
+  function guardRushPointerAction(ev) {
+    if (!player.wayfaring.rush || AdaptivePlayerTrolling.pendingDebtCollector()) return
+    if (ev.target.closest?.('#game, .dpad button[data-dx], #playerStatuses')) return
+    ev.preventDefault()
+    ev.stopImmediatePropagation()
+  }
+  document.addEventListener('click', guardRushPointerAction, true)
+  document.addEventListener('touchstart', guardRushPointerAction, {capture:true,passive:false})
+
   document.querySelectorAll('.dpad button[data-dx]').forEach(btn => {
     const dx = parseInt(btn.dataset.dx, 10), dy = parseInt(btn.dataset.dy, 10)
     btn.addEventListener('touchstart', (ev) => {
@@ -18672,6 +19134,7 @@ more difficult:
       // character (if any) left behind before deciding whether to record.
       replayData = null
       replayRecording = false
+      discoverPlayerSight('arrival')
       if (document.getElementById('replayToggle').checked) startReplayRecording()
       updateReplayButton()
       closeRaceSelect()
@@ -18710,6 +19173,7 @@ more difficult:
 
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
+    player.wayfaring = ArtifactWayfaring.freshState()
     AdaptivePlayerTrolling.reset()
     // A newly generated world always begins on the surface, even when this
     // page previously loaded or played an underground/tower character. The
@@ -18815,7 +19279,6 @@ more difficult:
       Mimics.initialize()
       rotateGeneratedWorld(randInt(0, 3))
       initializeDwarvenCrates()
-      spawnSurfaceFissures()
       TowerMaze.guaranteeChaosScroll()
       player.x = spawnPoint.x
       player.y = spawnPoint.y

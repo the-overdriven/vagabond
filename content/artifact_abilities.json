@@ -16,8 +16,24 @@
     ],
     "trinket": []
   },
-  "baseDomains": {},
+  "baseDomains": {
+    "Feather": ["wayfaring"],
+    "Girdle": ["wayfaring"],
+    "Tippet": ["wayfaring"],
+    "Scarf": ["wayfaring"],
+    "Anklet": ["wayfaring"],
+    "Flint": ["wayfaring"],
+    "Sextant": ["wayfaring"],
+    "Shoehorn": ["wayfaring"],
+    "Adze": ["wayfaring"],
+    "Amphora": ["wayfaring"],
+    "Jug": ["wayfaring"],
+    "Rope": ["wayfaring"],
+    "Bridle": ["wayfaring"],
+    "Saddle": ["wayfaring"]
+  },
   "domains": {
+    "wayfaring": ["highlander", "adrenaline", "permafrost", "exile", "drifter", "troglodyte", "pilgrim", "trailblazer", "expedition", "prospector", "firekeeper", "endurance", "nomads_curse", "longstrider", "never_look_back", "windwalker", "skirmisher", "tidefang", "escape_artist", "rush", "backtrack", "blink", "phantom_trail", "water_walking", "emberwalker", "ashen_wanderer", "castaway", "frostwalker", "forestwalker", "unseen", "one_with_the_wild", "farsight", "spelunker"],
     "martial": [
       "shadow_strike",
       "flurry",
@@ -98,6 +114,291 @@
     ]
   },
   "abilities": {
+    "highlander": {
+      "name": "Highlander",
+      "description": "Move freely on hills, gain extra defense there, and knock enemies farther downhill.",
+      "hillDefBase": 2,
+      "hillDefDivisor": 10,
+      "hillDefCap": 5,
+      "extraPush": 1,
+      "enabled": true,
+      "priceBonus": 360
+    },
+    "adrenaline": {
+      "name": "Adrenaline",
+      "description": "While below 25% of maximum HP, gain 2 SPD plus 10% of your permanent SPD.",
+      "hpThreshold": 0.25,
+      "speedBonus": 2,
+      "speedFraction": 0.1,
+      "enabled": true,
+      "priceBonus": 250
+    },
+    "permafrost": {
+      "name": "Permafrost",
+      "description": "Immune to environmental freezing. Gain 3 DEF on freezing terrain but lose 3 DEF on sand.",
+      "coldDefense": 3,
+      "sandDefense": -3,
+      "enabled": true,
+      "priceBonus": 270
+    },
+    "exile": {
+      "name": "Exile",
+      "description": "Gain ATK and DEF farther from the Temple, including at greater depths. The Temple no longer heals you, and you cannot read Scrolls of Homecoming.",
+      "intrinsicCurse": true,
+      "startDistance": 50,
+      "depthDistance": 50,
+      "maxMapFraction": 0.8,
+      "maxBonus": 10,
+      "enabled": true,
+      "priceBonus": 500
+    },
+    "drifter": {
+      "name": "Drifter",
+      "description": "Gain Magic Find but lose the ability to read Scrolls of Homecoming while carrying this artifact.",
+      "intrinsicCurse": true,
+      "rollMin": 8,
+      "rollMax": 15,
+      "enabled": true,
+      "priceBonus": 450
+    },
+    "troglodyte": {
+      "name": "Troglodyte",
+      "description": "Lose maximum HP, ATK and DEF near the surface, but gain them in the deep underground.",
+      "intrinsicCurse": true,
+      "neutralZ": -4,
+      "maxSteps": 8,
+      "hpPctPerStep": 5,
+      "enabled": true,
+      "priceBonus": 400
+    },
+    "pilgrim": {
+      "name": "Pilgrim",
+      "description": "The Temple can heal you up to 100 HP + 10% of your maximum HP. Every 700 newly discovered tiles restore 10% of your maximum HP and grant 30 XP per character level (before XP bonuses).",
+      "templeBase": 100,
+      "templeHpFraction": 0.1,
+      "tilesPerReward": 700,
+      "healFraction": 0.1,
+      "xpPerLevel": 30,
+      "enabled": true,
+      "priceBonus": 450
+    },
+    "trailblazer": {
+      "name": "Trailblazer",
+      "description": "Every 5 newly discovered tiles reduce all active cooldowns of Wayfaring artifacts by 1 turn. Your XP bonus determines the percentage chance of reducing them by an additional turn.",
+      "tilesPerReduction": 5,
+      "enabled": true,
+      "priceBonus": 350
+    },
+    "expedition": {
+      "name": "Expedition",
+      "description": "Recover health and gain experience on your first visit to a new underground depth.",
+      "healFraction": 0.25,
+      "xp": 100,
+      "enabled": true,
+      "priceBonus": 300
+    },
+    "prospector": {
+      "name": "Prospector",
+      "description": "Temporarily improve effective Mining upon first entering each mine floor while carrying this artifact.",
+      "miningBonus": 25,
+      "duration": 100,
+      "enabled": true,
+      "priceBonus": 250
+    },
+    "firekeeper": {
+      "name": "Firekeeper",
+      "description": "Recover health twice as fast while resting at a burning campfire without food.",
+      "restEvery": 2,
+      "enabled": true,
+      "priceBonus": 150
+    },
+    "endurance": {
+      "name": "Endurance",
+      "description": "Long uninterrupted walks without damage restore health and trigger additional natural recovery.",
+      "steps": 20,
+      "healFraction": 0.01,
+      "enabled": true,
+      "priceBonus": 400
+    },
+    "longstrider": {
+      "name": "Longstrider",
+      "description": "Occasionally move without allowing enemies to act. Only ordinary successful steps count.",
+      "priceBonus": 500,
+      "minSteps": 5,
+      "maxSteps": 10,
+      "enabled": true
+    },
+    "never_look_back": {
+      "name": "Never Look Back",
+      "logOnly": true,
+      "description": "After discovering terrain, enemies may miss their next phase. Without discovery, they may act twice.",
+      "priceBonus": 450,
+      "intrinsicCurse": true,
+      "skipChance": 0.5,
+      "extraChance": 0.25,
+      "enabled": true
+    },
+    "windwalker": {
+      "name": "Windwalker",
+      "description": "Dodging an attack may prepare a free step in a direction of your choice.",
+      "priceBonus": 400,
+      "chance": 0.4,
+      "enabled": true
+    },
+    "skirmisher": {
+      "name": "Skirmisher",
+      "description": "Breaking adjacency with an enemy by stepping away prepares +20 percentage points critical chance on your next bow shot.",
+      "priceBonus": 300,
+      "critBonusPP": 20,
+      "enabled": true
+    },
+    "tidefang": {
+      "name": "Tidefang",
+      "description": "Swimming ashore beside an enemy prepares +20 percentage points critical chance on your next melee strike.",
+      "priceBonus": 200,
+      "critBonusPP": 20,
+      "enabled": true
+    },
+    "escape_artist": {
+      "name": "Escape Artist",
+      "description": "Immune to Rooted; webs pull you a shorter distance, further reduced by your ATK advantage.",
+      "priceBonus": 300,
+      "pullMinPercent": 25,
+      "pullMaxPercent": 75,
+      "atkPerTile": 5,
+      "enabled": true
+    },
+    "rush": {
+      "name": "Rush",
+      "description": "Choose up to four consecutive steps in a single world turn. Traps can interrupt the sprint.",
+      "priceBonus": 450,
+      "cooldown": 500,
+      "maxSteps": 4,
+      "enabled": true,
+      "active": true
+    },
+    "backtrack": {
+      "name": "Backtrack",
+      "description": "Return to your position three completed turns ago on the same level. Only position is restored.",
+      "priceBonus": 400,
+      "cooldown": 500,
+      "historyTurns": 3,
+      "enabled": true,
+      "active": true
+    },
+    "blink": {
+      "name": "Blink",
+      "description": "Teleport to a random free tile reachable on foot within twelve steps without opening doors.",
+      "priceBonus": 500,
+      "cooldown": 500,
+      "range": 12,
+      "enabled": true,
+      "active": true
+    },
+    "phantom_trail": {
+      "name": "Phantom Trail",
+      "description": "Leave a spectral double at your position for eight turns. Move away to fool pursuing enemies and expose them to a surprise strike.",
+      "priceBonus": 450,
+      "cooldown": 500,
+      "duration": 8,
+      "decoyChance": 0.5,
+      "surpriseCritPP": 10,
+      "shadowDamageBonus": 0.25,
+      "enabled": true,
+      "active": true
+    },
+    "nomads_curse": {
+      "name": "Nomad’s Curse",
+      "description": "Racial and food regeneration heal twice as much after exploring new terrain, but provide no healing otherwise.",
+      "intrinsicCurse": true,
+      "regenMultiplier": 2,
+      "enabled": true,
+      "priceBonus": 350
+    },
+    "water_walking": {
+      "name": "Water Walking",
+      "description": "Walk on deep water and use items for eight world turns. Reach non-water terrain to renew the reserve.",
+      "enabled": true,
+      "duration": 8,
+      "priceBonus": 350
+    },
+    "emberwalker": {
+      "name": "Emberwalker",
+      "description": "Walk across lava at the cost of 5% maximum HP per entered tile or stationary world turn.",
+      "enabled": true,
+      "damageFraction": 0.05,
+      "priceBonus": 250
+    },
+    "ashen_wanderer": {
+      "name": "Ashen Wanderer",
+      "description": "Walk on lava unharmed, but actual swimming deals 2% maximum HP each world turn.",
+      "enabled": true,
+      "intrinsicCurse": true,
+      "swimDamageFraction": 0.02,
+      "priceBonus": 400
+    },
+    "castaway": {
+      "name": "Castaway",
+      "description": "Survive a fatal hit while swimming by escaping to a reachable safe shore. Swimming skill improves the remaining HP. Recharge at the Temple.",
+      "enabled": true,
+      "skillPerHeal": 10,
+      "healFractionPerStep": 0.01,
+      "maxHealFraction": 0.1,
+      "priceBonus": 450
+    },
+    "frostwalker": {
+      "name": "Frostwalker",
+      "description": "Freeze water underfoot into a temporary ice bridge. The entire crossing cracks after 10 turns and melts after 15. Cracking ice breaks under forced displacement.",
+      "enabled": true,
+      "crackAfter": 10,
+      "meltAfter": 15,
+      "drowningFraction": 0.1,
+      "priceBonus": 450
+    },
+    "forestwalker": {
+      "name": "Forestwalker",
+      "description": "Improves forest concealment by 10 percentage points, retains it across one open tile and reduces forest ambush chance by 75%. Naturally woodland-adapted characters can prepare a guaranteed dodge every 30 turns.",
+      "enabled": true,
+      "hideBonusPP": 10,
+      "ambushMultiplier": 0.25,
+      "openTiles": 1,
+      "dodgeCooldown": 30,
+      "priceBonus": 350
+    },
+    "unseen": {
+      "name": "Unseen",
+      "description": "Spend a turn without moving or fighting beside cover to hide. Follow cover or cross up to two consecutive open tiles without rerolling each enemy's detection check.",
+      "enabled": true,
+      "openTiles": 2,
+      "priceBonus": 450
+    },
+    "one_with_the_wild": {
+      "name": "One with the Wild",
+      "description": "Ordinary beasts stop pursuing you while you stand in a forest. Attacking a beast in the forest breaks the truce for 1000 turns. Exceptional beasts and forest spirit agitation ignore the truce.",
+      "enabled": true,
+      "cooldown": 1000,
+      "priceBonus": 400
+    },
+    "farsight": {
+      "name": "Farsight",
+      "description": "Glimpse a completely unknown fragment of the current level without moving. Magic Find enlarges the vision; underground it briefly reveals creatures in the connected caves. Recovers after 1000 turns.",
+      "enabled": true,
+      "active": true,
+      "baseSize": 4,
+      "maxSize": 6,
+      "mfPerSize": 5,
+      "minWalkableFraction": 0.5,
+      "visionTurns": 1,
+      "cooldown": 1000,
+      "priceBonus": 400
+    },
+    "spelunker": {
+      "name": "Spelunker",
+      "description": "Sense the size of the cave beyond an entrance, whether it descends deeper, and whether there are other exits.",
+      "enabled": true,
+      "sizes": [{"name":"Tiny","max":99},{"name":"Small","max":249},{"name":"Medium","max":499},{"name":"Large","max":999}],
+      "priceBonus": 200
+    },
     "shadow_strike": {
       "name": "Shadow Strike",
       "description": "Melee strikes made while invisible deal 50% more damage.",

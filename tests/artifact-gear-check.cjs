@@ -23,6 +23,7 @@ function artifact(base, tier) {
       rng = () => .9
       pick = list => {
         if (list.includes(${JSON.stringify(base)})) return ${JSON.stringify(base)}
+        if (${JSON.stringify(base)} === "Feather" && list.includes("highlander")) return "highlander"
         const effect = list.find(value => typeof value === 'object' && value.id && value.tier === ${tier})
         return effect || savedPick(list)
       }
@@ -217,7 +218,7 @@ test('artifact Short Bow fires at fixed bow damage and consumes ammunition', asy
 
 test('non-gear artifacts keep The, equipment artifacts do not', async () => {
   await ready()
-  const amulet = artifact('Amulet', 3)
+  const amulet = artifact('Feather', 3)
   assert.equal(run(`visibleItemTier(${JSON.stringify(amulet)})`),null,
     'unidentified artifacts cannot leak their tier through display colors')
   assert.equal(run(`visibleItemTierTag(${JSON.stringify(amulet)})`),'',
@@ -226,7 +227,7 @@ test('non-gear artifacts keep The, equipment artifacts do not', async () => {
   assert.equal(run(`visibleItemTier(${JSON.stringify(amulet)})`),3,
     'identification reveals the tier again')
   const hauberk = artifact('Hauberk', 3)
-  assert.match(amulet.name, /^The Amulet of /)
+  assert.match(amulet.name, /^The Feather of /)
   assert.doesNotMatch(hauberk.name, /^The\s/)
   assert.equal(amulet.artifactSlot, 'trinket')
   assert.equal(hauberk.artifactSlot, 'armor')
@@ -234,7 +235,7 @@ test('non-gear artifacts keep The, equipment artifacts do not', async () => {
     const savedPick = pick, savedRng = rng
     try {
       rng=()=>0
-      pick=list => list.includes('Amulet') ? 'Amulet' : savedPick(list)
+      pick=list => list.includes('Feather') ? 'Feather' : savedPick(list)
       return makeArtifactItem(3)
     } finally {pick=savedPick;rng=savedRng}
   })()`))
@@ -402,7 +403,9 @@ test('domain powers are guaranteed on gear, unique across overlapping domains, a
       loadJson('artifact_abilities.json').abilities[item.abilityId].name)
     if (base.rangedAtk) assert.deepEqual(pool, ['long_shot','deadeye','crippling_shot','ambusher'], 'bows allow shared Ambusher, not unrelated martial powers')
   }
-  assert.equal(artifact('Amulet', 3).abilityId, null, 'non-gear artifacts have no enabled domain yet')
+  assert.ok(run('eligibleArtifactTrinketNouns(3).includes("Feather")'))
+  assert.ok(!run('eligibleArtifactTrinketNouns(3).includes("Amulet")'))
+  assert.ok(run('artifactAbilityPool({kind:"artifact",artifactSlot:"trinket",noun:"Feather"}).length===23'))
   assert.deepEqual(clone(run(`(() => {
     ARTIFACT_ABILITIES.domains.shields=['brace','fleetfoot'];
     const pool=artifactAbilityPool({kind:'artifact',artifactSlot:'shield',base:'Buckler'})
@@ -1628,7 +1631,7 @@ test('artifact pricing is identification-dependent, capped and non-profitable on
       const identifiedBuy = itemBuyValue(item)
       const identifiedSell = itemSellValue(item)
       if (identifiedBuy !== Math.min(cfg.maxBuyPrice, item.baseValue + premium)) throw Error('identified buy')
-      if (identifiedSell !== SELL_VALUE_BY_TIER[item.tier] + Math.floor(premium * .25))
+      if (identifiedSell !== (powers[item.abilityId].intrinsicCurse ? Math.floor(SELL_VALUE_BY_TIER[item.tier] / 4) : SELL_VALUE_BY_TIER[item.tier]) + Math.floor(premium * .25))
         throw Error('identified sale')
       if (identifiedSell > identifiedBuy) throw Error('identified resale profit')
       item.curse={everyTurns:10,types:['hp']}
@@ -1641,8 +1644,8 @@ test('artifact pricing is identification-dependent, capped and non-profitable on
     if (itemBuyValue(empty) !== 280) throw Error('trinket gambling surcharge')
     return {examined, powerCount:Object.keys(powers).length}
   })()`)
-  assert.equal(result.powerCount, 65)
-  assert.equal(result.examined, 65 * 14)
+  assert.equal(result.powerCount, 71)
+  assert.equal(result.examined, 71 * 14)
 })
 
 test('artifact activations log and animate while concealing unidentified powers', async () => {
@@ -1746,7 +1749,7 @@ test('Batch 2: new artifact definitions follow domain unions and weapon classes'
       shield:artifactAbilityPool(item('shield','Buckler'))}
     return {count:Object.keys(ARTIFACT_ABILITIES.abilities).length,types}
   })()`))
-  assert.equal(result.count,65)
+  assert.equal(result.count,71)
   for (const type of Object.values(result.types)) assert.equal(new Set(type).size,type.length)
   for (const type of ['one','two','bow']) assert(result.types[type].includes('ambusher'))
   for (const type of ['one','two']) {
@@ -1983,7 +1986,7 @@ test('Batch 3: new combat-state powers preserve equipment restrictions and JSON 
       armor:artifactAbilityPool(item('armor')),
       shield:artifactAbilityPool(item('shield'))}
   })()`))
-  assert.equal(powers.count,65)
+  assert.equal(powers.count,71)
   assert(powers.prices,'every ability ends with priceBonus')
   assert(powers.one.includes('growing_malice') && !powers.one.includes('reaper'))
   assert(powers.two.includes('growing_malice') && powers.two.includes('reaper'))
@@ -2131,7 +2134,7 @@ test('Alchemist: both Alchemist variants are armor-only and preserve catalog pri
     return {abilities:Object.entries(ARTIFACT_ABILITIES.abilities).map(([id,o])=>[id,Object.keys(o).at(-1)]),
       armor:artifactAbilityPool(item('armor')),shield:artifactAbilityPool(item('shield'))}
   })()`))
-  assert.equal(powers.abilities.length,65)
+  assert.equal(powers.abilities.length,71)
   assert(powers.abilities.every(([,last])=>last==='priceBonus'))
   for (const id of ['alchemists_vest_hp','alchemists_vest_guard']) {
     assert(powers.armor.includes(id),id+' must roll on armor')

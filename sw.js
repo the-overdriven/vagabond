@@ -12,7 +12,7 @@
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
 // Independent from the displayed game version; increment for cache refreshes.
-const CACHE_REVISION = 33;
+const CACHE_REVISION = 54;
 const CACHE_VERSION = `${CACHE_PREFIX}${self.VAGABOND_GAME_VERSION}-cache-${CACHE_REVISION}`;
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
@@ -74,6 +74,7 @@ const PRECACHE_URLS = [
   './src/combatSkills.js',
   './src/tracking.js',
   './src/version.js',
+  './src/artifactWayfaring.js',
   './src/supabase.js',
   './src/graveyard.js',
   './src/highscores.js',
