@@ -171,6 +171,19 @@ describe('Animated terrain rendering', () => {
               !Array.from({length: 32}, (_,i) =>
                 shorelineAlpha(straight,0,0,(i+0.5)/32,0.31,64)).some(alpha => alpha === 1))
             throw new Error('water centers stay open and straight banks vary within one tile')
+          reset('snow')
+          for (const isolated of ['water','ice']) {
+            cell(0,0,isolated)
+            const pond = terrainVisual(isolated,x,y)
+            if (!pond.enclosedBank || shorelineAlpha(pond.shoreBlend,x,y,0.78,0.64,64,false,true) !== 0)
+              throw new Error('isolated pond keeps a broad visible center')
+          }
+          reset('water')
+          cell(-1,0,'crackingice')
+          if (!terrainVisual('water',x,y).iceEdge?.[3])
+            throw new Error('cracking lake ice extends into the adjacent water texture')
+          reset('water')
+          cell(0,-1,'grass'); cell(-1,-1,'snow')
           const sharedShoreBiomes = mixedShore.shoreBlend[4] === null &&
             mixedShore.shoreBlend[0] === 'snow' && mixedShore.shoreBlend[1] === 'grass'
           const oldPixels = ctx.getImageData(0,0,TILE_PX,TILE_PX)

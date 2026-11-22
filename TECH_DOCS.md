@@ -10419,7 +10419,10 @@ their full base texture. A continuous contour interpolates the neighboring land
 and water cells. Small world-coordinate variations break up straight banks,
 while each water tile keeps its center and mixed shores use the shared ground
 textures. A blend never exposes an ASCII background color through a missing
-ground layer.
+ground layer. Where lake ice meets open water, the ice texture follows an uneven
+contour into adjacent water tiles while their centers remain open. A single water
+or ice tile enclosed by land on all four sides retains a broad, rounded center,
+including along snowy banks. These contours affect only the tile artwork.
 
 A river's actual map tiles never change just to improve its appearance. Surface
 lava pools use the same irregular bank contour along grass, sand, snow and the

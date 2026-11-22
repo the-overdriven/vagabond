@@ -12572,7 +12572,7 @@ more difficult:
 
   // Sample one continuous bank contour in world coordinates. The threshold
   // varies below tile scale while neighboring tiles share the same field.
-  function shorelineAlpha(biomes, x, y, u, v, size, riverBank = false) {
+  function shorelineAlpha(biomes, x, y, u, v, size, riverBank = false, enclosed = false) {
     if (riverBank) {
       // Taper displacement to zero at tile boundaries so river mouths meet lakes.
       const weight = Math.sin(Math.PI*u)**2 * Math.sin(Math.PI*v)**2
@@ -12589,16 +12589,22 @@ more difficult:
     const wx = (x+u) * Math.PI/4, wy = (y+v) * Math.PI/4
     const threshold = 0.185 + 0.032*Math.sin(3*wx+5*wy) +
       0.021*Math.sin(7*wx-4*wy) + 0.011*Math.sin(13*wx+11*wy)
-    return Math.max(0, Math.min(1, (land-threshold)*size + 0.5))
+    let coverage = land - threshold
+    if (enclosed) {
+      const radius = 0.42 + (threshold - 0.185) * 0.5
+      coverage = Math.min(coverage, Math.hypot(u - 0.5, v - 0.5) - radius)
+    }
+    return Math.max(0, Math.min(1, coverage * size + 0.5))
   }
 
-  function drawSurfaceShoreBlend(px, py, visual) {
-    const size = TILE_PX, biomes = visual.shoreBlend
+  function drawSurfaceShoreBlend(px, py, visual, iceEdge = false) {
+    const size = TILE_PX, biomes = iceEdge ? visual.iceEdge : visual.shoreBlend
     const {shoreX, shoreY} = visual
-    const key = [size, shoreX, shoreY, visual.riverBank, ...biomes].join(',')
+    const key = [size, shoreX, shoreY, visual.riverBank, iceEdge, !!visual.enclosedBank, ...biomes].join(',')
     let canvas = surfaceShoreBlendCache.get(key)
     if (!canvas) {
-      const ground = surfaceGroundBlendCanvas(biomes)
+      const ice = iceEdge && resolveVisualImage(RENDER_STYLE.terrainTiles.ice)
+      const ground = iceEdge ? (ice && scaledVisualCanvas(ice, 1)) : surfaceGroundBlendCanvas(biomes)
       if (!ground) return false
       canvas = document.createElement('canvas')
       canvas.width = canvas.height = size
@@ -12606,7 +12612,7 @@ more difficult:
       const pixels = ground.getContext('2d').getImageData(0,0,size,size)
       for (let y=0; y<size; y++) for (let x=0; x<size; x++) {
         pixels.data[(y*size+x)*4+3] *= shorelineAlpha(biomes,shoreX,shoreY,
-          (x+0.5)/size,(y+0.5)/size,size,visual.riverBank)
+          (x+0.5)/size,(y+0.5)/size,size,visual.riverBank,visual.enclosedBank)
       }
       cctx.putImageData(pixels,0,0)
       if (surfaceShoreBlendCache.size >= 512) surfaceShoreBlendCache.clear()
@@ -12712,11 +12718,19 @@ more difficult:
         !hasCardinalWater(x, y, terrain))
       return {riverX:x, riverY:y, diagonalRiverArms: riverArms, baseTileKey: diagonalRiverGround(x, y, terrain)}
     const transitionLayers = surfaceTransitionLayers(tileKey, x, y, terrain)
-    if (transitionLayers.length || riverArms) return {
-      overlayImages: transitionLayers,
+    let iceEdge = null
+    if (tileKey === 'water' && terrain === surfaceMap) {
+      const neighbors = []
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++)
+        neighbors.push(isLakeIce(terrain[y + dy]?.[x + dx]))
+      if (neighbors.includes(true)) iceEdge = neighbors
+    }
+    const shoreBlend = transitionLayers.length ? surfaceBlendBiomes(null, x, y, terrain) : null
+    if (transitionLayers.length || riverArms || iceEdge) return {
+      overlayImages: transitionLayers, iceEdge, shoreBlend,
+      enclosedBank: shoreBlend && [1, 3, 5, 7].every(i => shoreBlend[i]),
       riverX:x, riverY:y, riverBank: tileKey === 'river' || tileKey === 'frozenriver',
       shoreX: x % 8, shoreY: y % 8,
-      shoreBlend: transitionLayers.length ? surfaceBlendBiomes(null, x, y, terrain) : null,
       diagonalRiverJoinArms: riverArms
     }
     return null
@@ -12864,6 +12878,7 @@ more difficult:
       : drawImageVisual(px, py, visual, visual.opacity)
     if (!drawn) return false
     if (visual.groundBlend) drawSurfaceGroundBlend(px, py, visual.groundBlend)
+    if (visual.iceEdge) drawSurfaceShoreBlend(px, py, visual, true)
     if (visual.shoreBlend) drawSurfaceShoreBlend(px, py, visual)
     else if (Array.isArray(visual.overlayImages)) {
       for (const layer of visual.overlayImages) {
