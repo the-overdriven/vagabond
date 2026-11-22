@@ -28,6 +28,14 @@ describe('Desktop overlay layout', () => {
       expect(win.eval('TILE_PX')).to.equal(48)
       win.eval('changeTileSize(-1)')
       expect(win.eval('requestedTilePx')).to.equal(44)
+      expect(win.eval(`(() => {
+        const w = map[0]?.length || MAP_W
+        const h = map.length || MAP_H
+        return Math.abs(-targetCamX(0) * TILE_PX - visibleCanvasBounds.left - TILE_PX) < 0.01 &&
+          Math.abs(-targetCamY(0) * TILE_PX - visibleCanvasBounds.top - TILE_PX) < 0.01 &&
+          Math.abs((w - targetCamX(w - 1) + 1) * TILE_PX - visibleCanvasBounds.right) < 0.01 &&
+          Math.abs((h - targetCamY(h - 1) + 1) * TILE_PX - visibleCanvasBounds.bottom) < 0.01
+      })()`), 'all four surface edges leave a full tile visible').to.equal(true)
       win.eval('changeTileSize(1)')
       expect(win.eval('requestedTilePx')).to.equal(48)
     })

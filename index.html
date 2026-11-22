@@ -12934,8 +12934,7 @@ more difficult:
   function hoveredTreeEntityTileKey() {
     if (!USE_TILE_IMAGES || currentZ !== 0 || lastMousePx === null || lastMousePy === null ||
         window.matchMedia('(pointer: coarse)').matches) return null
-    const mx = Math.floor(camX + Math.floor(lastMousePx / TILE_PX))
-    const my = Math.floor(camY + Math.floor(lastMousePy / TILE_PX))
+    const {mx, my} = canvasWorldTile(lastMousePx, lastMousePy)
     if (!treeCanopyVisualAt(mx, my) || !undergroundTileVisible(mx, my)) return null
     if (player.x === mx && player.y === my) return keyXY(mx, my)
     return renderEnemiesAt(mx,my).some(e => e.alive &&
@@ -13258,16 +13257,27 @@ more difficult:
     return restored
   }
 
+  function cameraAxis(position, size, view, clippedPixels) {
+    const margin = currentZ === 0 ? 1 + clippedPixels / TILE_PX : 0
+    if (margin && size + 2 * margin < view) return Math.floor((size - view) / 2)
+    return Math.max(-margin, Math.min(Math.max(-margin, size - view + margin),
+      position - Math.floor(view / 2)))
+  }
+
+  function canvasWorldTile(px, py) {
+    return {mx: Math.floor(camX + px / TILE_PX), my: Math.floor(camY + py / TILE_PX)}
+  }
+
   function targetCamX(px) {
     const x = px === undefined ? player.x : px
     const width = map && map[0] ? map[0].length : MAP_W
-    return Math.max(0, Math.min(Math.max(0, width - VIEW_W), x - Math.floor(VIEW_W / 2)))
+    return cameraAxis(x, width, VIEW_W, visibleCanvasBounds.left)
   }
 
   function targetCamY(py) {
     const y = py === undefined ? player.y : py
-    const height = map ? map.length : MAP_H
-    return Math.max(0, Math.min(Math.max(0, height - VIEW_H), y - Math.floor(VIEW_H / 2)))
+    const height = map?.length || MAP_H
+    return cameraAxis(y, height, VIEW_H, visibleCanvasBounds.top)
   }
 
   function snapCameraToPlayer() {
@@ -14186,6 +14196,50 @@ more difficult:
   }
 
 
+  // Draw one bronze-bound stone segment immediately outside the surface map.
+  function drawWorldBorder(mx, my, width, height) {
+    if (mx < -1 || my < -1 || mx > width || my > height) return
+    const side = mx === -1 || mx === width
+    const end = my === -1 || my === height
+    ctx.save()
+    ctx.translate(Math.round((mx - camX) * TILE_PX), Math.round((my - camY) * TILE_PX))
+    ctx.scale(TILE_PX / 32, TILE_PX / 32)
+    ctx.fillStyle = '#292728'
+    ctx.fillRect(0, 0, 32, 32)
+    ctx.translate(16, 16)
+    if (side && !end) ctx.rotate(mx === -1 ? -Math.PI / 2 : Math.PI / 2)
+    else if (my === height) ctx.rotate(Math.PI)
+    if (side && end) {
+      ctx.strokeStyle = '#93764b'
+      ctx.lineWidth = 2
+      ctx.strokeRect(-13, -13, 26, 26)
+      ctx.rotate(Math.PI / 4)
+      ctx.fillStyle = '#846742'
+      ctx.fillRect(-7, -7, 14, 14)
+      ctx.fillStyle = '#c4a06b'
+      ctx.fillRect(-4, -4, 8, 8)
+    } else {
+      ctx.fillStyle = '#695742'
+      ctx.fillRect(-16, -13, 32, 2)
+      ctx.fillRect(-16, 9, 32, 4)
+      ctx.fillStyle = '#b39a71'
+      ctx.fillRect(-16, 12, 32, 1)
+      ctx.strokeStyle = '#695742'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(-16, -1)
+      ctx.lineTo(-7, -1)
+      ctx.lineTo(0, -6)
+      ctx.lineTo(7, -1)
+      ctx.lineTo(0, 4)
+      ctx.lineTo(-7, -1)
+      ctx.moveTo(7, -1)
+      ctx.lineTo(16, -1)
+      ctx.stroke()
+    }
+    ctx.restore()
+  }
+
   function renderScene(now, terrainCells = null, vision = null) {
     if (!map.length || worldGenerating) return
     // A remote view uses the same scene layers, but never changes local sight,
@@ -14251,6 +14305,10 @@ more difficult:
       for (let vx = 0; vx < renderCols; vx++) {
         if (terrainCells && !terrainCells.has(vy * VIEW_W + vx)) continue
         const mx = baseMapX + vx, my = baseMapY + vy
+        if (currentZ === 0 && (mx < 0 || my < 0 || mx >= mapW || my >= mapH)) {
+          drawWorldBorder(mx, my, mapW, mapH)
+          continue
+        }
         const projectedSurface = currentZ > 0 && map[my]?.[mx] === 'towervoid'
         if (projectedSurface && !player.godMode && !discovered[my]?.[mx]) continue
         const terrainSource = projectedSurface ? surfaceMap : map
@@ -15189,8 +15247,7 @@ more difficult:
 
   function desktopPointerInspectsEnemy(e) {
     if (!e || lastMousePx === null || lastMousePy === null) return false
-    const vx = Math.floor(lastMousePx / TILE_PX), vy = Math.floor(lastMousePy / TILE_PX)
-    const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
+    const {mx, my} = canvasWorldTile(lastMousePx, lastMousePy)
     return tileInspectInfo(mx, my)?.enemy === e
   }
 
@@ -15518,8 +15575,7 @@ more difficult:
       if (desktopCombatTooltipEnemy) renderDesktopCombatTooltip()
       return
     }
-    const vx = Math.floor(lastMousePx / TILE_PX), vy = Math.floor(lastMousePy / TILE_PX)
-    const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
+    const {mx, my} = canvasWorldTile(lastMousePx, lastMousePy)
     const info = tileInspectInfo(mx, my)
     const e = info ? info.enemy : null
     setDesktopCanvasCursor(e)
@@ -15573,7 +15629,8 @@ more difficult:
   canvas.addEventListener('mousemove', (ev) => {
     if (fireballAim) {
       const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
-      setFireballTarget(Math.floor(camX + Math.floor(p.px / TILE_PX)), Math.floor(camY + Math.floor(p.py / TILE_PX)))
+      const {mx, my} = canvasWorldTile(p.px, p.py)
+      setFireballTarget(mx, my)
       return
     }
     const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
@@ -15581,8 +15638,7 @@ more difficult:
     lastMousePy = p.py
     updateTooltip()
     if (!player.wayfaring.rush && !window.matchMedia('(pointer: coarse)').matches && !mapOpen && !invOpen && !tradeOpen && !raceOpen && !cameraAnimating && !attackAnim) {
-      const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
-      const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
+      const {mx, my} = canvasWorldTile(p.px, p.py)
       const enemy = enemies.find(e => onCurrentLevel(e) && e.alive && e.x === mx && e.y === my &&
         undergroundTileVisible(mx, my) && enemyCanBeSeen(e))
       const npcAtTile = currentZ === 0 && npcs.some(n => n.x === mx && n.y === my)
@@ -15627,8 +15683,8 @@ more difficult:
   function handleCanvasTap(clientX, clientY) {
     if (holeJumpOpen || campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || attackAnim || enemyAttackPresentationPending() || replayPlaying) return
     const p = canvasEventToBufferXY(clientX, clientY)
-    const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
-    const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
+    const {mx, my} = canvasWorldTile(p.px, p.py)
+    if (!map[my]?.[mx]) return
     if (player.wayfaring.rush) {
       const dx = mx - player.x, dy = my - player.y
       const distance = Math.max(Math.abs(dx), Math.abs(dy))
@@ -15713,8 +15769,7 @@ more difficult:
     if (player.wayfaring.rush || fireballAim) { handleCanvasTap(ev.clientX, ev.clientY); return }
     if (!window.matchMedia('(pointer: coarse)').matches && !campOpen && !mapOpen && !invOpen && !tradeOpen && !npcMenuOpen && !raceOpen && !cameraAnimating && !attackAnim && !enemyAttackPresentationPending() && !replayPlaying) {
       const p = canvasEventToBufferXY(ev.clientX, ev.clientY)
-      const vx = Math.floor(p.px / TILE_PX), vy = Math.floor(p.py / TILE_PX)
-      const mx = Math.floor(camX + vx), my = Math.floor(camY + vy)
+      const {mx, my} = canvasWorldTile(p.px, p.py)
       const e = enemies.find(en => onCurrentLevel(en) && en.alive && en.x === mx && en.y === my &&
         undergroundTileVisible(mx, my) && enemyCanBeSeen(en))
       if (e) {

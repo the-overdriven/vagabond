@@ -10669,6 +10669,11 @@ bounds rather than the oversized render buffer so this deliberate clipping
 cannot trim them after resize or zoom. A cramped window caps the effective tile
 size so at least seven columns fit; desktop otherwise has no 50-tile camera cap,
 so wide and tall monitors expose additional map instead of leaving unused space.
+On the surface, the camera leaves a full tile of visible space beyond each world
+edge, including at corners and zoom levels that clip the canvas. A bronze-trimmed
+stone frame marks the last playable tile in both tile and ASCII modes. At the
+world edge, the frame meets the viewport edge when the map fills that axis.
+
 The right-side minimap and keyboard hints are fixed overlays and never reserve
 canvas width. Expanding or collapsing either panel therefore does not resize the
 camera or make the map jump. Coarse-pointer layouts retain the 16-column
