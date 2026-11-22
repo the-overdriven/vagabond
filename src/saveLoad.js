@@ -1441,6 +1441,3 @@ document.getElementById('fileLoad').addEventListener('change', (event) => {
   if (file) loadGame(file)
   event.target.value = '' // allow re-selecting the same file later
 })
-document.getElementById('btnRaceLoad').addEventListener('click', () => {
-  document.getElementById('fileLoad').click()
-})

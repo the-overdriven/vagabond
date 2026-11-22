@@ -213,19 +213,22 @@ const Mimics = (() => {
     return groundItems.find(g=>g.isMimic&&onCurrentLevel(g)&&g.x===x&&g.y===y)
   }
   function revealBump(x,y) { return reveal(hiddenAt(x,y)) }
-  function deathLoot(e) {
+  function deathLoot(e, visibleAtDeath = false) {
     if(!e.mimicLoot)return false
     const loot=e.mimicLoot
     const gold=(loot.gold||0)+Math.max(1,Math.round(BONUS_GOLD*WORLD_GEN_CONFIG.lootRules.worldGoldMultiplier))
     if(gold){player.gold+=gold;log(`You recover ${gold} gold from the ${e.name}.`,'loot')}
+    let soundPriority = 0
     for(const item of loot.items||[]) {
       // These are precisely the pre-rolled contents of the disguised chest.
       if(isStackableKind(item.kind))addInventoryItem(item.kind,{count:item.count||1})
       else carryItem(item)
       const label = item.kind === 'artifact' ? artifactDisplayName(item) : item.name || itemDefinition(item.kind)?.name || item.kind
       lootLog(`The ${e.name} contained ${label}.`,item,label)
-      if (item.kind === 'artifact' && enemyIsVisibleOnMainView(e)) spawnRareDropAnim(e)
+      if (visibleAtDeath) soundPriority = Math.max(soundPriority, lootSoundPriority(item, item.rangedAtk ? e.tier : 0))
+      if (item.kind === 'artifact' && visibleAtDeath) spawnRareDropAnim(e)
     }
+    playLootSound(soundPriority)
     return true
   }
   return {initialize,update,onLoad,onLevelChange,revealAdjacent,hiddenAt,revealBump,revealBySpell,deathLoot,

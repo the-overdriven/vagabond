@@ -210,7 +210,7 @@ more difficult:
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vagabond">
-  <link rel="stylesheet" href="css/style.css?v=20261109-hill-terrain-status">
+  <link rel="stylesheet" href="css/style.css?v=20261122-race-checkbox-spacing">
   <style>
     #loadingOverlay { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(ellipse at center, #24202b, #0b0b10 70%); color: #e7dbc3; font: 18px Georgia, serif; letter-spacing: .08em; }
     #loadingOverlay[hidden] { display: none; }
@@ -346,6 +346,7 @@ more difficult:
       <button class="slbtn" id="btnLoad" title="Load game from a .json file">📂 Load</button>
       <button class="slbtn" id="btnReplay" title="Watch this run from the beginning" style="display:none">▶ Show Replay</button>
       <button class="slbtn" id="btnGraveyard" type="button" aria-label="Graveyard" title="Graveyard">💀</button>
+      <button class="slbtn" id="btnSound" type="button" aria-label="Sound" aria-pressed="true" title="Mute sound">🔊</button>
       <button class="slbtn" id="btnHighscores" type="button" aria-label="Highscores" title="Highscores">🏆</button>
       <input type="file" id="fileLoad" accept="application/json,.json" class="visually-hidden">
     </div>
@@ -392,11 +393,13 @@ more difficult:
             <span class="cursed-world-mobile-note" aria-hidden="true">Even more random world. Highly experimental and potentially unbalanced. Careful!</span>
           </div>
           <span id="raceError"></span>
-          <button class="slbtn" id="btnRaceRecover" type="button" hidden title="Load the latest manual save stored on this device">Load local save</button>
-          <span class="inline-actions">
-            <button class="slbtn" id="btnRaceLoad" type="button" title="Load an existing character from a .json save">📂 Load save</button>
-            <button class="slbtn" id="btnBegin" type="button">Begin your journey</button>
-          </span>
+          <div class="race-footer-actions">
+            <a class="music-credits-link" href="https://github.com/the-overdriven/vagabond/blob/HEAD/CREDITS.md" target="_blank" rel="noopener">Music credits</a>
+            <span class="inline-actions race-start-actions">
+              <button class="slbtn" id="btnRaceRecover" type="button" hidden title="Load the latest manual save stored on this device">Load local save</button>
+              <button class="slbtn" id="btnBegin" type="button">Begin your journey</button>
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -2325,6 +2328,8 @@ more difficult:
 <script src="src/tracking.js"></script>
 <script src="src/rareFlee.js"></script>
 <script src="src/combatSkills.js"></script>
+<script src="src/musicAudio.js"></script>
+<script src="src/lootAudio.js"></script>
 <script>
   'use strict'
   /* ============================== ITEM / ENTITY FACTORIES ============================== */
@@ -3048,6 +3053,8 @@ more difficult:
       log(`You knock the ${item.base || item.name} from the ${e.name}'s grip!`, 'good')
       spawnDamageNumber(e.x,e.y,'Disarmed!','#d8bd92')
       if (converted) spawnRareDropAnim({...e,x:spot.x,y:spot.y})
+      if (onCurrentLevel(e) && undergroundTileVisible(spot.x, spot.y))
+        playLootSound(lootSoundPriority(item, e.tier))
     }
     return true
   }
@@ -5802,6 +5809,23 @@ more difficult:
        monsterGearQualityTailChance(item, sourceTier) < 0.10)
   }
 
+  // Priority is presentation only. Ordinary high-tier gear is not exceptional
+  // unless its actual modifier exceeds the existing ordinary quality ceiling.
+  function lootSoundPriority(item, sourceTier = 0, rare = false) {
+    if (item?.kind === 'artifact') return 4
+    if (['weapon','shield','armor'].includes(item?.kind)) {
+      if (item.mod === 'xp' ? item.xpBonus > 15 :
+          item.mod === 'hp' ? item.modAmt > 59 : item.mod && item.modAmt > 10) return 3
+      return rare || isRareMonsterDrop(item, sourceTier) ? 2 : 1
+    }
+    return rare ? 2 : 0
+  }
+
+  function playLootSound(priority) {
+    if (priority && !replayPlaying && !replaySimulationMode && !replayAnimationsDisabled)
+      LootAudio.play(priority)
+  }
+
   function enemyLootSubject(e) {
     return e.adaptiveEventId==='last_survivor' && e.name?.endsWith(', Last Survivor')
       ? e.name : `The ${e.name}`
@@ -5812,6 +5836,10 @@ more difficult:
     const strength = deathContext?.strength ?? (enemyArtifactLootEligible(e)
       ? monsterLootStrength(enemyPermanentStats(e)) : 0)
     let rareFxQueued = false
+    let soundPriority = 0
+    const noteLootSound = (item, rare = false) => {
+      if (visibleAtDeath) soundPriority = Math.max(soundPriority, lootSoundPriority(item, e.tier, rare))
+    }
     const showRareDrop = rare => {
       if (!rare || rareFxQueued || !visibleAtDeath) return
       rareFxQueued = true
@@ -5836,9 +5864,11 @@ more difficult:
         const bowLabel = onGround ? bow.base : bow.name
         lootLog(`${enemyLootSubject(e)} dropped ${bowLabel}.`, bow, bowLabel)
         // The Hunting Bow is only a quarter of the 25% shooter-bow drop.
-        showRareDrop((bow.base === 'Hunting Bow' &&
+        const rare = (bow.base === 'Hunting Bow' &&
           RANGED_CONFIG.shortBowDropChance * 0.25 < 0.10) ||
-          isRareMonsterDrop(bow, e.tier))
+          isRareMonsterDrop(bow, e.tier)
+        showRareDrop(rare)
+        noteLootSound(bow, rare)
       }
     }
 
@@ -5879,6 +5909,7 @@ more difficult:
       const name = itemDefinition(selected.kind).name
       log(`${enemyLootSubject(e)} dropped ${count === 1 ? name : count + ' × ' + name}.`, 'loot')
       showRareDrop(selected.chance < 0.10)
+      noteLootSound(null, selected.chance < 0.10)
     }
 
     // Fungus always yields ordinary unidentified mushrooms. Keep this separate
@@ -5906,6 +5937,7 @@ more difficult:
         const label = onGround ? art.noun : artifactDisplayName(art)
         lootLog(`${enemyLootSubject(e)} dropped ${label}.`, art, label)
         showRareDrop(true)
+        noteLootSound(art)
         if (onGround) placeEnemyLootOnGround(e, art)
         else carryItem(art)
       }
@@ -5919,6 +5951,8 @@ more difficult:
       const label = onGround ? (item.base || item.name) : artifactDisplayName(item)
       lootLog(`${enemyLootSubject(e)} dropped ${label}.`, item, label)
       showRareDrop(isRareMonsterDrop(item, e.tier))
+      noteLootSound(item)
+      playLootSound(soundPriority)
       // Adaptive enemies' enchanted gear is a visible ground pickup, not
       // silently added to inventory or auto-equipped after a melee kill.
       if (onGround || e.adaptiveEventId === 'fan_club' && AdaptivePlayerTrolling.active()) {
@@ -5929,9 +5963,7 @@ more difficult:
       carryItem(item)
       return
     }
-    if (e.humanoid) {
-      return
-    }
+    playLootSound(soundPriority)
   }
 
   function xpForEnemy(e) {
@@ -6844,7 +6876,7 @@ more difficult:
   function killEnemy(e, playerCredit = true, cause = 'trap', deathFxDelay = 0) {
     ArtifactWayfaring.forgetEnemy(e)
     Frostwalker.forget(e)
-    const visibleAtDeath = enemyIsVisibleOnMainView(e)
+    const visibleAtDeath = onCurrentLevel(e) && enemyIsVisibleOnMainView(e)
     const inspiredNearby = e.prefix === 'Champion' && enemies.some(other => other !== e && other.alive && other.hp > 0 && other.prefix !== 'Champion' && onCurrentLevel(other) && onCurrentLevel(e) && Math.max(Math.abs(other.x-e.x), Math.abs(other.y-e.y)) <= INSPIRED_RADIUS)
     if (!e.alive) return
     const permanentStats = playerCredit || enemyArtifactLootEligible(e) ? enemyPermanentStats(e) : null
@@ -6915,7 +6947,7 @@ more difficult:
         kind:'stolenloot',gold:e.stolenGold})
       e.stolenGold=0
     }
-    if (!e.artifactSoulGhost && cause !== 'sacrifice' && !Mimics.deathLoot(e)) {
+    if (!e.artifactSoulGhost && cause !== 'sacrifice' && !Mimics.deathLoot(e, visibleAtDeath)) {
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
       lootFromEnemy(e, cause === 'drowning' || (playerCredit && ['arrow', 'fireball', 'poison'].includes(cause) && distance > ATTACK_RANGE),
         visibleAtDeath, deathFxDelay, deathContext)
@@ -10251,6 +10283,7 @@ more difficult:
       lastLootHighlights = itemLogHighlight(item)
       if (!suppressLootLog) lootLog(`You open a chest and find a ${item.name}.`, item)
       if (!maybeAutoEquipWeapon(item, true)) carryItem(item)
+      playLootSound(lootSoundPriority(item, chestTier))
     },
     chitin: (chestTier, mf, entry) => {
       const count = randInt(entry.countMin, entry.countMax)
@@ -10272,6 +10305,7 @@ more difficult:
       if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item, true))) {
         carryItem(item)
       }
+      playLootSound(lootSoundPriority(item))
     },
     potion: () => {
       addPotion()
@@ -10334,6 +10368,7 @@ more difficult:
           lastLootHighlights=itemLogHighlight(item,name)
           if(!suppressLootLog)lootLog(`You open the labyrinth chest: ${name}, ${gold} gold, and ${bonuses.join(' and ')}.`,item,name)
           if(!(item.kind==='weapon'&&maybeAutoEquipWeapon(item,true)))carryItem(item)
+          playLootSound(lootSoundPriority(item))
           spawnPickupAnim(g)
           groundItems.splice(i,1)
           continue
@@ -10364,6 +10399,7 @@ more difficult:
           lastLootHighlights = itemLogHighlight(item,name)
           if (!suppressLootLog) lootLog(`You open the royal treasury chest and find ${name} and ${gold} gold!`,item,name)
           if (!(item.kind === 'weapon' && maybeAutoEquipWeapon(item,true))) carryItem(item)
+          playLootSound(lootSoundPriority(item))
           Campfires.findFlint(0.005)
           spawnPickupAnim(g)
           groundItems.splice(i,1)
@@ -10375,6 +10411,7 @@ more difficult:
           lastLootResult = `${artifactDisplayName(art)}.`
           lastLootHighlights = itemLogHighlight(art, artifactDisplayName(art))
           if (!suppressLootLog) lootLog(`You open the chest. Inside rests ${artifactDisplayName(art)}.`, art, artifactDisplayName(art))
+          playLootSound(lootSoundPriority(art))
           Campfires.findFlint(0.005)
           spawnPickupAnim(g)
           groundItems.splice(i, 1)
@@ -10389,6 +10426,7 @@ more difficult:
           lastLootHighlights = itemLogHighlight(item, label)
           if (!suppressLootLog) lootLog(`You open a chest and find ${label}.`, item, label)
           spawnRareDropAnim(g)
+          playLootSound(lootSoundPriority(item))
         } else {
           (CHEST_LOOT_HANDLERS[reward.result] || CHEST_LOOT_HANDLERS.idscroll)(chestTier, mf, reward.entry)
         }
@@ -18763,6 +18801,7 @@ more difficult:
   }
 
   window.addEventListener('keydown', (ev) => {
+    if (ev.target?.id === 'btnSound' && ['Enter', ' ', 'Spacebar'].includes(ev.key)) return
     if (Highscores.isOpen()) {
       Highscores.handleKeydown(ev)
       return
@@ -18983,7 +19022,7 @@ more difficult:
   // status strip receive input, but don't let another UI action interleave.
   function guardRushPointerAction(ev) {
     if (!player.wayfaring.rush || AdaptivePlayerTrolling.pendingDebtCollector()) return
-    if (ev.target.closest?.('#game, .dpad button[data-dx], #playerStatuses')) return
+    if (ev.target.closest?.('#game, .dpad button[data-dx], #playerStatuses, #btnSound')) return
     ev.preventDefault()
     ev.stopImmediatePropagation()
   }

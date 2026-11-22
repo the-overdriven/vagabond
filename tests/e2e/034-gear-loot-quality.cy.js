@@ -36,8 +36,8 @@ describe('Exceptional prefixes and monster loot quality', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
       const old={chance,rng,lootLog,spawnRareDropAnim,maybeAutoEquipWeapon,makeArtifactItem,
-        inventory:player.inventory}
-      const effects=[],victim={...ENEMY_TEMPLATE_BY_NAME.Goblin,name:'Goblin',baseName:'Goblin',humanoid:true,tier:1,
+        inventory:player.inventory,play:LootAudio.play,replayPlaying}
+      const sounds=[],effects=[],victim={...ENEMY_TEMPLATE_BY_NAME.Goblin,name:'Goblin',baseName:'Goblin',humanoid:true,tier:1,
         maxHp:ENEMY_TEMPLATE_BY_NAME.Goblin.hp,
         x:player.x+1,y:player.y,level:currentZ,levelKind:currentLevelKind()}
       try {
@@ -52,6 +52,7 @@ describe('Exceptional prefixes and monster loot quality', () => {
         check(isRareMonsterDrop({kind:'artifact'},1),'all artifacts qualify')
         check(!isRareMonsterDrop({kind:'weapon',base:'Dagger',tier:5},5),
           'ordinary high-tier gear does not qualify on tier alone')
+        LootAudio.play=priority=>sounds.push(priority)
         spawnRareDropAnim=(e,delay)=>effects.push({x:e.x,delay})
         maybeAutoEquipWeapon=()=>false; lootLog=()=>{}
         rng=()=>{throw Error('animation classifier consumed gameplay RNG')}
@@ -75,11 +76,21 @@ describe('Exceptional prefixes and monster loot quality', () => {
         rng=()=>0.5
         lootFromEnemy(rare,false,true)
         check(effects.length===3,'6.6% group drop also receives a sparkle')
+        check(JSON.stringify(sounds)==='[2,1,4,2]',
+          'one cue per visible death; artifact wins and offscreen loot stays silent')
+        chance=()=>false
+        lootFromEnemy({...victim,equipment:gear(13)},false,true)
+        check(sounds.at(-1)===3,'exceptional modifier has a distinct cue')
+        replayPlaying=true
+        const soundCount=sounds.length
+        lootFromEnemy({...victim,equipment:gear(13)},false,true)
+        check(sounds.length===soundCount,'replay does not play loot audio')
       } finally {
         chance=old.chance;rng=old.rng;lootLog=old.lootLog
         spawnRareDropAnim=old.spawnRareDropAnim
         maybeAutoEquipWeapon=old.maybeAutoEquipWeapon
         makeArtifactItem=old.makeArtifactItem;player.inventory=old.inventory
+        LootAudio.play=old.play;replayPlaying=old.replayPlaying
       }
     })()`))
   })

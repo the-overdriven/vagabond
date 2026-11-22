@@ -288,6 +288,7 @@ function restoreLiveAfterReplay() {
   turnCount = counters.turnCount
   consecutiveWaitTurns = counters.consecutiveWaitTurns
   oldHunterQuestSerial = counters.oldHunterQuestSerial
+  LootAudio.syncMusic()
 }
 
 function finishReplayPlayback() {
@@ -755,6 +756,8 @@ function startReplayPlayback() {
     replayRngIndex = pos
   }
   replayPlaying = true
+  LootAudio.stop()
+  MusicAudio.suspend()
   skipLogTypingForReplay()
   replayPaused = false
   replaySimulationMode = false

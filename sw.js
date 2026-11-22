@@ -12,7 +12,7 @@
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
 // Independent from the displayed game version; increment for cache refreshes.
-const CACHE_REVISION = 59;
+const CACHE_REVISION = 64;
 const CACHE_VERSION = `${CACHE_PREFIX}${self.VAGABOND_GAME_VERSION}-cache-${CACHE_REVISION}`;
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
@@ -72,6 +72,13 @@ const PRECACHE_URLS = [
   './src/replay.js',
   './src/saveLoad.js',
   './src/combatSkills.js',
+  './src/lootAudio.js',
+  './src/musicAudio.js',
+  './audio/music/dark-fantasy-gothic-dungeon.mp3',
+  './audio/loot/gear-drop.wav',
+  './audio/loot/rare-drop.wav',
+  './audio/loot/exceptional-prefix-drop.wav',
+  './audio/loot/artifact-drop.wav',
   './src/tracking.js',
   './src/version.js',
   './src/artifactWayfaring.js',
@@ -91,7 +98,7 @@ const PRECACHE_URLS = [
   './img/icons/brushwood.svg',
   './src/fireball.js',
   './img/icons/scroll-of-fireball.svg',
-  './css/style.css?v=20261107-mobile-npc-dialogue',
+  './css/style.css?v=20261122-race-checkbox-spacing',
   './content/starting_weapons.json',
   './content/gear_weapons.json',
   './content/artifact_abilities.json',
@@ -237,6 +244,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Media elements often request byte ranges, including when offline on Safari.
+  // Cache only full audio responses; never overwrite them with partial ones.
+  if (url.pathname.includes('/audio/music/') || url.pathname.includes('/audio/loot/')) {
+    event.respondWith(audioResponse(req));
+    return;
+  }
+
   // Everything else (avatars/enemies/npc images, icons): stale-while-revalidate.
   // Serve the cached copy instantly (fast + works offline), but ALWAYS
   // re-check the server in the background and overwrite the cache if the file
@@ -261,3 +275,41 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+async function audioResponse(req) {
+  const cache = await caches.open(PRECACHE);
+  const fullRequest = new Request(req.url);
+  let full = await cache.match(fullRequest);
+  if (!full) {
+    try {
+      full = await fresh(fullRequest);
+      if (full.status !== 200) return full;
+      // A full cache or denied storage should not interrupt online playback.
+      try { await cache.put(fullRequest, full.clone()); } catch { /* Best effort. */ }
+    } catch { return Response.error(); }
+  }
+  const range = req.headers.get('Range');
+  if (!range) return full;
+  const bytes = await full.arrayBuffer();
+  const size = bytes.byteLength;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+  let start = 0, end = size - 1;
+  if (match && (match[1] || match[2])) {
+    if (match[1]) {
+      start = Number(match[1]);
+      if (match[2]) end = Math.min(end, Number(match[2]));
+    } else {
+      start = Math.max(0, size - Number(match[2]));
+    }
+  } else { start = size; }
+  if (start >= size || end < start) {
+    return new Response(null, {status: 416, headers: {'Content-Range': `bytes */${size}`}});
+  }
+  return new Response(bytes.slice(start, end + 1), {status: 206, headers: {
+    'Content-Type': full.headers.get('Content-Type') ||
+      (new URL(req.url).pathname.endsWith('.wav') ? 'audio/wav' : 'audio/mpeg'),
+    'Accept-Ranges': 'bytes',
+    'Content-Length': String(end - start + 1),
+    'Content-Range': `bytes ${start}-${end}/${size}`
+  }});
+}

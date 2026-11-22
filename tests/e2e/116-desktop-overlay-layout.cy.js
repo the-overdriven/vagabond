@@ -221,6 +221,20 @@ describe('Desktop overlay layout', () => {
       expect(rect.right, 'compact HUD sits at the right edge').to.be.closeTo(1440 - 16, 1)
     })
 
+    cy.get('.race-options').should($options => {
+      const options = $options[0]
+      const footer = options.closest('.race-foot')
+      const labels = [...options.querySelectorAll('.permadeath-option')]
+      const rects = labels.map(label => label.getBoundingClientRect())
+      expect(rects).to.have.length(3)
+      expect(rects[2].right, 'checkboxes align to right edge')
+        .to.be.closeTo(footer.getBoundingClientRect().right, 1)
+      expect(footer.querySelector('.world-size-option').getBoundingClientRect().right)
+        .to.be.lessThan(rects[0].left)
+      expect(rects[1].left - rects[0].right, 'first checkbox gap').to.be.closeTo(18, 1)
+      expect(rects[2].left - rects[1].right, 'second checkbox gap').to.be.closeTo(18, 1)
+    })
+
     // The compact treatment belongs only to race selection. Once that
     // overlay closes, the full centered in-game HUD must come back.
     cy.get('#raceOverlay').invoke('removeClass', 'show')
@@ -262,7 +276,12 @@ describe('Desktop overlay layout', () => {
         const top=button.ownerDocument.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2)
         expect(top===button || button.contains(top),'Begin remains clickable').to.equal(true)
       })
-      cy.get('#btnRaceLoad').should('be.visible')
+      cy.get('#btnRaceLoad').should('not.exist')
+      cy.get('#btnLoad').should('be.visible').then($button => {
+        const button=$button[0],rect=button.getBoundingClientRect()
+        const top=button.ownerDocument.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2)
+        expect(top===button || button.contains(top),'HUD Load remains clickable').to.equal(true)
+      })
     }
   })
 

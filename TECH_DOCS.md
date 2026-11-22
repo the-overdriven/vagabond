@@ -7892,6 +7892,24 @@ new weapon, shield or armor. Converted equipment uses the separate rule in §44.
 Other artifact sources (including guaranteed adaptive rewards and special
 chests) are independent and retain their own generation rules.
 
+## Loot audio
+
+Visible enemy deaths, disarmed equipment and opened reward containers play
+one cue for the best newly awarded item. An artifact takes priority over
+exceptional gear (modifier above the ordinary maximum: HP +59, XP +15%,
+other supported stats +10), then rare loot (the existing below-10% monster
+loot and modifier-quality rules), then ordinary weapons, armor and shields.
+Ordinary chest gear uses the same modifier-quality classification. Gold,
+ordinary consumables, common materials and ammunition have no dedicated cue.
+A rare consumable or material still qualifies for the generic rare cue.
+
+A death outside the current visible main view is silent, including hidden
+Mimic rewards. Merely generating or loading loot, seeing a closed chest or
+collecting an already-dropped item does not play a cue. Sound does not expose
+an artifact's powers or identification outcome. Audio is presentation only;
+loot resolution does not wait for playback or consume additional RNG. Replay
+and background tabs are silent. Overlapping cues favor the higher priority.
+
 ---
 
 # 44. Enemy Equipment Drops
@@ -10038,20 +10056,22 @@ warns the player to verify the downloaded file. If both fail, the game reports a
 save failure; a failed write does not replace an earlier committed recovery
 snapshot.
 
-Character selection offers **Load local save** when the latest manual snapshot
-uses the current save format. Recovery uses the ordinary save loader, including
-its version validation, and does not create a new world or consume RNG. The
-single backup is shared by manual saves on the same browser profile/site;
-starting a character does not overwrite it until the next manual save. It is not
-an autosave, cloud sync, or a substitute for exported JSON files: browser
-storage can be cleared, blocked, or evicted. Replay playback cannot write a
-recovery save, and neither the backup metadata nor download status enters the
-save payload or replay tape. Generation-only changes keep the format: saves
-store the complete generated world and current RNG state, and replays load their
-complete initial snapshot rather than rerunning generation. Optional cave
-metadata stored in existing cave descriptors does not require a new format.
-Incompatible required fields and terrain encodings require a save-version bump;
-incompatible replay rules require a replay or save version bump.
+The top HUD provides **Load** for importing a JSON save on both desktop and
+mobile. Character selection offers **Load local save** when the latest manual
+snapshot uses the current save format. Recovery uses the ordinary save loader,
+including its version validation, and does not create a new world or consume
+RNG. The single backup is shared by manual saves on the same browser
+profile/site; starting a character does not overwrite it until the next manual
+save. It is not an autosave, cloud sync, or a substitute for exported JSON
+files: browser storage can be cleared, blocked, or evicted. Replay playback
+cannot write a recovery save, and neither the backup metadata nor download
+status enters the save payload or replay tape. Generation-only changes keep the
+format: saves store the complete generated world and current RNG state, and
+replays load their complete initial snapshot rather than rerunning generation.
+Optional cave metadata stored in existing cave descriptors does not require a
+new format. Incompatible required fields and terrain encodings require a
+save-version bump; incompatible replay rules require a replay or save
+version bump.
 
 The loader retains its exact-version check; this does not introduce migration
 or acceptance of differently numbered saves.
@@ -10584,6 +10604,24 @@ Therefore:
 ---
 
 # 69. UI Controls
+
+The compact speaker button in the top HUD toggles loot audio and background
+music in both desktop and touch layouts. Sound starts enabled; the browser
+retains the preference locally across sessions, independently of character
+saves and replays. Muting immediately stops the current cue, pauses music and
+costs no turn.
+
+Background music begins after the first user interaction, plays a complete
+track at low volume and then leaves a two-minute silent interval before the
+next track in the playlist. A single-track playlist repeats that track after
+the interval. Music pauses when muted, in a hidden tab or during replay and
+resumes when permitted; an elapsed silent interval is not restarted. Audio
+files (both loot cues and soundtrack tracks) are precached by the service
+worker, including support for partial media requests while offline. Music is
+presentation only and never affects the turn counter, game RNG or save data.
+A discreet link in the bottom-left corner of the character creation panel
+opens the music attribution in `CREDITS.md`. The journey and local recovery
+buttons are aligned to the right of the footer, wrapping on narrow screens.
 
 Wide, fine-pointer desktop layouts use a UI font scale of **1.1**; narrow
 or touch layouts retain **1.0**.
@@ -11994,11 +12032,13 @@ The **Cursed world** checkbox in character creation is off by default. The
 Cursed world label has a brown desktop tooltip warning that the mode may be
 unbalanced. On mobile-sized or touch screens, the World size selector appears
 separately and the three checkboxes form separate full-width rows. The warning
-appears below them only while Cursed world is checked. The desktop tooltip is
-anchored to the Cursed world label; each checkbox sits beside its text with a
-small fixed gap. With the checkbox off, generation uses the base configuration
-and logs no trait line. The mobile checkbox layout and the warning's
-checked/unchecked visibility are covered by `tests/e2e/021-startup-ui.cy.js` and
+appears below them only while Cursed world is checked. On desktop, World size
+stays on the left and the three checkboxes are grouped on the right with
+spacing between the labels. The tooltip is anchored to the Cursed world label;
+each checkbox sits beside its text with a small fixed gap. With the checkbox
+off, generation uses the base configuration and logs no trait line. The mobile
+checkbox layout and the warning's checked/unchecked visibility are covered by
+`tests/e2e/021-startup-ui.cy.js` and
 `tests/e2e/022-cursed-world-options.cy.js`. After a valid name/race is
 confirmed, a cursed world draws the requested number of traits before world
 generation. All generation retries use the same resolved effects. Each nonempty

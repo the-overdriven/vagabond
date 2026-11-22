@@ -117,7 +117,7 @@ describe('Vagabond smoke test', () => {
     cy.get('#raceOverlay .panelbox')
       .should('be.visible')
 
-    cy.get('#btnRaceLoad').click()
+    cy.get('#btnLoad').click()
 
     // Path is resolved relative to the project root by selectFile, not the
     // fixtures folder (that's cy.fixture()'s behavior, not this one).
