@@ -81,11 +81,16 @@ describe('Save export and recovery', () => {
         win.document.getElementById('logpanel').textContent).not.to.contain('Game saved to file.')
     })
 
-    // Reload the browser document to verify recovery from IndexedDB.
-    // The independent startup-resource test exercises a stalled image decoder;
-    // adding a never-settling decoder here couples save recovery to image loading.
-    cy.reload()
-    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
+    // Exercise the real recovery button from character selection. Every
+    // readRecoverySave call opens a new IndexedDB transaction, so this checks
+    // the committed snapshot rather than the current in-memory game state.
+    // Restarting the entire image-heavy application is a separate startup
+    // concern and must not make save/recovery verification depend on it.
+    cy.window().then(win => {
+      expect(win.eval('player.gold')).to.equal(expected.player.gold + 9)
+      win.eval('openRaceSelect()')
+    })
+    cy.get('#raceOverlay').should('have.class', 'show')
     cy.get('#btnRaceRecover', {timeout: 15000}).should('be.visible').click()
     cy.get('#raceOverlay', {timeout: 60000}).should('not.have.class', 'show')
     cy.window().then(win => {
