@@ -2070,37 +2070,29 @@ wanderers. Both roaming selections use the **full depth-eligible species pool**,
 not just the selected dominant families or their leftovers, and use each
 species' configured rarity as a direct relative weight. Thus a `0.02` species
 has one fiftieth of the selection weight of an otherwise eligible `1.0` species
-in these global draws. This is a relative weight, not a 2% spawn chance. **All
-Dwarven Ruins populations, including corridor wanderers, require an explicit
-`z-n` biome in the monster template.** The `z-n` tag is a minimum depth: for
-example, `z-5` allows spawning on z:-5 and deeper, but not z:-4. An ordinary
-`cave` biome alone never grants Ruins eligibility. Tier minimums, rarity and the
-existing encounter-role rules still apply. The Ruins package uses an empty
-`nativeBiomes` list to enforce that distinction; ordinary cave spawning is
-unaffected. Family member lists are only thematic candidates; listing a species
-there cannot override its depth-biome requirement. Only species explicitly
-marked `"ultraRare": true` in `enemy_templates.json` are limited to **one
-individual per species per world**, across surface, underground and forest
-ambush generation. A low `rarity` weight by itself does not imply uniqueness.
-After an ultra-rare species spawns, subsequent weighted selections exclude it
-and other eligible monsters fill those slots. Unflagged species, including Myrka
-(`0.02`) and Vampire (`0.01`), can repeat. Themed room populations remain
-predictable while wandering encounters can occasionally be exceptional. **All**
-Ruins enemies use their species' normal idle wandering mode and home radius,
-including Champions, escorts, ranged backliners and other tactical room/vault
-guards. Roles determine initial positions and shooter selection, not stationary
-behavior; `far` still becomes `roam` underground and normal active-range/terrain
-limits apply. The configured default is exactly **one Champion per floor**,
-usually spawning with an escort in a remote or tactical room. Other prefixes
-begin at **11%**, rise by **2.5 percentage points per floor**, and cap at
-**28%**; random prefix rolls exclude Champion.
+in these global draws. This is a relative weight, not a 2% spawn chance.
+**Ultra-rare beasts never spawn in the Dwarven Fort or Dwarven Ruins**,
+including corridor and ambient encounters, regardless of biome or depth. Other
+rare species remain eligible under the normal habitat and tier rules. Family
+member lists are only thematic candidates; they cannot override habitat, depth
+or ultra-rare exclusions. Themed room populations remain predictable while
+wandering encounters can occasionally be exceptional. **All** Ruins enemies use
+their species' normal idle wandering mode and home radius, including Champions,
+escorts, ranged backliners and other tactical room/vault guards. Roles determine
+initial positions and shooter selection, not stationary behavior; `far` still
+becomes `roam` underground and normal active-range/terrain limits apply. The
+configured default is exactly **one Champion per floor**, usually spawning with
+an escort in a remote or tactical room. Other prefixes begin at **11%**, rise by
+**2.5 percentage points per floor**, and cap at **28%**; random prefix rolls
+exclude Champion.
 
-Cave species may appear when their tier's depth permits it. Surface species
-must opt in using a `z-N` biome tag, meaning depth N or deeper. Current tier
-thresholds are tier 2–3 at D1 (z:-4), tier 4 from z:-6. These tags only affect
-dungeon eligibility; names, stats and ordinary surface biomes stay intact.
-Entrances keep an eight-tile enemy clearance. Encounter spawns also avoid
-trap triggers and emitters within the configured two-tile trap clearance,
+Ordinary cave species may appear when their tier's depth permits it. Species
+without the `cave` biome must opt in using a `z-N` biome tag, meaning depth N or
+deeper. If present, this tag is always a minimum depth, even for cave species.
+Current tier thresholds are tier 2–3 at D1 (z:-4), tier 4 from z:-6. These tags
+only affect dungeon eligibility; names, stats and ordinary surface biomes stay
+intact. Entrances keep an eight-tile enemy clearance. Encounter spawns also
+avoid trap triggers and emitters within the configured two-tile trap clearance,
 existing objects and other monsters.
 
 A fleeing creature that actually moves on a Ruins floor may warn nearby
@@ -4048,23 +4040,25 @@ After the tier is chosen, the species inside that tier is selected by its
 `rarity` weight. `rarity` is a **relative weight**, not an absolute spawn
 percentage: a template with `rarity: 0.02` receives one fiftieth of the weight
 of a same-tier `rarity: 1.0` template. Surface world traits may further adjust
-non-humanoid weighting. The independent `"ultraRare": true` template flag,
-not the numeric rarity, enforces **at most one spawned individual of that
-species per world** across surface, caves, Dwarven Ruins and forest ambushes.
-Currently only NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN have
-this flag. An absent flag is `false`. Once one of these species spawns, even if
-it later dies, it cannot spawn again in the same world; a different eligible
-monster fills subsequent ordinary weighted slots. Other species are unaffected.
-In particular, Myrka (`0.02`) and Vampire (`0.01`) may spawn multiple times.
-At least one Vampire is still guaranteed in a distant eligible underground
-crypt or bat cave; this does not prevent other natural Vampire spawns.
-Templates listing only depth biomes such as `z-9` are ineligible for surface
-population, including migration groups; the missing-surface-biome fallback
-cannot spawn mine-exclusive monsters on the overworld. A template with an
-explicit surface biome remains eligible under its normal surface rules.
-No additional persistent state is required: the existing saved enemy roster
-and world-wide killed-species history enforce uniqueness, including across
-permadeath characters. Existing saved enemies are never removed.
+non-humanoid weighting. The independent `"ultraRare": true` template flag, not
+the numeric rarity, enforces **at most one spawned individual of that species
+per world** across spawn sources, including the Old Hunter's rare hunt. Only
+NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN have this flag. An
+absent flag is `false`. They may occur in eligible natural habitats and rare
+hunts, but never as Dwarven Fort or Ruins inhabitants or adaptive trolling
+encounters. Once one of these species spawns, even if it later dies, it cannot
+spawn again in the same world; a different eligible monster fills subsequent
+ordinary weighted slots. Other species are unaffected. In particular, Myrka
+(`0.02`) and Vampire (`0.01`) may spawn multiple times. At least one Vampire is
+still guaranteed in a distant eligible underground crypt or bat cave; this does
+not prevent other natural Vampire spawns. Templates listing only depth biomes
+such as `z-9` are ineligible for surface population, including migration groups;
+the missing-surface-biome fallback cannot spawn mine-exclusive monsters on the
+overworld. A template with an explicit surface biome remains eligible under its
+normal surface rules. No additional persistent state is required: the existing
+saved enemy roster and world-wide killed-species history enforce uniqueness,
+including across permadeath characters. Existing saved enemies are never
+removed.
 
 Higher-tier enemies are placed farther from the Temple during normal surface
 enemy spawning.
@@ -4131,13 +4125,13 @@ The tier-4 Wyvern has base **132 HP, 18 ATK, 2 DEF and 7 SPD**. Its flying,
 poison and carrion-related behavior remains unchanged; its lower armor makes
 direct damage a more practical counter to its speed and high health.
 
-Current templates contain **96 enemies**, including the special 
-encounter-only Venom Eater and Mushroom Prophet. The seven all-uppercase species
-NULK, SKELD, DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN use `rarity: 0.02`
-and `ultraRare: true`. They follow the normal tier, biome, distance, prefix,
-wandering and stat-variance rules, but each is limited to one spawned
-individual per world. Other rare creatures, including Myrka and Vampire,
-do not have this limit.
+Current templates contain **96 enemies**, including the special encounter-only
+Venom Eater and Mushroom Prophet. The seven all-uppercase species NULK, SKELD,
+DRUSK, GAUR, ASHFANG, MIREHOWL and NHALUUN use `rarity: 0.02` and
+`ultraRare: true`. They follow the normal tier, biome, distance, prefix,
+wandering and stat-variance rules in eligible habitats, subject to world-wide
+uniqueness and the dungeon and adaptive encounter exclusions described above.
+Other rare creatures, including Myrka and Vampire, do not have this limit.
 
 ### Tier 1
 
@@ -4818,16 +4812,18 @@ The stolen item remains on the thief and the theft escape never restarts;
 ordinary low-HP fleeing can still apply to monsters with `flee`. Sacred-ground
 protection still prevents new thefts.
 
-A thief with an empty equipment slot immediately equips eligible stolen weapons,
-shields, or armor and logs "<name> has equipped <item>." Bows remain in the
-stolen loot bag unless the thief is an assigned arrow shooter. Monsters have one
+Only humanoid thieves with an empty equipment slot immediately equip eligible
+stolen weapons, shields or armor and log "<name> has equipped <item>."
+Non-humanoid thieves (such as Tulla and Barolg) can steal equipment but carry it
+without equipping it or gaining any bonuses. Bows remain in the stolen loot bag
+unless the humanoid thief is an assigned arrow shooter. Monsters have one
 equipment slot; existing gear is never replaced by theft. Consumables and
-artifacts are carried without equipping. This uses the normal enemy equipment
-rules, including weapon ATK/GRACE, armor or shield DEF, and their usual speed
-penalty. Bonuses apply once, so a cornered thief can fight with the stolen gear.
-Death returns it through the bag only, without an additional equipment drop.
-Replacing that gear later through existing permadeath loot rules leaves the
-stolen item recoverable in its bag.
+artifacts are carried without equipping. Normal enemy equipment rules apply,
+including weapon ATK/GRACE, armor or shield DEF, and their usual speed penalty.
+Bonuses apply once, so a cornered humanoid thief can fight with stolen gear.
+Death returns the item through the bag only, without an additional equipment
+drop. Replacing equipped stolen gear later through the existing permadeath loot
+rules leaves the stolen item recoverable in its bag.
 
 A red bag marks the carrier on the map in tiles and ASCII mode and in desktop
 and mobile inspection. Only dropped bags on the floor in tile mode use the
@@ -12239,7 +12235,7 @@ traversal, placement rules and seeded random draws.
 | # | Reaction | Player trigger | World response |
 |---:|---|---|---|
 | 1 | **Merchant Expansion** (`merchant_expansion`) | Sell goods for **1,500g** total, buy goods for **1,500g** total, **or** kill all required surface monsters within 100 tiles of the Temple (excluding `farWandering`). | Merchant adds one weapon, one armor/shield and one utility item. Permanent stock addition; another character can unlock another expansion after permadeath. |
-| 2 | **Nemesis** (`nemesis`) | Die to the **same enemy species twice**. | A Champion of that species is guaranteed on the last Dwarven Ruins floor. |
+| 2 | **Nemesis** (`nemesis`) | Die to the **same non-ultra-rare enemy species twice**. | A Champion of that species is guaranteed on the last Dwarven Ruins floor. |
 | 3 | **Fan Club** (`fan_club`) | Equip prefixed weapon, shield and armor with the **same modifier**. | Three matching-prefixed Kobold, Goblin and Skink copy the style, use real enchanted equipment and can drop it. |
 | 4 | **Fireball Self-Harm** (`self_fireball`) | Damage yourself with **two separately cast Fireballs**. | A Scroll of Fireball appears in an accessible narrow underground corridor. |
 | 5 | **Venom Eater** (`venom_eater`) | Poison **15 distinct enemies**, or spend **5 venom coatings** on undead targets. | Venom Eater appears in deep ruins; poisoned weapon hits heal it instead of poisoning. |
@@ -12406,12 +12402,12 @@ The gold payment and item removal happen in the same recorded NPC-topic action.
 
 ### Monster encounters, environmental lures and rewards
 
-**Nemesis:** If at least two deaths were inflicted on the same monster species,
-a Champion of that species is guaranteed on entry to the final Dwarven Ruins
-floor (including a later return). If several species qualify, the most frequent
-killer wins; the latest death breaks ties. It spawns off-screen on connected,
-safe terrain and never reappears after the event has been committed. The
-Champion uses the ordinary Champion bonuses and normal monster combat rules.
+**Nemesis:** If at least two deaths were inflicted on the same non-ultra-rare
+monster species, a Champion of that species is guaranteed on entry to the final
+Dwarven Ruins floor (including a later return). If several species qualify, the
+most frequent killer wins; the latest death breaks ties. It spawns off-screen on
+connected, safe terrain and never reappears after the event has been committed.
+The Champion uses the ordinary Champion bonuses and normal monster combat rules.
 Merely inspecting the UI or re-entering a floor does not consume randomness.
 
 **Venom Eater:** Only in Cursed World, successfully poisoning **15 different
@@ -12636,13 +12632,13 @@ family, but no artificial combat immunity is added. Its appearance occupies
 random numbers during warning turns. Total walls mined, current pending warning,
 the spawned enemy and one-time completion persist in saves/replays.
 
-**Unfinished Business — returning wounded survivor:** When the player
-personally wounds **three distinct ordinary, hostile enemies below 25% of
-maximum HP**, then escapes while each is still alive, one of those enemies may
-return on a later scheduled encounter check. Escaping requires moving at least
-**eight Chebyshev tiles** from the wounded enemy, leaving its floor, or
-ending combat after the five-turn quiet period with the required separation.
-A continuing fight credits at most one survivor. Event enemies, existing
+**Unfinished Business — returning wounded survivor:** When the player personally
+wounds **three distinct ordinary, hostile enemies below 25% of maximum HP**,
+then escapes while each is still alive, one of those enemies may return on a
+later scheduled encounter check. Escaping requires moving at least **eight
+Chebyshev tiles** from the wounded enemy, leaving its floor, or ending combat
+after the five-turn quiet period with the required separation. A continuing
+fight credits at most one survivor. Event enemies, ultra-rare beasts, existing
 prefixed monsters, special quest targets, stolen-item carriers, guarded
 progression-key carriers and other reserved encounter roles do not qualify.
 Repeatedly attacking or fleeing the same enemy never credits it twice.
@@ -12767,34 +12763,34 @@ to disrupt its shooters, fight or escape.
 enemies of one base species** when that species represents **at least 20% of all
 player-credited kills** can qualify a once-per-character retaliation. The game
 reads the existing Bestiary `killsBySpecies` totals, including prefixed variants
-under their base species; trap-only deaths are excluded. Only ordinary hostile
-species with a native habitat at the current surface, cave or dungeon location
-can form a band. At a later **scheduled 500-step check**, a reachable group may
-gather off-screen: **one individually named Last Survivor** with Champion stats,
-Champion aura and **50% additional HP after ordinary modifiers**, accompanied by
-**two ordinary members of the same species**. The leader is never below **tier
-3** and has stat floors of **80 max HP, 13 ATK, 5 DEF, 6 SPD and 3 GRACE** after
-bonuses; the companions remain ordinary species members. These floors prevent a
-low-tier species from creating a trivial Champion while preserving
-species-specific abilities. The group appears 12–28 path steps from the player,
-outside the viewport or underground FOV, away from occupied tiles, traps and
-transitions, and within two tiles of one another. The most-killed currently
-placeable qualifying species is chosen, with alphabetical ties. A species that
-cannot form a legal band in its natural habitat waits for another check; no
-other species is manufactured to fill the gap. Once spawned, all three use
-ordinary monster combat and awareness rules: this is a gathered revenge band
-rather than telepathic tracking. The leader receives one randomly selected name
-from at least 50 unique entries in `content/monster_names.json` when the band
-actually spawns (for example, *Grukhar, Last Survivor*). The selected name is
-preserved with the enemy in save/replay, while its original Bestiary species
-remains available as `baseName` for sprites, kill statistics and abilities. Name
-selection uses the seeded gameplay RNG, not cosmetic randomness or per-frame
-drawing. The named leader is the final survivor of an earlier slaughtered band,
-*not* literally the last member of the species. The group counts as **one
-special threat** under the area's lifetime budget; its participants, Champion
-aura and completion survive normal save and replay without a second kill-history
-ledger. Its threshold, band size, strength and spawn distances are configured in
-`content/adaptive_player_trolling.json`.
+under their base species; trap-only deaths are excluded. Only ordinary hostile,
+non-ultra-rare species with a native habitat at the current surface, cave or
+dungeon location can form a band. At a later **scheduled 500-step check**, a
+reachable group may gather off-screen: **one individually named Last Survivor**
+with Champion stats, Champion aura and **50% additional HP after ordinary
+modifiers**, accompanied by **two ordinary members of the same species**. The
+leader is never below **tier 3** and has stat floors of **80 max HP, 13 ATK, 5
+DEF, 6 SPD and 3 GRACE** after bonuses; the companions remain ordinary species
+members. These floors prevent a low-tier species from creating a trivial
+Champion while preserving species-specific abilities. The group appears 12–28
+path steps from the player, outside the viewport or underground FOV, away from
+occupied tiles, traps and transitions, and within two tiles of one another. The
+most-killed currently placeable qualifying species is chosen, with alphabetical
+ties. A species that cannot form a legal band in its natural habitat waits for
+another check; no other species is manufactured to fill the gap. Once spawned,
+all three use ordinary monster combat and awareness rules: this is a gathered
+revenge band rather than telepathic tracking. The leader receives one randomly
+selected name from at least 50 unique entries in `content/monster_names.json`
+when the band actually spawns (for example, *Grukhar, Last Survivor*). The
+selected name is preserved with the enemy in save/replay, while its original
+Bestiary species remains available as `baseName` for sprites, kill statistics
+and abilities. Name selection uses the seeded gameplay RNG, not cosmetic
+randomness or per-frame drawing. The named leader is the final survivor of an
+earlier slaughtered band, *not* literally the last member of the species. The
+group counts as **one special threat** under the area's lifetime budget; its
+participants, Champion aura and completion survive normal save and replay
+without a second kill-history ledger. Its threshold, band size, strength and
+spawn distances are configured in `content/adaptive_player_trolling.json`.
 
 **Humanoid Hunter — hesitant beasts:** When at least **30** player-credited
 kills are humanoids and humanoids account for **70% or more** of all the
@@ -13017,32 +13013,35 @@ countdown. Killing it ends the hunt permanently. Dormancy, the surface-turn
 countdown and its last counted turn survive saves and deterministic replays;
 rendering or waiting in menus cannot advance the countdown.
 
-**Low HP Carrion:** Staying below **25% of maximum HP for 30 consecutive
-game turns** makes one special hunter eligible, provided the player is still
-wounded when the scheduled check occurs and combat has ended. Healing to
-25% or more resets the streak and prevents a pending spawn. The game selects
-a naturally occurring **living, non-humanoid tier-four beast** with at least
-100 HP and 12 ATK, excluding rupture attackers; the creature must be native
-to the current surface biome or underground depth and have a reachable,
-off-screen spawn point 12–28 tiles away. It receives `carrionInstinct` **only
+**Low HP Carrion:** Staying below **25% of maximum HP for 30 consecutive game
+turns** makes one special hunter eligible, provided the player is still wounded
+when the scheduled check occurs and combat has ended. Healing to 25% or more
+resets the streak and prevents a pending spawn. The game selects a naturally
+occurring **living, non-humanoid beast of tier 4 or higher** with at least 100
+HP and 12 ATK, excluding ultra-rare, event-only, rupture and thief species. The
+creature must be native to the current surface biome or underground depth and
+have a reachable, off-screen spawn point 12–28 tiles away. Eligible species are
+selected by their relative rarity weights. It receives `carrionInstinct` **only
 on that individual** (never on the species template), takes the name *Carrion
 [species]* and appears with an ordinary prefixed-monster halo. Its existing
-abilities, base combat stats and movement speed are otherwise retained.
-Once spawned it tracks the player even from beyond ordinary AGGRO through
-real passable paths, respecting invisibility, sanctuary and combat rules.
-The normal `carrionInstinct` +25% ATK applies only when the player is below
-20% HP. The monster is not teleported into combat and cannot attack during
-its summoning turn. The appearance uses a local special-threat slot and is
-once per character; an unsuitable habitat or unsafe location defers it.
+abilities, base combat stats and movement speed are otherwise retained. Once
+spawned it tracks the player even from beyond ordinary AGGRO through real
+passable paths, respecting invisibility, sanctuary and combat rules. The normal
+`carrionInstinct` +25% ATK applies only when the player is below 20% HP. The
+monster is not teleported into combat and cannot attack during its summoning
+turn. The appearance uses a local special-threat slot and is once per character;
+an unsuitable habitat or unsafe location defers it.
 
 **Reckless Fighter:** Each time a fight ends with the player **strictly below
 10% maximum HP** while carrying at least one Life Potion, add one to the
-reckless-fight count. A fight consists of player or enemy combat attack
-attempts (melee, arrows or spells) and ends after **five full turns with no
-attacks from either side**. A prolonged fight counts only once; dying before
-the quiet period does not count. After **five such fights**, a scheduled
-encounter check may spawn one strong, native living beast on reachable,
-off-screen terrain 12–28 tiles away.
+reckless-fight count. A fight consists of player or enemy combat attack attempts
+(melee, arrows or spells) and ends after **five full turns with no attacks from
+either side**. A prolonged fight counts only once; dying before the quiet period
+does not count. After **five such fights**, a scheduled encounter check may
+spawn one strong, native living beast on reachable, off-screen terrain 12–28
+tiles away. The beast must be non-humanoid, at least tier 3, with 60 HP and 10
+ATK or more. The same exclusions and relative rarity weights as the Low HP
+Carrion selection apply.
 
 Both outcomes have **1.8× base HP** (at least **1.25× player maximum HP**),
 **1.15× ATK**, **1.3× DEF**, unchanged SPD and a visible prefixed-monster

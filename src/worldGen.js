@@ -6458,6 +6458,8 @@ function dungeonEncounterTemplatesForDepth(packageId, z, cfg, hooks = {}) {
   // packages can require an explicit z-n monster biome at their depth.
   const nativeBiomes = new Set(Array.isArray(cfg?.nativeBiomes) ? cfg.nativeBiomes : ['cave'])
   return ENEMY_TEMPLATES.filter(tmpl => {
+    // Unique beasts never inhabit the dwarven stronghold.
+    if (tmpl.ultraRare && (packageId === 'dwarvenRuins' || packageId === 'dwarvenFort')) return false
     const minDepth = Number(cfg?.minDepthByTier?.[String(tmpl.tier)])
     if (!Number.isFinite(minDepth) || depth < minDepth) return false
     if ((tmpl.aggro ?? AGGRO_RANGE) <= 0) return false

@@ -1144,7 +1144,8 @@ const AdaptivePlayerTrolling = (() => {
     if (!active() || completed('last_survivor')) return []
     const cfg = config.events.last_survivor
     const {entries, total} = killTotals()
-    const kills = entries.filter(([species]) => !!ENEMY_TEMPLATE_BY_NAME[species])
+    const kills = entries.filter(([species]) => ENEMY_TEMPLATE_BY_NAME[species] &&
+      !ENEMY_TEMPLATE_BY_NAME[species].ultraRare)
     if (!total) return []
     return kills.filter(([species, n]) => n >= cfg.minSpeciesKills && n / total >= cfg.minKillShare &&
       (ENEMY_TEMPLATE_BY_NAME[species].rarity ?? 0) > 0 &&
@@ -1541,6 +1542,7 @@ const AdaptivePlayerTrolling = (() => {
         enemy.name !== (enemy.baseName || enemy.name) ||
         !ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name] ||
         ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name].adaptiveOnly ||
+        ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name].ultraRare ||
         !(ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name].rarity > 0) ||
         !(ENEMY_TEMPLATE_BY_NAME[enemy.baseName || enemy.name].aggro > 0) ||
         !onCurrentLevel(enemy) || state.unfinishedEscapes.includes(enemy.id)) return false
@@ -2966,7 +2968,8 @@ const AdaptivePlayerTrolling = (() => {
   function nemesisSpecies() {
     const threshold = config.events.nemesis.minDeathsBySpecies
     const eligible = Object.keys(state.deathsBySpecies).filter(species =>
-      state.deathsBySpecies[species] >= threshold && ENEMY_TEMPLATE_BY_NAME[species])
+      state.deathsBySpecies[species] >= threshold && ENEMY_TEMPLATE_BY_NAME[species] &&
+      !ENEMY_TEMPLATE_BY_NAME[species].ultraRare)
     eligible.sort((a, b) => state.deathsBySpecies[b] - state.deathsBySpecies[a] ||
       state.lastDeathBySpecies[b] - state.lastDeathBySpecies[a] || a.localeCompare(b))
     return eligible[0] || null
@@ -3549,6 +3552,7 @@ const AdaptivePlayerTrolling = (() => {
       ? new Set(dungeonEncounterTemplatesForDepth(packageId,currentZ,encounters).map(t=>t.name))
       : null
     const eligible = ENEMY_TEMPLATES.filter(tmpl =>
+      !tmpl.ultraRare && !tmpl.adaptiveOnly &&
       (eventId !== 'beast_hunter' || cfg.monsterPool.includes(tmpl.name)) &&
       tmpl.family === 'living' && !tmpl.humanoid && (tmpl.aggro ?? 0) > 0 &&
       (tmpl.rarity ?? 0) > 0 && tmpl.tier >= cfg.minTier &&
@@ -3620,7 +3624,7 @@ const AdaptivePlayerTrolling = (() => {
             fishermanQuest?.targetId === enemy.id) return false
         const species=enemy.baseName || enemy.name
         const tmpl=ENEMY_TEMPLATE_BY_NAME[species]
-        if (!tmpl || tmpl.adaptiveOnly) return false
+        if (!tmpl || tmpl.adaptiveOnly || tmpl.ultraRare) return false
         if (onCurrentLevel(enemy) && (currentZ===0
           ? enemy.x>=camX && enemy.x<camX+VIEW_W && enemy.y>=camY && enemy.y<camY+VIEW_H
           : undergroundTileVisible(enemy.x,enemy.y))) return false
@@ -4210,7 +4214,8 @@ const AdaptivePlayerTrolling = (() => {
   function spawnAdaptiveHunter(id,options) {
     if(!options.length || (id !== 'beast_hunter' && activeAdaptivePursuit()) ||
         completed(id))return false
-    const choice=pick(options),base=choice.tmpl,spot=pick(choice.sites)
+    const choice=id==='beast_hunter' ? pick(options) : pickWeighted(options, o=>o.tmpl.rarity)
+    const base=choice.tmpl,spot=pick(choice.sites)
     const cfg=config.events[id],isReckless=id==='reckless_fighter',
       isGraceful=isReckless && chance(cfg.gracefulChance),
       isWild=isReckless && !isGraceful,isBeastHunter=id==='beast_hunter'

@@ -79,6 +79,14 @@ describe('Rare monster templates and ultra-rare uniqueness', () => {
       const ultra=enemies.filter(e=>ENEMY_TEMPLATE_BY_NAME[e.baseName]?.ultraRare===true)
       const species=ultra.map(e=>e.baseName)
       check(new Set(species).size===species.length,'ultra-rare species are unique world-wide')
+      const strongholdZ=new Set([-3,...dungeonPackageLevels('dwarvenRuins').map(r=>r.z)])
+      check(!ultra.some(e=>e.levelKind==='chain' && strongholdZ.has(e.level)),
+        'no ultra-rare beasts inhabit the Fort or Ruins')
+      const cfg=dungeonPackageConfig('dwarvenRuins').encounters
+      check(!dungeonEncounterTemplatesForDepth('dwarvenRuins',-6,cfg).some(t=>t.ultraRare),
+        'tier-four Ruins pool excludes even unspawned ultra-rare species')
+      check(dungeonEncounterTemplatesForDepth('dwarvenRuins',-6,cfg).some(t=>t.name==='Spineback'),
+        'ordinary rare cave predators remain eligible')
       check(enemies.some(e=>e.baseName==='Vampire' && e.level<0),'guaranteed underground Vampire')
       check(naturalSpawnEligible(ENEMY_TEMPLATE_BY_NAME.Vampire),'Vampire can spawn again')
       check(naturalSpawnEligible(ENEMY_TEMPLATE_BY_NAME.Myrka),'Myrka can spawn again')

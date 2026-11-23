@@ -706,9 +706,27 @@ describe('Adaptive Player Trolling', () => {
         check(!AdaptivePlayerTrolling.onPlayerMoved(),'29 turns do not produce carrion hunter')
         turnCount++;AdaptivePlayerTrolling.onWorldTurn()
         player.steps=1000
+        // Even an unspawned ultra-rare beast cannot become an adaptive hunter.
+        const repeatable=ENEMY_TEMPLATES.filter(t=>!t.ultraRare && t.family==='living' && !t.humanoid)
+        const onlyUnique=action=>{
+          const weights=repeatable.map(t=>t.rarity)
+          const state=AdaptivePlayerTrolling.serialize()
+          try {
+            repeatable.forEach(t=>t.rarity=0)
+            action()
+          } finally {
+            repeatable.forEach((t,i)=>t.rarity=weights[i])
+            AdaptivePlayerTrolling.restore(state)
+          }
+        }
+        onlyUnique(()=>{
+          check(!AdaptivePlayerTrolling.onPlayerMoved(),'unique-only pool cannot spawn Carrion')
+          check(!enemies.some(e=>e.adaptiveEventId==='low_hp_carrion'),'no unique Carrion created')
+        })
         check(AdaptivePlayerTrolling.onPlayerMoved(),'30 turns allow a Carrion hunter')
         let hunter=enemies.find(e=>e.adaptiveEventId==='low_hp_carrion')
-        check(!!hunter && hunter.prefix==='Carrion' && hunter.tier>=4,'special native strong beast')
+        check(!!hunter && hunter.prefix==='Carrion' && hunter.tier>=4 &&
+          !ENEMY_TEMPLATE_BY_NAME[hunter.baseName].ultraRare,'special native repeatable strong beast')
         check(hunter.abilities.includes('carrionInstinct') &&
           !ENEMY_TEMPLATE_BY_NAME[hunter.baseName].abilities.includes('carrionInstinct'),
           'only chosen individual gains carrion instinct')
@@ -742,11 +760,16 @@ describe('Adaptive Player Trolling', () => {
           player.hp=playerMaxHp();turnCount++;AdaptivePlayerTrolling.onWorldTurn()
         }
         player.steps=500
+        onlyUnique(()=>{
+          check(!AdaptivePlayerTrolling.onPlayerMoved(),'unique-only pool cannot spawn Reckless Fighter')
+          check(!enemies.some(e=>e.adaptiveEventId==='reckless_fighter'),'no unique rival created')
+        })
         chance=()=>true // explicitly exercise the Graceful branch
         check(AdaptivePlayerTrolling.onPlayerMoved(),'five fights spawn a Graceful rival')
         chance=()=>false
         let graceful=enemies.find(e=>e.adaptiveEventId==='reckless_fighter')
         check(!!graceful && graceful.prefix==='Graceful' &&
+          !ENEMY_TEMPLATE_BY_NAME[graceful.baseName].ultraRare &&
           graceful.grace>playerGrace() && graceful.spd===ENEMY_TEMPLATE_BY_NAME[graceful.baseName].spd,
           'higher GRACE and no extra speed')
         check(graceful.maxHp>=Math.round(ENEMY_TEMPLATE_BY_NAME[graceful.baseName].hp*1.8),

@@ -4020,7 +4020,7 @@ more difficult:
   }
 
   function applyEnemyEquipment(e, item) {
-    if (!e || !item || (item.rangedAtk && !enemyCanEquipBow(e))) return false
+    if (!e?.humanoid || !item || (item.rangedAtk && !enemyCanEquipBow(e))) return false
     initializeEnemyGearScale(e)
     removeEnemyEquipmentBonuses(e)
     const before = {atk:e.atk, def:e.def, spd:e.spd, hp:e.hp, maxHp:e.maxHp}
@@ -4944,10 +4944,8 @@ more difficult:
   }
 
   function hunterRareTemplates() {
-    const unavailable = new Set(worldKilledSpecies)
-    for (const e of enemies) if (e.alive) unavailable.add(trackSpecies(e))
     return ENEMY_TEMPLATES.filter(t => t && t.wander === 'far' && t.humanoid === false &&
-      t.ultraRare === true && !unavailable.has(t.name))
+      t.ultraRare === true && naturalSpawnEligible(t))
   }
 
   function hunterReachableSurfaceTiles() {

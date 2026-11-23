@@ -326,6 +326,7 @@ describe('Dwarven Ruins encounter progression', () => {
           for (const enemy of mobs) {
             const tmpl = ENEMY_TEMPLATE_BY_NAME[enemy.baseName]
             check(!!tmpl, 'every Ruins encounter has a species template')
+            check(!tmpl.ultraRare, 'no ultra-rare beasts in any Ruins role')
             if ((tmpl.rarity ?? 1) <= cfg.dominantRarityCutoff && enemy.dungeonRole)
               check(['corridor','roamer'].includes(enemy.dungeonRole),
                 'rare monsters only enter through globally weighted wandering encounters')
@@ -719,6 +720,9 @@ describe('Dwarven Ruins encounter progression', () => {
         AdaptivePlayerTrolling.onFloorChanged()
         check(!AdaptivePlayerTrolling.serialize().completed.includes('nemesis'),'one death does not qualify')
         const beforeCount=enemies.length
+        for(let i=0;i<3;i++) AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'NHALUUN'})
+        check(!AdaptivePlayerTrolling.onFloorChanged(),'unique species cannot become a Nemesis')
+        check(enemies.length===beforeCount,'no ultra-rare duplicate created')
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Goblin'})
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Goblin'})
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Giant Rat'})

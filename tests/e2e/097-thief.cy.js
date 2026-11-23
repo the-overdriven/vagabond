@@ -116,6 +116,27 @@ describe('One-time monster theft', () => {
           theftCheck(player.inventory.filter(i=>i.hunterQuestId===item.hunterQuestId).length===1,'one recovered gear copy')
           chance=()=>true
         }
+        for(const name of ['Tulla','Barolg']) for(const kind of ['weapon','shield','armor']) {
+          resetTheftArena();const beast=makeThief(name,{abilities:['thief']})
+          const item={kind,name:'Beast loot '+kind,base:'Test '+kind,tier:2,
+            ...(kind==='weapon'?{atk:7,grace:5}:{def:8,mod:'hp',modAmt:4}),identified:true}
+          const stats=()=>JSON.stringify({atk:beast.atk,def:beast.def,spd:beast.spd,hp:beast.hp,maxHp:beast.maxHp})
+          const before=stats(),id=beast.id
+          player.inventory=[item];const startMessages=messages.length
+          theftCheck(tryEnemyTheft(beast),'non-humanoid steals '+name+' '+kind)
+          theftCheck(!beast.equipment && !beast.stolenItemEquipped && stats()===before,
+            'non-humanoid cannot equip or gain stats '+name+' '+kind)
+          theftCheck(!messages.slice(startMessages).some(m=>m.includes('has equipped')),'no false equip message')
+          const saved=JSON.parse(JSON.stringify(buildSaveObject()))
+          loadGameFromObject(saved,{isReplayInit:true})
+          const loaded=enemies.find(e=>e.id===id)
+          theftCheck(loaded && !loaded.equipment && !loaded.stolenItemEquipped &&
+            JSON.stringify(loaded.stolenItem)===JSON.stringify(item),'carried gear restored')
+          chance=()=>false;killEnemy(loaded)
+          const bags=groundItems.filter(g=>g.kind==='stolenloot')
+          theftCheck(bags.length===1 && JSON.stringify(bags[0].item)===JSON.stringify(item),'one exact bag')
+          chance=()=>true
+        }
         resetTheftArena();const e=makeThief(),original={kind:'shield',name:'Existing shield',def:3}
         applyEnemyEquipment(e,original);const atk=e.atk
         player.inventory=[{kind:'weapon',name:'New blade',atk:9,grace:4}];tryEnemyTheft(e)
