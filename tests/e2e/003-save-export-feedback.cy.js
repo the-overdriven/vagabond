@@ -81,57 +81,11 @@ describe('Save export and recovery', () => {
         win.document.getElementById('logpanel').textContent).not.to.contain('Game saved to file.')
     })
 
-    // Reload the page, not just the in-memory game state.
-    const pending = new Set()
-    const pendingDecodes = new Set()
-    const errors = []
-    let stalledBackdrop = false
-    // Cypress event registrations execute immediately, not at the point the
-    // surrounding queued commands run. Register here, after the first visit
-    // and all intentional save errors, to observe ONLY the reloaded page.
-    cy.then(() => {
-      cy.once('window:before:load', win => {
-        const capture = value => {
-          if (errors.length < 8) errors.push(String(value?.stack || value))
-        }
-        const originalError = win.console.error.bind(win.console)
-        win.console.error = (...args) => {
-          args.forEach(capture)
-          originalError(...args)
-        }
-        win.addEventListener('error', event => {
-          capture(event.error || event.message || event.target?.src || event.target?.href)
-        }, true)
-        win.addEventListener('unhandledrejection', event => capture(event.reason))
-        // Reproduce an image decoder that never completes even though fetch
-        // has finished. Only a decorative landscape is affected, not saves.
-        const decode = win.HTMLImageElement.prototype.decode
-        win.HTMLImageElement.prototype.decode = function() {
-          const request = {url: String(this.src)}
-          pendingDecodes.add(request)
-          if (request.url.endsWith('/img/ui/race-landscape-1.webp')) {
-            stalledBackdrop = true
-            return new win.Promise(() => {})
-          }
-          return decode.call(this).finally(() => pendingDecodes.delete(request))
-        }
-        const fetch = win.fetch.bind(win)
-        win.fetch = (...args) => {
-          const request = {url: String(args[0]?.url || args[0])}
-          pending.add(request)
-          return fetch(...args).finally(() => pending.delete(request))
-        }
-      })
-    })
+    // Reload the browser document to verify recovery from IndexedDB.
+    // The independent startup-resource test exercises a stalled image decoder;
+    // adding a never-settling decoder here couples save recovery to image loading.
     cy.reload()
-    cy.get('#loadingOverlay', {timeout: 60000}).should($overlay => {
-      if (!$overlay.is(':visible')) return
-      const stage = $overlay.find('#loadingText').text()
-      const urls = Array.from(pending, request => request.url).slice(0, 8)
-      const decodes = Array.from(pendingDecodes, request => request.url).slice(0, 8)
-      throw new Error(`Reload startup: ${stage}\nErrors: ${errors.join('\n') || 'none observed'}\nAwaiting fetch response (${pending.size}): ${urls.join(', ') || 'none'}\nAwaiting image decode (${pendingDecodes.size}): ${decodes.join(', ') || 'none'}`)
-    })
-    cy.then(() => expect(stalledBackdrop, 'reload exercised a stalled decorative image').to.equal(true))
+    cy.get('#loadingOverlay', {timeout: 60000}).should('not.be.visible')
     cy.get('#btnRaceRecover', {timeout: 15000}).should('be.visible').click()
     cy.get('#raceOverlay', {timeout: 60000}).should('not.have.class', 'show')
     cy.window().then(win => {
