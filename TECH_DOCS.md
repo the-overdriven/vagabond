@@ -94,18 +94,22 @@ The player chooses:
 
 The world is generated **only after Begin confirms a valid name and race**.
 Startup loads content and essential images under a rotating skull with
-`Loading...`; after confirmation, the overlay says `Generating world...`.
-The overlay blocks input and allows a paint before synchronous generation.
-Content and image requests retry a transient transport failure once after a
-bounded request timeout. Missing or invalid content is still reported as an
-error. Essential sprites are decoded before the selection screen opens;
-background image warming uses bounded concurrency, shares in-flight requests,
-and stops queuing new work when the page is discarded. Animated terrain frames
-are also prepared at the current zoom when a late image load succeeds.
-If animation frames are suspended, startup and game operations continue after
-a short presentation-only fallback instead of waiting indefinitely for a paint.
-Character race and Permadeath are set before world generation. Invalid names
-and duplicate Begin clicks cannot start a second world.
+`Loading...`; after confirmation, the overlay says `Generating world...`. The
+overlay blocks input and allows a paint before synchronous generation. Content
+and image requests retry a transient transport failure once after a bounded
+request timeout. Missing or invalid content is still reported as an error.
+Essential sprites are prioritized before character selection opens. Image
+decoding has a 10-second timeout per image; optional startup visuals have a
+shared 30-second deadline. If visuals stall, character selection and local save
+recovery remain accessible using available images and existing fallbacks.
+Remaining visuals warm in the background with bounded concurrency, share
+in-flight requests, and stop queuing new work when the page is discarded.
+Animated terrain frames are also prepared at the current zoom when a late image
+load succeeds. If animation frames are suspended, startup and game operations
+continue after a short presentation-only fallback instead of waiting
+indefinitely for a paint. Character race and Permadeath are set before world
+generation. Invalid names and duplicate Begin clicks cannot start another
+world.
 
 **World size** is independently selectable at character creation (XS, S, M, L,
 XL, XXL); **L** is the default 260×260 surface. See [§9. World](#9-world). The
@@ -128,20 +132,20 @@ including after page reloads when browser storage is available. These
 visual-only assets never advance gameplay RNG, change world geometry, or affect
 replay or saving. No preview world is generated at runtime: world generation
 happens only after confirming **Begin your journey**. All eight WebPs are
-precached by the service worker and preloaded and decoded on desktop during
-`Loading...` before the selection appears, avoiding a black flash on first
-display; subsequent visits can use the cache. On mobile/touch layouts the
-original static dark background remains and the large-image preload is skipped.
-The 🎲 button next to the name input chooses a random name from
-`content/random_names_human.json`; this is cosmetic and does not consume the
-game's seeded RNG or affect replay. On desktop the character-selection overlay
-stays above gameplay-only overlays (the side minimap, keyboard hints and message
-log) while the top HUD remains visible; the viewport-anchored form itself stays
-below the HUD even when a field is focused or scrolled into view. On narrow
-windows, only the character form scrolls within the space below the HUD so its
-fields remain accessible without covering the Load button. Desktop form height
-includes its padding and borders within that available space, including short
-windows with a wrapped HUD.
+precached by the service worker and prioritized for desktop decoding during
+`Loading...`, avoiding a black flash under normal conditions. If decoding
+stalls, selection can open before all images are ready. Subsequent visits can
+use the cache. On mobile/touch layouts the original static dark background
+remains and the large-image preload is skipped. The 🎲 button next to the name
+input chooses a random name from `content/random_names_human.json`; this is
+cosmetic and does not consume the game's seeded RNG or affect replay. On desktop
+the character-selection overlay stays above gameplay-only overlays (the side
+minimap, keyboard hints and message log) while the top HUD remains visible; the
+viewport-anchored form itself stays below the HUD even when a field is focused
+or scrolled into view. On narrow windows, only the character form scrolls within
+the space below the HUD so its fields remain accessible without covering the
+Load button. Desktop form height includes its padding and borders within that
+available space, including short windows with a wrapped HUD.
 
 There are currently **10 races**.
 
@@ -596,20 +600,20 @@ creature dies, becomes unseen, leaves the visible screen or level, or cannot be
 reached using known terrain. Clicking empty ground still targets a fixed tile.
 Unreachable targets do not start a route. Coarse-pointer/mobile input does not
 use this cursor or desktop monster-click behavior. Both sword and bow SVGs are
-decoded with the essential startup images, before character selection opens. The
-game rasterizes them into ready-to-use PNG data cursors, including a greyed-out
-bow variant for unavailable shots; no new SVG fetch or PNG conversion is
-performed on first hover. All three variants retain their sword/arrow-tip
-hotspots. Touch layouts do not prepare or show desktop cursors. The chase target
-and planned route are transient UI state, cleared by loading a save or replay;
-the executed movement and combat actions remain individually recorded for
-deterministic playback. Auto-path footsteps and the remaining-step counter
-render above underground fog/darkness, remaining legible on already-discovered
-tiles beyond current sight. When a planned melee route ends on an occupied enemy
-tile, its last footprint is omitted in both hover previews and active pursuit,
-keeping the creature's sprite unobscured. The counter and movement/attack
-behavior remain unchanged. Pathfinding still refuses unknown underground tiles,
-so this does not expose unexplored terrain.
+prioritized with the essential startup images. The game rasterizes them into
+ready-to-use PNG data cursors, including a greyed-out bow variant for
+unavailable shots, before selection under normal conditions. If preparation is
+delayed or fails, the SVG cursor is used instead. All three variants retain
+their sword/arrow-tip hotspots. Touch layouts do not prepare or show desktop
+cursors. The chase target and planned route are transient UI state, cleared by
+loading a save or replay; the executed movement and combat actions remain
+individually recorded for deterministic playback. Auto-path footsteps and the
+remaining-step counter render above underground fog/darkness, remaining legible
+on already-discovered tiles beyond current sight. When a planned melee route
+ends on an occupied enemy tile, its last footprint is omitted in both hover
+previews and active pursuit, keeping the creature's sprite unobscured. The
+counter and movement/attack behavior remain unchanged. Pathfinding still refuses
+unknown underground tiles, so this does not expose unexplored terrain.
 
 On fine-pointer desktop layouts, attacking an enemy also keeps a temporary
 combat inspection target. While the keyboard-hint panel is collapsed, if that
@@ -4243,16 +4247,17 @@ tile); enemy prefixes and other display names reuse the base species image.
 An absent or failed image falls back to the same tier-colored glyph used by
 ASCII mode. The wide Giant Spider image is scaled to fit without distortion.
 
-Monster sprites load before character selection to avoid switching from letters
-to images during play. The existing P toggle displays **letter glyphs for every
-monster in ASCII mode**. Portraits in inspection and the Bestiary stay separate.
-Movement, water clipping, flying draw order, invisibility, awareness/enrage
-outlines, warning/status marks, and prefixed-enemy terrain tint apply equally
-to monster sprites. In tile mode, a subtle, semi-transparent **one-tile circular
-backing** beneath each visible enemy improves contrast without obscuring
-its sprite or changing ASCII. For prefixed enemies, the backing matches the
-color of their surrounding tile tint. Graphics have no effect on enemy identity,
-mechanics, randomness, saves, or replay.
+Monster sprites are prioritized before character selection to avoid switching
+from letters to images during play. If startup visuals stall, missing sprites
+use the existing glyph fallback. The existing P toggle displays **letter glyphs
+for every monster in ASCII mode**. Portraits in inspection and the Bestiary stay
+separate. Movement, water clipping, flying draw order, invisibility,
+awareness/enrage outlines, warning/status marks, and prefixed-enemy terrain tint
+apply equally to monster sprites. In tile mode, a subtle, semi-transparent
+**one-tile circular backing** beneath each visible enemy improves contrast
+without obscuring its sprite or changing ASCII. For prefixed enemies, the
+backing matches the color of their surrounding tile tint. Graphics have no
+effect on enemy identity, mechanics, randomness, saves, or replay.
 
 ---
 

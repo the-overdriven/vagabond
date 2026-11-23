@@ -1290,6 +1290,37 @@ more difficult:
     await Promise.all(Array.from({length: Math.min(8, queue.length)}, worker))
   }
 
+  // Resource fetch timeouts do not cover HTMLImageElement.decode(). A stalled
+  // decoder must not keep the loading screen up indefinitely.
+  async function decodeVisualImage(image) {
+    let timer
+    try {
+      await Promise.race([
+        image.decode(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Image decode timed out')), 10000)
+        })
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  // Even bounded individual requests may take too long in aggregate. Visuals
+  // can finish warming after the selection UI opens; required JSON still must
+  // load successfully before init is called.
+  async function waitForStartupVisuals(ready) {
+    let timer
+    try {
+      return await Promise.race([
+        ready.then(() => true),
+        new Promise(resolve => { timer = setTimeout(() => resolve(false), 30000) })
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
   async function preloadImage(path) {
     let url = null
     try {
@@ -1297,7 +1328,7 @@ more difficult:
       url = URL.createObjectURL(blob)
       const image = new Image()
       image.src = url
-      await image.decode()
+      await decodeVisualImage(image)
       preloadedImageUrls.set(path, url)
       preloadedImages.set(path, image)
       failedImagePaths.delete(path)
@@ -15616,7 +15647,7 @@ more difficult:
         const url = sprite.toDataURL('image/png')
         const decoded = new Image()
         decoded.src = url
-        await decoded.decode()
+        await decodeVisualImage(decoded)
         return url
       } catch (error) {
         console.warn('Could not prepare desktop cursor:', error)
@@ -19160,7 +19191,7 @@ more difficult:
       const image = new Image()
       image.src = path
       try {
-        await image.decode()
+        await decodeVisualImage(image)
         preloadedImages.set(path, image)
       } catch (err) {
         console.warn('Failed to preload race backdrop:', path, err)
@@ -19487,9 +19518,6 @@ more difficult:
     for (const visual of Object.values(RENDER_STYLE?.projectiles || {})) {
       if (visual?.image) initialVisuals.push(visual.image)
     }
-    if (initialVisuals.length) await preloadImages(initialVisuals)
-    await prepareDesktopCursors()
-    prepareAnimatedVisuals()
     // Small read-only hook used by E2E tests. It is only exposed when the page
     // is running inside Cypress and does not become part of normal gameplay.
     if (window.Cypress) {
@@ -19517,10 +19545,17 @@ more difficult:
         }
       }
     }
-    // Essential visuals load under the startup overlay. Remaining images
-    // warm in the background while character creation waits for Begin.
-    await preloadImages(RACES.map(race => raceSelectionImagePath(race.id)))
-    await raceBackdropsReady
+    // Prioritize essential visuals, but do not block save recovery or a new
+    // game on optional images when a browser stalls during startup.
+    const visualsReady = (async () => {
+      if (initialVisuals.length) await preloadImages(initialVisuals)
+      await prepareDesktopCursors()
+      prepareAnimatedVisuals()
+      await preloadImages(RACES.map(race => raceSelectionImagePath(race.id)))
+      await raceBackdropsReady
+    })()
+    const visualsLoaded = await waitForStartupVisuals(visualsReady)
+    if (!visualsLoaded) console.warn('Startup visual deadline reached; continuing with available images.')
     openRaceSelect()
     refreshRaceAvatars()
     ensureAmbientTileAnimationLoop()
@@ -19528,7 +19563,12 @@ more difficult:
     // underneath Loading... before revealing character creation.
     await paintLoading()
     setLoading(null)
-    preloadImages().catch(err => console.warn(err))
+    // Keep the normal preload order even if the visual deadline opened the UI
+    // early. Do not start a second large queue competing with the first one.
+    visualsReady.then(() => {
+      if (raceOpen) refreshRaceAvatars()
+    }).catch(err => console.warn(err)).then(() => preloadImages())
+      .catch(err => console.warn(err))
   }
 
   loadContent().then(() => init()).catch(err => {

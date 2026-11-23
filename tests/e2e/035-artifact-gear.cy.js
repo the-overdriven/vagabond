@@ -143,17 +143,18 @@ describe('Gear bases on procedural artifacts', () => {
       try {
         log=msg=>messages.push(msg)
         ArtifactWayfaring.discover(1)
-        check(player.wayfaring.pilgrimTiles===0&&player.hp===60&&player.totalXpEarned===30,
-          'Pilgrim grants the unchanged reward at exactly 700 discovered tiles')
-        check(messages[0]==='Pilgrim rewards your exploration: +10 HP.'&&messages[1]==='You gain 30 XP.',
-          'Pilgrim announces the reward before its XP')
+        // A Human receives 20% extra XP: 30 base XP becomes 36.
+        check(player.wayfaring.pilgrimTiles===0&&player.hp===60&&player.totalXpEarned===36,
+          'Pilgrim grants the 700-tile reward including the Human XP bonus')
+        check(messages[0]==='Pilgrim rewards your exploration: +10 HP.'&&messages[1]==='You gain 36 XP.',
+          'Pilgrim announces the reward before its modified XP')
         messages.length=0;player.inventory=[sample('expedition')];currentZ=-1
         ArtifactWayfaring.visitDepth()
-        check(messages[0]==='Expedition rewards your descent.'&&messages[1]==='You gain 100 XP.'&&
+        check(messages[0]==='Expedition rewards your descent.'&&messages[1]==='You gain 120 XP.'&&
           messages[2].startsWith('You reached Level 2!'),'Expedition announces the reward before XP and level-up')
         messages.length=0;player.inventory[0].identified=false;currentZ=-2
         ArtifactWayfaring.visitDepth()
-        check(messages[0]==='A strange power rewards your descent.'&&messages[1]==='You gain 100 XP.',
+        check(messages[0]==='A strange power rewards your descent.'&&messages[1]==='You gain 120 XP.',
           'Unidentified Expedition announces the reward without revealing its name')
       } finally {log=originalLog}
     })()`))

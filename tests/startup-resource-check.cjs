@@ -47,9 +47,21 @@ const {run, context} = require('./helpers/node-game-runtime.cjs')
   const frame = run('RENDER_STYLE.terrainTiles.water.frames[0]')
   await run('preloadImages('+JSON.stringify([frame])+')')
   assert.equal(run(`(()=>{const image=preloadedImages.get(${JSON.stringify(frame)});return scaledVisualCache.get(image).has(TILE_PX+'|1||false')})()`),true,'late frame prepared at current zoom')
+  // A completed fetch does not guarantee a completed image decode. The
+  // visual deadlines must work independently of browser animation frames.
+  context.setTimeout = fn => setTimeout(fn, 5)
+  context.clearTimeout = clearTimeout
+  context.Image = class { decode() { return new Promise(() => {}) } }
+  await run('preloadImages(["stalled-decode.png"])')
+  assert.equal(run('failedImagePaths.has("stalled-decode.png") && !imagePreloadsInFlight.size'), true)
+  assert.equal(run('imageSrc("stalled-decode.png")'), 'stalled-decode.png', 'failed decode retains fallback')
+  assert.equal(await run('waitForStartupVisuals(new Promise(()=>{}))'), false, 'stalled visual batch releases startup')
+  assert.equal(await run('waitForStartupVisuals(Promise.resolve())'), true, 'normal visual batch finishes immediately')
+  await assert.rejects(run('waitForStartupVisuals(Promise.reject(new Error("unexpected failure")))'), /unexpected failure/)
+  context.setTimeout = () => 0; context.clearTimeout = () => {}
   run('imagePreloadingStopped=true')
   await run('preloadImages(["old-page.png"])')
   assert.equal(calls.has('old-page.png'), false)
   assert.equal(run('rngState'),rng,'startup resource handling has no gameplay RNG effects')
-  console.log('PASS startup: timeout recovery, HTTP failure, shared retries, bounded image requests, late frame preparation, discarded page')
+  console.log('PASS startup: timeout recovery, HTTP failure, shared retries, bounded image requests, late frame preparation, visual deadlines, discarded page')
 })().catch(err=>{console.error(err);process.exitCode=1})
