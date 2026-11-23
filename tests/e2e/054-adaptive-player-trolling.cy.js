@@ -445,12 +445,21 @@ describe('Adaptive Player Trolling', () => {
       const originalChance=chance
       try {
         activeWorldTraits=[{name:'test curse',effects:[]}]
-        player.x=55;player.y=55;player.steps=0;player.gold=0
+        // The Tower's basement occupies the same global z:-1 grid as caves.
+        // This simulated cave must not accidentally land inside the labyrinth.
+        const site=[[55,55],[55,85],[85,55],[85,85],[110,55],[55,110]]
+          .find(([x,y])=>!TowerMaze.inRegion(-1,x,y) &&
+            !TowerMaze.inRegion(-2,x,y) &&
+            sanctuaryDistance(x,y)>FLEE_DISTANCE+15)
+        check(!!site,'cave test needs a safe site outside the tower labyrinth')
+        const [siteX,siteY]=site
+        player.x=siteX;player.y=siteY;player.steps=0;player.gold=0
         player.hp=playerMaxHp();player.inventory=[{kind:'scrollOfInvisibility',count:2}]
         player.killsBySpecies={};enemies=[];groundItems=[];npcs=[];occupied=new Set()
         // Three known exits exercise the 40% rule; the game preserves this
         // cave geometry in saves and must not reroll when stairs are used.
-        caves=[{crypt:false,entrances:[{x:55,y:55},{x:57,y:55},{x:59,y:55}]}]
+        caves=[{crypt:false,entrances:[{x:siteX,y:siteY},
+          {x:siteX+2,y:siteY},{x:siteX+4,y:siteY}]}]
         AdaptivePlayerTrolling.reset()
         turnCount=2000;currentZ=-1;currentCave=0;map=undergroundMap
         AdaptivePlayerTrolling.onFloorChanged({fromZ:0,fromKind:'surface',fromCave:-1})
@@ -470,8 +479,9 @@ describe('Adaptive Player Trolling', () => {
           'the exact 100-turn threshold qualifies without an RNG roll')
         // Leaving on the surface is the ONLY time the chance is evaluated.
         currentZ=0;currentCave=-1;map=surfaceMap
-        for(let y=40;y<=70;y++)for(let x=40;x<=70;x++)map[y][x]='forest'
-        player.x=55;player.y=55;snapCameraToPlayer();rebuildActiveLevelOccupancy()
+        for(let y=siteY-15;y<=siteY+15;y++)
+          for(let x=siteX-15;x<=siteX+15;x++)map[y][x]='forest'
+        player.x=siteX;player.y=siteY;snapCameraToPlayer();rebuildActiveLevelOccupancy()
         let seenRoll=null
         chance=p=>{if(p===0.2||p===0.4)seenRoll=p;return true}
         replaySimulationMode=false;replayAnimationsDisabled=false
@@ -526,7 +536,7 @@ describe('Adaptive Player Trolling', () => {
         check(AdaptivePlayerTrolling.serialize().triggerFlags.unused_scroll_ambush,
           'a Skink kill satisfies the species condition')
         currentZ=0;currentCave=-1;map=surfaceMap
-        player.x=55;player.y=55;rebuildActiveLevelOccupancy()
+        player.x=siteX;player.y=siteY;rebuildActiveLevelOccupancy()
         check(AdaptivePlayerTrolling.onFloorChanged({fromZ:-1,fromKind:'chain',fromCave:0}),
           'Skink-based cave retaliation spawns near the cave exit')
         check(enemies.filter(e=>e.adaptiveEventId==='unused_scroll_ambush').length===3 &&
