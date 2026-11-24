@@ -39,6 +39,7 @@ function beginShooterGame() {
         shooterAbility:extra.shooterAbility ?? ability, shotsRemaining:extra.shotsRemaining ?? 10,
         shooterMode:extra.shooterMode ?? 'ranged',
         equipment:extra.equipment ?? null, prefix:extra.prefix ?? null, crit:!!extra.crit,
+        groundingLostAbilities:[],
         ...extra
       }
       enemies.push(e); occupied.add(keyXY(e.x,e.y)); return e

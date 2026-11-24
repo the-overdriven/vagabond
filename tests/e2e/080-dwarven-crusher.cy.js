@@ -63,7 +63,8 @@ describe('Dwarven wall Crusher',()=>{
       const h=deepLevels[3].hazards[0]
       const monster=(id,x,prefix)=>({id,name:'Skeleton',baseName:'Skeleton',prefix,
         alive:true,level:-5,levelKind:'chain',x,y:12,hp:100,maxHp:100,atk:1,def:1,
-        spd:1,grace:1,tier:2,abilities:[],equipment:{weapon:null,armor:null,shield:null},immunityUntilTurn:0})
+        spd:1,grace:1,tier:2,abilities:[],groundingLostAbilities:[],
+        equipment:{weapon:null,armor:null,shield:null},immunityUntilTurn:0})
       enemies=[monster('normal',10,null),monster('champion',14,'Champion')]
       player.x=12;player.y=12;DungeonHazards.onActorEntered(player,11,12)
       turnCount++;DungeonHazards.onPlayerTurnConsumed(turnCount)

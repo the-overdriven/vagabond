@@ -273,12 +273,16 @@ describe('Gear bases on procedural artifacts', () => {
       player.wayfaring=ArtifactWayfaring.freshState();player.inventory=[]
       player.equip={weapon:null,shield:null,armor:null}
       enemies=[];npcs=[];groundItems=[];occupied=new Set()
-      for(let y=35;y<=45;y++)for(let x=35;x<=45;x++)map[y][x]='grass'
+      for(let y=35;y<=45;y++)for(let x=35;x<=45;x++) {
+        map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))
+      }
       ArtifactGeomancy.resetWorld()
       const effect=ARTIFACT_EFFECTS.find(e=>e.tier===3)
       const gem=id=>makeArtifactTrinket('Stone',effect,0,id)
       player.inventory=[gem('stonemaker'),gem('stone_circle'),gem('resonance')]
       check(!ArtifactWayfaring.activeItem(player.inventory[0]),'Geomancy cannot trigger Wayfaring')
+      // Forced-ability God Mode fixtures are identified by construction.
+      player.inventory.forEach(item=>{item.identified=false})
       check(!ArtifactGeomancy.canActivate(0),'unidentified Geomancy cannot activate')
       player.inventory[0].identified=true
       player.inventory[1].identified=true
@@ -329,8 +333,10 @@ describe('Gear bases on procedural artifacts', () => {
       const stone=id=>makeArtifactTrinket('Stone',effect,0,id)
       player.inventory=[stone('stonepress'),stone('cragbowl')]
       map[40][41]='boulder';tileUnderlays[keyXY(41,40)]='grass'
+      player.inventory.forEach(item=>{item.identified=false})
       check(!ArtifactGeomancy.canActivate(0,[1,0]),'an unidentified Stonepress is inert')
       player.inventory[0].identified=true
+      check(ArtifactGeomancy.canActivate(0,[1,0]),'identified Stonepress can activate')
       const before=turnCount
       check(ArtifactGeomancy.availablePressDirections().some(dir=>dir[0]===1&&dir[1]===0),
         'direction exists for the adjacent rock')
@@ -882,8 +888,11 @@ describe('Gear bases on procedural artifacts', () => {
         verify(!ARTIFACT_ABILITIES.domains.bulwark.includes(id),
           'Armor-only ability leaked into shared bulwark domain: '+id)
       }
-      verify(Object.values(ARTIFACT_ABILITIES.abilities).every(ability=>!('slots' in ability)),
+      verify(Object.entries(ARTIFACT_ABILITIES.abilities).every(([id,ability])=>
+        !('slots' in ability) || (id==='spell_cairn' && ability.slots===2)),
         'Artifact equipment-slot restrictions must be expressed through domains')
+      verify(ARTIFACT_ABILITIES.abilities.spell_cairn.slots===2,
+        'Spell Cairn slots count stored scrolls, not equipment slots')
       player.equip={weapon:{kind:'weapon',base:'Dagger',atk:2,grace:5},shield:null,
         armor:{kind:'artifact',artifactSlot:'armor',base:'Tunic',def:0,bonuses:{},
           name:'Tunic of the Oath',noun:'Tunic',identified:true,abilityId:'berserkers_oath',

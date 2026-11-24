@@ -32,6 +32,7 @@ describe('Tracking and beast evidence', () => {
       window.trackAssert = (condition, message) => { if (!condition) throw new Error(message) }
       window.trackEnemy = (extra = {}) => ({id: 'track-test', name: 'Wolf', baseName: 'Wolf',
         x: 40, y: 40, level: 0, alive: true, wander: 'far', abilities: [], humanoid: false,
+        groundingLostAbilities: [],
         hp: 20, maxHp: 20, atk: 1, def: 0, spd: 1, tier: 1, aggro: 1,
         farTargetX: 40, farTargetY: 25, ...extra})
     })()`))

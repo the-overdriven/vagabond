@@ -17,7 +17,7 @@ describe('Temple sanctuary boundary, immunity and pursuit', () => {
           enemies=[{id:'holy-test',name:'Goblin',baseName:'Goblin',tier:1,level:0,
             x:61,y:50,homeX:61,homeY:50,alive:true,hp:100,maxHp:100,atk:5,def:0,spd:2,
             aggro:8,abilities:[],humanoid:false,aware:true,alarmed:false,sleeping:false,wander:false,
-            meleeHitXpGranted:0}];
+            meleeHitXpGranted:0,groundingLostAbilities:[]}];
           occupied=new Set(['61,50']);`)
       })
     })

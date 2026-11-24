@@ -187,7 +187,8 @@ describe('Old Hunter rare Tracking hunt and Echo-Blight Horn', () => {
       player.freezing = {active:false, turns:0}; player.curseDebuffs = []
       player.inventory = [createItem('echoBlightHorn')]
       const mk = (id,x,y,humanoid=false,level=0) => ({id,name:id,baseName:id,tier:1,level,alive:true,
-        hp:10,maxHp:10,atk:1,def:0,spd:1,aggro:0,abilities: [],humanoid,x,y,homeX:x,homeY:y,homeTileType:'grass',wander:false,prefix:null,equipment:null})
+        hp:10,maxHp:10,atk:1,def:0,spd:1,aggro:0,abilities: [],groundingLostAbilities:[],
+        humanoid,x,y,homeX:x,homeY:y,homeTileType:'grass',wander:false,prefix:null,equipment:null})
       enemies = [
         mk('east-near', player.x+5, player.y),
         mk('east-far', player.x+20, player.y),
