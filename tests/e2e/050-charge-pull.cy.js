@@ -293,7 +293,7 @@ describe('Charge and Pull terrain rules', () => {
           stopCameraAnimation(); clearEnemyAnims(); enemies=[]; occupied.clear(); damageAnims=[]; projectileAnims=[]
           replayAnimationsDisabled=false
           player.x=40; player.y=40; player.hp=1000
-          player.inventory=[makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(effect=>effect.tier===3),0,'escape_artist')]
+          player.inventory=[makeArtifactTrinket('Feather',ARTIFACT_EFFECTS.find(effect=>effect.tier===3),0,'escape_artist')]
           player.inventory[0].identified=!zero
           const spider=rushEnemy('Giant Spider',35,40); spider.aggro=6
           player.baseAtk=enemyAtk(spider)+(zero?20:0)

@@ -16,9 +16,9 @@ const eq = (code, value, msg) => assert.deepEqual(copy(run(code)), value, msg)
     player.slowTurns=0;player.gazeTurns=0;player.mummyCurseTurns=0;player.speedPotionTurns=0;
     player.curseDebuffs=[];player.godMode=false;currentZ=0;map=surfaceMap;player.x=40;player.y=40;
     for(let y=38;y<=42;y++)for(let x=38;x<=45;x++)map[y][x]='grass';
-    globalThis.specimen=(id,noun='Feather')=>makeWayfaringTrinket(noun,ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id);
+    globalThis.specimen=(id,noun='Feather')=>makeArtifactTrinket(noun,ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id);
     globalThis.originalStats={atk:playerAtk(),def:playerDef(),spd:playerSpd(),mf:playerMf(),hp:playerMaxHp()};`)
-  const nouns='Feather Girdle Tippet Scarf Anklet Flint Sextant Shoehorn Adze Amphora Jug Rope Bridle Saddle'.split(' ')
+  const nouns='Feather Girdle Tippet Scarf Anklet Flint Sextant Shoehorn Adze Amphora Jug Rope Bridle Saddle Tome Orb Grimoire Rune Hexagram Circlet Sealstone Diadem Bangle Muddler Bonefolder Scriber Cauldron Stone Chisel Gong Seal Idol Crozier Grindstone Mallet Trowel'.split(' ')
   eq('eligibleArtifactTrinketNouns(3).slice().sort()',nouns.sort())
   for (const tier of [1,3,4,5]) {
     const items=copy(run(`Array.from({length:40},()=>makeArtifactItem(${tier},0,{nonGearOnly:true}))`))

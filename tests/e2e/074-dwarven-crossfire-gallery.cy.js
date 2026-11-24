@@ -19,6 +19,9 @@ describe('Dwarven Ruins crossfire prison galleries', () => {
         await generateNewWorld()
         check(validateDwarvenRuinsStratum().ok, 'seed ' + seed + ' initial floor validation')
         for (const {level, z} of dungeonPackageLevels('dwarvenRuins')) {
+          check(level.rooms.filter(r=>r.stairRoom || r.gallery).every(r=>
+            dwarvenRoomInterior(r).every(p=>level.map[p.y][p.x]!=='boulder')),
+            'natural boulders stay outside stair halls and crossfire galleries')
           const galleries = level.rooms.filter(r => r.gallery)
           check(galleries.length <= 1, 'at most one gallery per level')
           for (const room of galleries) {

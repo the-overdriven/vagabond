@@ -20,7 +20,9 @@ describe('God Mode artifact identification',()=>{
           for(const base of catalog)
             for(const id of artifactAbilityPool({...base,kind:'artifact',artifactSlot:slot,base:base.name}))
               expected.add((slot==='weapon'?(base.rangedAtk?'bow':'melee'):slot)+':'+id)
-        for(const id of ARTIFACT_ABILITIES.domains.wayfaring) expected.add('trinket:'+id)
+        const effect=ARTIFACT_EFFECTS.reduce((first,next)=>next.tier<first.tier?next:first)
+        for(const noun of eligibleArtifactTrinketNouns(effect.tier))
+          for(const id of artifactAbilityPool({kind:'artifact',artifactSlot:'trinket',noun,tier:effect.tier})) expected.add('trinket:'+id)
         const keys=testStock().map(i=>(i.artifactSlot==='weapon'?(i.rangedAtk?'bow':'melee'):i.artifactSlot)+':'+i.abilityId)
         check(keys.length===expected.size&&new Set(keys).size===keys.length&&keys.every(k=>expected.has(k)),
           'one representative per category and power')

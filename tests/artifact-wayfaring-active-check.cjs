@@ -12,7 +12,7 @@ const eq=(code,val,msg)=>assert.deepEqual(JSON.parse(JSON.stringify(run(code))),
     player.rootTurns=0;player.poisonTurns=0;player.berserkTurns=0;currentZ=0;map=surfaceMap;player.x=40;player.y=40;turnCount=0;
     for(let y=25;y<=55;y++)for(let x=25;x<=55;x++){map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))}
     player.wayfaring=ArtifactWayfaring.freshState();discovered.forEach(r=>r.fill(false));discoverPlayerSight('arrival');
-    globalThis.sampleD=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id);
+    globalThis.sampleD=id=>makeArtifactTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id);
     globalThis.foeD=(name,x,y)=>{const t=ENEMY_TEMPLATE_BY_NAME[name];const e=addEnemy({...t,baseName:name,x,y,level:0,alive:true,hp:300,maxHp:300,aware:true,equipment:null,homeX:x,homeY:y,homeTileType:'grass'});occupied.add(keyXY(x,y));return e};
     };cleanD();globalThis.originalChance=chance;globalThis.actualPhase=resolveEnemyPhase;globalThis.phaseCalls=0;resolveEnemyPhase=()=>{phaseCalls++}`)
   run(`player.inventory=[sampleD('rush')];player.inventory[0].identified=false`)

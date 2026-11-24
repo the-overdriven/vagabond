@@ -3,7 +3,7 @@ async function wayfaringStealthChecks(fixture) {
   const check=(ok,msg)=>{if(!ok)throw Error(msg)}
   const originalChance=chance
   const restore=save=>{loadGameFromObject(structuredClone(save),{isReplayInit:true});replayRecording=false;replayPlaying=false;replayAnimationsDisabled=true;replaySimulationMode=false}
-  const sample=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
+  const sample=id=>makeArtifactTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
   const reset=(...ids)=>{
     chance=originalChance;restore(fixture);enemies=[];npcs=[];groundItems=[];occupied=new Set();
     player.equip={weapon:null,shield:null,armor:null};player.race='human';player.hp=200;player.maxHp=200;

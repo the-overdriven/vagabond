@@ -55,6 +55,13 @@ describe('Gear bases on procedural artifacts', () => {
       const catalog=Object.entries(ITEM_DEFINITIONS || {})
       check(catalog.every(([kind,definition])=>typeof definition.description==='string' &&
         definition.description.trim()),'every catalog item has a readable description')
+      check(ARTIFACT_ABILITIES.domains.geomancy.includes('earthmaw') &&
+        ARTIFACT_ABILITIES.abilities.earthmaw.enabled &&
+        ARTIFACT_ABILITIES.abilities.earthmaw.active,
+        'Earthmaw is an identified-only active Geomancy artifact power')
+      check(ARTIFACT_ABILITIES.abilities.earthmaw.description.includes('within 3 tiles') &&
+        ARTIFACT_ABILITIES.abilities.earthmaw.description.includes('including diagonals'),
+        'Earthmaw describes its reach before casting')
       check(!!TILE_DESC.mausoleumtrapdoor,'mausoleum trapdoor is inspectable')
     })()`))
   })
@@ -85,9 +92,13 @@ describe('Gear bases on procedural artifacts', () => {
       player.weakenTurns=0;player.stoneSkinTurns=0;player.berserkTurns=0;player.curseDebuffs=[]
       player.slowTurns=0;player.speedPotionTurns=0;player.gazeTurns=0
       replayAnimationsDisabled=true;replayRecording=false
-      const wanted=ARTIFACT_ABILITIES.domains.wayfaring
+      const wanted=ARTIFACT_ABILITIES.domains.wayfaring.concat(ARTIFACT_ABILITIES.domains.geomancy.filter(id=>ARTIFACT_ABILITIES.abilities[id].enabled))
+      check(['petrify','sounding_stone','grounding'].every(id=>wanted.includes(id)),
+        'completed Geomancy status, listening and suppression powers are rollable')
+      check(artifactDomains({kind:'artifact',artifactSlot:'trinket',noun:'Flint'}).includes('wayfaring') &&
+        artifactDomains({kind:'artifact',artifactSlot:'trinket',noun:'Flint'}).includes('geomancy'),'Flint preserves two domains')
       const effect=ARTIFACT_EFFECTS.find(e=>e.tier===3)
-      const sample=id=>makeWayfaringTrinket('Feather',effect,0,id)
+      const sample=id=>makeArtifactTrinket('Feather',effect,0,id)
       for(let i=0;i<30;i++) {
         const item=makeArtifactItem(5,0,{nonGearOnly:true})
         check(eligibleArtifactTrinketNouns(item.tier).includes(item.noun)&&wanted.includes(item.abilityId), 'eligible loot')
@@ -100,6 +111,20 @@ describe('Gear bases on procedural artifacts', () => {
       check(trailblazerText.includes('5 newly discovered tiles reduce all active cooldowns of Wayfaring artifacts by 1 turn') &&
         trailblazerText.includes('Your XP bonus determines the percentage chance of reducing them by an additional turn'),
         'Trailblazer inspection explains which artifacts recharge and the bonus chance')
+      const lodestone=makeArtifactTrinket('Stone',effect,0,'lodestone')
+      const originalGround=groundItems, originalSpot=treasureMapSpot
+      treasureMapSpot=null
+      player.inventory=[lodestone]
+      const treasureX=player.x+3,treasureY=player.y
+      const treasureKey=keyXY(treasureX,treasureY), wasDug=dugSandTiles.has(treasureKey)
+      dugSandTiles.delete(treasureKey)
+      groundItems=[{kind:'buriedgear',x:treasureX,y:treasureY,level:currentZ,
+        levelKind:currentLevelKind(),item:null}]
+      check(ArtifactGeomancy.buriedTreasureNearby(),'Lodestone senses placed buried gear')
+      groundItems=[]
+      check(!ArtifactGeomancy.buriedTreasureNearby(),'Lodestone ignores dug or absent treasure')
+      groundItems=originalGround;treasureMapSpot=originalSpot;player.inventory=[]
+      if(wasDug)dugSandTiles.add(treasureKey)
       const def=playerDef(),speed=playerSpd(),mf=playerMf()
       player.inventory=[sample('highlander')];map[40][40]='hill'
       check(playerDef()===def+4&&playerSpd()===speed,'Highlander replaces hill penalty and defense')
@@ -171,7 +196,7 @@ describe('Gear bases on procedural artifacts', () => {
         enemies=[];npcs=[];groundItems=[];occupied=new Set()
         for(let y=38;y<=42;y++)for(let x=37;x<=45;x++)map[y][x]='grass'
         player.wayfaring=ArtifactWayfaring.freshState()
-        const sample=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
+        const sample=id=>makeArtifactTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
         player.inventory=[sample('longstrider'),sample('never_look_back'),sample('windwalker')]
         // Exercise both phase modifiers with presentation enabled, including hidden identity.
         const originalLog=log,originalPopup=spawnDamageNumber
@@ -224,7 +249,7 @@ describe('Gear bases on procedural artifacts', () => {
       enemies=[];npcs=[];groundItems=[];occupied=new Set()
       for(let y=35;y<=45;y++)for(let x=35;x<=50;x++){map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))}
       player.wayfaring=ArtifactWayfaring.freshState()
-      const sample=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
+      const sample=id=>makeArtifactTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
       player.inventory=[sample('water_walking'),sample('emberwalker'),sample('castaway'),sample('rush')]
       map[40][41]='water';map[40][42]='lava';map[40][43]='lava';map[40][44]='lava'
       await tryMove(1,0);check(!isActuallySwimming()&&canUseItemsWhileSwimming()&&ArtifactWayfaring.waterRemaining()===7,'water walking permits item use')
@@ -240,6 +265,133 @@ describe('Gear bases on procedural artifacts', () => {
     })()`))
   })
 
+  it('raises Geomancy stones without exposing unidentified powers or breaking saves', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      replayAnimationsDisabled=true;replayRecording=false;replayPlaying=false
+      currentZ=0;map=surfaceMap;player.x=40;player.y=40;player.hp=playerMaxHp()
+      player.wayfaring=ArtifactWayfaring.freshState();player.inventory=[]
+      player.equip={weapon:null,shield:null,armor:null}
+      enemies=[];npcs=[];groundItems=[];occupied=new Set()
+      for(let y=35;y<=45;y++)for(let x=35;x<=45;x++)map[y][x]='grass'
+      ArtifactGeomancy.resetWorld()
+      const effect=ARTIFACT_EFFECTS.find(e=>e.tier===3)
+      const gem=id=>makeArtifactTrinket('Stone',effect,0,id)
+      player.inventory=[gem('stonemaker'),gem('stone_circle'),gem('resonance')]
+      check(!ArtifactWayfaring.activeItem(player.inventory[0]),'Geomancy cannot trigger Wayfaring')
+      check(!ArtifactGeomancy.canActivate(0),'unidentified Geomancy cannot activate')
+      player.inventory[0].identified=true
+      player.inventory[1].identified=true
+      player.inventory[2].identified=true
+      const before=turnCount
+      check(ArtifactGeomancy.activate(0),'Stonemaker activation')
+      check(turnCount===before+1,'one turn per activation')
+      check(ArtifactGeomancy.serialize().stones.length===1,'one summoned stone')
+      check(ArtifactGeomancy.cooldownRemaining('stonemaker')>0,'shared cooldown')
+      const dirs=ArtifactGeomancy.availableCircleDirections()
+      check(dirs.length>0,'at least one legal ring exit')
+      check(ArtifactGeomancy.activate(1,dirs[0]),'Stone Circle activation')
+      check(DIRS8.filter(([dx,dy])=>map[player.y+dy]?.[player.x+dx]==='boulder').length===7,
+        'one open tile remains in a seven-stone ring')
+      check(ArtifactGeomancy.cooldownRemaining('stonemaker')<499,
+        'Resonance reduces a different Geomancy cooldown')
+      check(ARTIFACT_ABILITIES.abilities.stonepress.enabled &&
+        ARTIFACT_ABILITIES.abilities.cragbowl.enabled,
+        'Stonepress and Cragbowl join the normal trinket pool')
+      player.inventory.push(gem('stonepress'),gem('cragbowl'))
+      player.inventory[3].identified=true;player.inventory[4].identified=true
+      check(ArtifactGeomancy.availablePressDirections().every(dir=>
+        DIRS8.some(([dx,dy])=>dx===dir[0]&&dy===dir[1])),
+        'Stonepress offers only legal adjacent directions')
+      const snapshot=structuredClone(ArtifactGeomancy.serialize())
+      const saved=structuredClone(buildSaveObject())
+      loadGameFromObject(saved,{isReplayInit:true})
+      check(JSON.stringify(ArtifactGeomancy.serialize())===JSON.stringify(snapshot),
+        'stone coordinates and expiries survive load')
+      check(terrainVisual('boulder',40,40,undergroundMap).image.includes('boulder-underground-'),
+        'underground uses round boulder art, not surface rock')
+    })()`))
+  })
+
+  it('moves and throws Geomancy stones without breaking collision or hidden-item rules', () => {
+    cy.window().then(win => win.eval(`(() => {
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      replayAnimationsDisabled=true;replayRecording=false;replayPlaying=false
+      currentZ=0;map=surfaceMap;player.x=40;player.y=40;player.godMode=false
+      player.hp=playerMaxHp();player.wayfaring=ArtifactWayfaring.freshState()
+      player.inventory=[];player.equip={weapon:null,armor:null,shield:null}
+      enemies=[];npcs=[];groundItems=[];occupied=new Set()
+      ArtifactGeomancy.resetWorld();camX=32;camY=32
+      for(let y=35;y<=49;y++)for(let x=35;x<=52;x++) {
+        map[y][x]='grass';grasslandTrees.delete(keyXY(x,y));discovered[y][x]=true
+      }
+      const effect=ARTIFACT_EFFECTS.find(e=>e.tier===3)
+      const stone=id=>makeArtifactTrinket('Stone',effect,0,id)
+      player.inventory=[stone('stonepress'),stone('cragbowl')]
+      map[40][41]='boulder';tileUnderlays[keyXY(41,40)]='grass'
+      check(!ArtifactGeomancy.canActivate(0,[1,0]),'an unidentified Stonepress is inert')
+      player.inventory[0].identified=true
+      const before=turnCount
+      check(ArtifactGeomancy.availablePressDirections().some(dir=>dir[0]===1&&dir[1]===0),
+        'direction exists for the adjacent rock')
+      toggleInv(true)
+      geomancyChoosingIndex=0
+      renderInventory()
+      const east=document.querySelector('[aria-label="Stonepress direction 1,0"]')
+      check(east,'Stonepress offers the east direction in inventory')
+      east.click()
+      check(!invOpen && !document.getElementById('invOverlay').classList.contains('show'),
+        'committing Stonepress closes inventory')
+      check(map[40][45]==='boulder'&&map[40][41]==='grass'&&
+        tileUnderlays[keyXY(45,40)]==='grass','natural stone moves with exact underlay')
+      check(turnCount===before+1,'one turn for the whole push')
+      player.inventory[1].identified=true
+      const goblin=ENEMY_TEMPLATE_BY_NAME.Goblin
+      for(const x of [48,49]) {
+        addEnemy({...goblin,baseName:'Goblin',x,y:40,level:0,levelKind:'surface',
+          alive:true,hp:300,maxHp:300,homeX:x,homeY:40,homeTileType:'grass'})
+      }
+      rebuildActiveLevelOccupancy()
+      check(ArtifactGeomancy.activate(1),'Cragbowl finds the rock and foe')
+      check(map[40][45]==='grass' && new Set(enemies.map(e=>keyXY(e.x,e.y))).size===2,
+        'the projectile shatters without overlapping actors')
+      const snapshot=structuredClone(buildSaveObject())
+      loadGameFromObject(snapshot,{isReplayInit:true})
+      check(ArtifactGeomancy.cooldownRemaining('cragbowl')>0,
+        'shared Cragbowl cooldown survives save/load')
+      // A prepared Grounding hit is personal, while its permanent suppression
+      // belongs to one enemy instance and survives save/load.
+      const grounding=stone('grounding');grounding.identified=true
+      player.inventory.push(grounding)
+      player.groundingArmed=false
+      const one=enemies[0],two=enemies[1]
+      one.abilities=['petrifyingGaze','ethereal'];one.groundingLostAbilities=[]
+      two.abilities=['petrifyingGaze'];two.groundingLostAbilities=[]
+      check(ArtifactGeomancy.activate(player.inventory.length-1),'Grounding arms one hit')
+      const charged=structuredClone(buildSaveObject())
+      loadGameFromObject(charged,{isReplayInit:true})
+      check(player.groundingArmed,'prepared Grounding survives save/load')
+      const target=enemies.find(e=>e.id===one.id)
+      const untouched=enemies.find(e=>e.id===two.id)
+      const previousLog=log,previousVisibility=enemyIsVisibleOnMainView
+      let groundingMessage
+      try {
+        log=message=>{groundingMessage=message}
+        enemyIsVisibleOnMainView=()=>true
+        check(ArtifactGeomancy.groundingHit(target,3),'direct hit discharges Grounding')
+      } finally {log=previousLog;enemyIsVisibleOnMainView=previousVisibility}
+      check(groundingMessage==='Grounding strips the '+target.name+' of Petrifying Gaze!',
+        'Grounding logs the tooltip display name')
+      check(!enemyHasAbility(target,'petrifyingGaze')&&enemyHasAbility(untouched,'petrifyingGaze'),
+        'Grounding removes the ability from only the struck creature')
+      const suppressed=structuredClone(buildSaveObject())
+      loadGameFromObject(suppressed,{isReplayInit:true})
+      check(!enemyHasAbility(enemies.find(e=>e.id===one.id),'petrifyingGaze')&&
+        enemyHasAbility(enemies.find(e=>e.id===two.id),'petrifyingGaze'),
+        'suppressed ability persists for only that enemy after reload')
+    })()`))
+  })
+
   it('activates identified Wayfaring powers and saves a partially completed Rush', () => {
     cy.window().then(win => win.eval(`(async () => {
       const check=(ok,msg)=>{if(!ok)throw Error(msg)}
@@ -249,7 +401,7 @@ describe('Gear bases on procedural artifacts', () => {
       enemies=[];npcs=[];groundItems=[];occupied=new Set()
       for(let y=25;y<=55;y++)for(let x=25;x<=55;x++){map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))}
       player.wayfaring=ArtifactWayfaring.freshState();ArtifactWayfaring.baselinePosition()
-      const sample=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
+      const sample=id=>makeArtifactTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
       player.inventory=[sample('rush'),sample('backtrack'),sample('blink'),sample('phantom_trail')]
       player.inventory[0].identified=false
       check(!ArtifactWayfaring.activate(0),'unidentified power is unavailable')
@@ -894,4 +1046,73 @@ describe('Gear bases on procedural artifacts', () => {
     cy.window().then(win=>win.eval('player.equip.weapon.identified=true;renderInventory()'))
     cy.get('#slotWeapon .val').should('have.class','tier3')
   })
+  it('keeps Spell Cairn controls compact and loads a selected scroll directly', () => {
+    cy.window().then(win=>win.eval(`(() => {
+      const effect=ARTIFACT_EFFECTS.find(e=>e.tier===3)
+      player.inventory=[makeArtifactTrinket('Stone',effect,0,'spell_cairn'),
+        createItem('scrollOfFear'),createItem('scrollOfDeathShield'),
+        createItem('scrollOfChaos')]
+      player.wayfaring=ArtifactWayfaring.freshState()
+      ensureReplayItemIds()
+      toggleInv(true)
+    })()`))
+    cy.get('#invList .cairn-scroll-picker').should('have.length',1)
+      .should('have.value','')
+    cy.get('#invList .cairn-slot-state').should('contain.text','0/2')
+    cy.get('#invList').should('not.contain','Load scroll')
+    cy.get('#invList .cairn-scroll-picker option').should('have.length',4)
+    cy.get('#invList .cairn-scroll-picker').select('1')
+    cy.window().should(win=> {
+      expect(win.eval('invOpen')).to.equal(false)
+      expect(win.eval('ArtifactGeomancy.cairnSlots(player.inventory[0]).map(p=>p.kind)'))
+        .to.deep.equal(['scrollOfFear'])
+    })
+    cy.window().then(win=>win.eval('toggleInv(true)'))
+    cy.get('#invList .cairn-slot-state').should('contain.text','1/2')
+      .should('contain.text','Fear')
+    cy.get('#invList .cairn-scroll-picker').should('exist')
+    cy.contains('#invList button','Release').should('be.enabled')
+    cy.window().then(win=>win.eval(`(() => {
+      const inspect=artifactInspectionText(player.inventory[0])
+      if(!inspect.includes('Stored scrolls: Fear'))throw Error('Inspect omits Cairn contents')
+    })()`))
+  })
+
+  it('loads geomancy inscriptions and keeps wayfaring inside its original cairn', () => {
+    cy.window().then(win=>win.eval(`(async()=>{
+      const check=(ok,msg)=>{if(!ok)throw Error(msg)}
+      const effect=ARTIFACT_EFFECTS.find(e=>e.tier===3)
+      const gem=id=>makeArtifactTrinket('Stone',effect,0,id)
+      currentZ=0;map=surfaceMap;player.hp=playerMaxHp()
+      player.wayfaring=ArtifactWayfaring.freshState()
+      const home={x:player.x,y:player.y,z:currentZ,
+        levelKind:currentLevelKind(),caveIndex:currentCave}
+      player.inventory=[gem('spell_cairn'),createItem('wayfaringscroll',{destination:home}),
+        gem('spell_cairn'),createItem('homecomingscroll')]
+      ensureReplayItemIds()
+      const cairnA=player.inventory[0],cairnB=player.inventory[2]
+      const way=player.inventory[1],homeScroll=player.inventory[3]
+      check(ArtifactGeomancy.activate(0,{op:'load',scrollReplayId:way.replayId}),
+        'Wayfaring should load into the first Cairn')
+      check(ArtifactGeomancy.boundCairn(cairnA)&&!canDropInventoryItem(cairnA),
+        'stored Wayfaring binds its Cairn')
+      check(!ArtifactGeomancy.compatibleCairnScrolls(cairnA).some(i=>i.kind==='homecomingscroll'),
+        'Cairn cannot hold two travel scrolls')
+      check(ArtifactGeomancy.activate(player.inventory.indexOf(cairnB),
+        {op:'load',scrollReplayId:homeScroll.replayId}),
+        'Homecoming may load into a different Cairn')
+      const stored=JSON.stringify(cairnA.geomancyCairn[0].destination)
+      check(await ArtifactGeomancy.activate(player.inventory.indexOf(cairnB),{op:'release'}),
+        'second Cairn releases Homecoming')
+      check(JSON.stringify(cairnA.geomancyCairn[0].destination)===stored,
+        'Homecoming must not rewrite Wayfaring stored elsewhere')
+      check(player.inventory.filter(i=>i.kind==='wayfaringscroll').length===0,
+        'Homecoming must not create a loose duplicate')
+      const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
+      loadGameFromObject(snapshot,{isReplayInit:true})
+      check(player.inventory.some(i=>ArtifactGeomancy.boundCairn(i)),
+        'stored Wayfaring remains bound across save/load')
+    })()`))
+  })
+
 })

@@ -34,7 +34,19 @@ function validFireballTarget(x, y) {
     undergroundTileVisible(x, y) && fireballClearLine(player.x, player.y, x, y)
 }
 
-function fireballBlastTiles(x, y) {
+function fireballBlastTiles(x, y, cross = playerHasArtifactAbility('burst_bending')) {
+  if (cross) {
+    const tiles = [{x,y}]
+    const reach = artifactRule('burst_bending','fireballArmLength')
+    for (const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+      for (let step=1;step<=reach;step++) {
+        const tx=x+dx*step,ty=y+dy*step
+        if (!fireballClearLine(x,y,tx,ty)) break
+        tiles.push({x:tx,y:ty})
+      }
+    }
+    return tiles
+  }
   const tiles = []
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
     if ((dx === -2 || dx === 2) && (dy === -2 || dy === 2)) continue
@@ -45,7 +57,9 @@ function fireballBlastTiles(x, y) {
 
 // The flame sprites extend beyond the damage ring. Give them room to curl
 // naturally while still masking opaque terrain and blocked sight lines.
-function fireballVisualTiles(x, y) {
+function fireballVisualTiles(x, y, cross = playerHasArtifactAbility('burst_bending')) {
+  // The cross uses its damage footprint as the exact visual clip too.
+  if (cross) return fireballBlastTiles(x,y,cross)
   const tiles = []
   for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
     if (fireballClearLine(x, y, x + dx, y + dy)) tiles.push({x:x + dx, y:y + dy})
@@ -127,24 +141,46 @@ async function castFireball(idx, x, y) {
     AdaptivePlayerTrolling.onScrollUsed('scrollOfFireball')
     ArtifactWayfaring.fighting()
     AdaptivePlayerTrolling.onCombatAttack(turnCount)
-    const scrollInvisibleCast = !player.godMode && player.invisibleTurns > 0
-    const tiles = fireballBlastTiles(x, y), cells = new Set(tiles.map(p => keyXY(p.x, p.y)))
+    const result=resolveScrollEffect({kind:'scrollOfFireball'},{source:'read',x,y})
+    if(!result.executed)throw Error('Validated Fireball failed to resolve')
+    if (result.fatal) {player.hp=0;die(null,'fireball')}
+    else consumeItemTurn()
+    updateHud();render();runAnimationLoop()
+    return true
+  } finally {finishRecordedReplayAction(scope)}
+}
+
+// Inventory and replay belong to the caller. Aimed or prepared Fireball uses
+// one deterministic damage resolver and the same tile footprint for all
+// gameplay callbacks and rendering. The source decides whether direct-hit
+// abilities and player scroll-use telemetry are eligible.
+function resolveFireballEffect({x,y,source='read',origin={x:player.x,y:player.y},
+  providedTiles=null,cross=playerHasArtifactAbility('burst_bending'),
+  aftershock=playerHasArtifactAbility('aftershock'),includePlayer=true}={}) {
+    const read=source==='read'
+    const scrollInvisibleCast=read && !player.godMode && player.invisibleTurns > 0
+    const tiles = providedTiles || fireballBlastTiles(x,y,cross)
+    const cells = new Set(tiles.map(p => keyXY(p.x, p.y)))
     Mimics.revealBySpell((mx,my) => cells.has(keyXY(mx,my)))
-    const victims = enemies.filter(e => e.alive && e.hp > 0 && onCurrentLevel(e) && cells.has(keyXY(e.x, e.y)))
-    const selfHit = cells.has(keyXY(player.x, player.y))
+    const victims = enemies.filter(e => e.alive && e.hp > 0 && onCurrentLevel(e) &&
+      !ArtifactGeomancy.buried(e) && cells.has(keyXY(e.x, e.y)))
+    const selfHit = includePlayer && cells.has(keyXY(player.x, player.y))
     const effect = itemDefinition('scrollOfFireball').effect
+    ArtifactGeomancy.scheduleAftershock(tiles, effect, aftershock)
     // Snapshot all rolls before callbacks, rewards, deaths or presentation.
     const hits = victims.map(enemy => ({enemy, damage:randInt(effect.minDamage, effect.maxDamage)}))
     const selfDamage = selfHit ? randInt(effect.minDamage, effect.maxDamage) : 0
+    const groundingHits = []
     let impactDelay = 0
     if (!replayAnimationsDisabled && !replaySimulationMode) {
       const presentation = queueEnemyAttackPresentation(FIREBALL_FLIGHT_MS + FIREBALL_BURST_MS)
-      fireballAnims.push({fromX:player.x, fromY:player.y, x, y, tiles,
-        visualTiles:fireballVisualTiles(x, y),
-        start:presentation.start, mapKey:currentMapViewKey()})
+      fireballAnims.push({fromX:origin.x, fromY:origin.y, x, y, tiles,
+        visualTiles:providedTiles || fireballVisualTiles(x,y,cross),
+        // Keep the cast/inscription shape, even if the trinket changes later.
+        cross:!!cross, start:presentation.start, mapKey:currentMapViewKey()})
       impactDelay = presentation.delay + FIREBALL_FLIGHT_MS
     }
-    log('You cast a fireball!', 'info')
+    log(read?'You cast a fireball!':'Runic fire erupts!', 'info')
     for (const {enemy:e, damage} of hits) {
       ArtifactWayfaring.playerAggression(e)
       AdaptivePlayerTrolling.onHungryMonsterAttacked(e)
@@ -154,7 +190,9 @@ async function castFireball(idx, x, y) {
         continue
       }
       const wasEnraged = enemyIsEnraged(e)
+      const damaged = Math.min(Math.max(0,e.hp),damage)
       e.hp -= damage
+      if (read && damaged > 0) groundingHits.push({enemy:e,damage:damaged})
       if (scrollInvisibleCast) AdaptivePlayerTrolling.onPlayerInvisibleHit(e, turnCount)
       revealEnemyInvisibility(e); breakEnemyFear(e); wakeSleepingEnemy(e)
       absorbEnemyFatalHit(e); AdaptivePlayerTrolling.onPlayerWoundedEnemy(e,damage); triggerEnemyShellRetreat(e)
@@ -163,6 +201,14 @@ async function castFireball(idx, x, y) {
       log(`Fireball burns the ${e.name} for ${damage} damage.`, 'good')
       logEnemyEnrageTransition(e, wasEnraged)
     }
+    // Grounding selects the nearest actually harmed creature, without
+    // reordering the spell's pre-rolled damage or ordinary hit callbacks.
+    groundingHits.sort((a,b) =>
+      Math.max(Math.abs(a.enemy.x-x),Math.abs(a.enemy.y-y)) -
+        Math.max(Math.abs(b.enemy.x-x),Math.abs(b.enemy.y-y)) ||
+      a.enemy.y-b.enemy.y || a.enemy.x-b.enemy.x)
+    if (read && groundingHits.length) ArtifactGeomancy.groundingHit(groundingHits[0].enemy,
+      groundingHits[0].damage)
     // Resolve self damage before XP healing. A lethal simultaneous blast cannot
     // be survived merely by leveling up from one of its kills.
     let actualSelfHpLoss = 0
@@ -173,14 +219,10 @@ async function castFireball(idx, x, y) {
       absorbPlayerFatalDamage()
     }
     // Count only a committed cast which actually damages its own caster.
-    if (selfHit && actualSelfHpLoss > 0) AdaptivePlayerTrolling.onSelfFireballHit()
+    if (read && selfHit && actualSelfHpLoss > 0) AdaptivePlayerTrolling.onSelfFireballHit()
     const fatal = player.hp <= 0
     for (const {enemy} of hits) if (enemy.hp <= 0) killEnemy(enemy, true, 'fireball', impactDelay)
-    if (fatal) { player.hp = 0; die(null, 'fireball') }
-    else consumeItemTurn()
-    updateHud(); render(); runAnimationLoop()
-    return true
-  } finally { finishRecordedReplayAction(scope) }
+    return {fatal}
 }
 
 // Cached, softly feathered flame particles. No external sprites or gameplay RNG.
@@ -236,7 +278,58 @@ function fireballGlow(x,y,radius,alpha) {
   ctx.fillStyle=glow;ctx.fillRect(x-radius,y-radius,radius*2,radius*2)
 }
 
+// Paint continuous bands along each arm in small pixel-art steps. Their noise
+// travels outward in blast coordinates, so tile boundaries have no seams.
+function drawFireballCrossBurst(a, age) {
+  const t=Math.max(0,Math.min(1,age/FIREBALL_BURST_MS))
+  if (t===1) return
+  const size=TILE_PX, step=size/24
+  const cx=(a.x-camX+0.5)*size, cy=(a.y-camY+0.5)*size
+  const directions=[[1,0],[-1,0],[0,1],[0,-1]]
+  const lengths=[0,0,0,0]
+  ctx.save()
+  ctx.beginPath()
+  for (const p of a.visualTiles) {
+    const dx=p.x-a.x,dy=p.y-a.y
+    if (dx && dy) continue
+    if (dx || dy) {
+      const arm=dx>0?0:dx<0?1:dy>0?2:3
+      lengths[arm]=Math.max(lengths[arm],Math.abs(dx)+Math.abs(dy))
+    }
+    if (undergroundTileVisible(p.x,p.y))
+      ctx.rect((p.x-camX)*size,(p.y-camY)*size,size,size)
+  }
+  ctx.clip()
+  ctx.globalAlpha*=Math.min(1,(1-t)/0.28)
+  const front=(Math.max(...lengths)+0.48)*Math.min(1,t/0.48)
+  const colors=['#d43c0d','#ff8517','#ffcf42','#fff4a3']
+  for (const [arm,[dx,dy]] of directions.entries()) {
+    if (!lengths[arm]) continue
+    const end=Math.min(front,lengths[arm]+0.48)*24
+    for (let i=0;i<Math.floor(end);i++) {
+      const wave=i*0.61-t*32+arm*3.7
+      const taper=Math.sqrt(Math.min(1,(end-i)/8))
+      const bend=Math.round(1.2*Math.sin(wave*0.45))
+      const width=(5.7+1.1*Math.sin(wave*0.31))*(1-0.35*t)*taper
+      const x=cx+(dx<0?-i-1:i)*step, y=cy+(dy<0?-i-1:i)*step
+      for (let layer=0;layer<colors.length;layer++) {
+        const radius=width*(1-layer*0.23)
+        const lo=Math.round(bend-radius*(1+0.24*Math.sin(wave+layer*0.3)))
+        const hi=Math.round(bend+radius*(1+0.31*Math.sin(wave*1.3+2)))
+        ctx.fillStyle=colors[layer]
+        if (dx) ctx.fillRect(x,cy+lo*step,step,(hi-lo)*step)
+        else ctx.fillRect(cx+lo*step,y,(hi-lo)*step,step)
+      }
+    }
+  }
+  // A compact incandescent knot also reads when all four arms are blocked.
+  fireballPuff(cx,cy,size*(0.76+0.10*Math.sin(t*21)),1.1,t*2,
+    Math.min(1,(1-t)/0.28))
+  ctx.restore()
+}
+
 function drawFireballBurst(a, age) {
+  if (a.cross) {drawFireballCrossBurst(a,age);return}
   const t=Math.min(1,age/FIREBALL_BURST_MS)
   const cx=(a.x-camX+0.5)*TILE_PX,cy=(a.y-camY+0.5)*TILE_PX
   // Damage remains strictly inside a.tiles; visual flames may curl past it.

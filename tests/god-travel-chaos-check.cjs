@@ -16,7 +16,7 @@ const {run,context} = require('./helpers/node-game-runtime.cjs')
   const expected = run(`[...new Set([['weapon',WEAPONS],['shield',SHIELDS],['armor',ARMORS]].flatMap(([slot,catalog])=>
     catalog.flatMap(base=>artifactAbilityPool({...base,kind:'artifact',artifactSlot:slot,base:base.name})
       .map(id=>(slot==='weapon'?(base.rangedAtk?'bow':'melee'):slot)+':'+id))).concat(
-    ARTIFACT_ABILITIES.domains.wayfaring.map(id=>'trinket:'+id)))]`)
+    eligibleArtifactTrinketNouns(3).flatMap(noun=>artifactAbilityPool({kind:'artifact',artifactSlot:'trinket',noun,tier:3}).map(id=>'trinket:'+id))))]`)
   const category = i=>i.artifactSlot==='weapon'?(i.rangedAtk?'bow':'melee'):i.artifactSlot
   assert.equal(fullStock.length,expected.length)
   assert.equal(new Set(fullStock.map(i=>i.replayId)).size,expected.length)

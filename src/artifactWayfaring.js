@@ -80,6 +80,7 @@ const ArtifactWayfaring = (() => {
     if (item?.abilityId === 'escape_artist' && has('escape_artist')) clearRoot()
     for (const id of ['windwalker','skirmisher','tidefang'])
       if (item?.abilityId === id && !has(id)) state()[id+'Ready']=false
+    ArtifactGeomancy.syncLodestone()
   }
   // Character-owned counters. Absolute expiry turns continue off-floor.
   function freshState(world = null) {
@@ -138,7 +139,7 @@ const ArtifactWayfaring = (() => {
         if (!active.length) continue
         const bonus=artifactXpBonusPP()/100
         const reduction=1+(bonus>0 && chance(Math.min(1,bonus))?1:0)
-        for(const id of active) s.cooldowns[id]=Math.max(turnCount,s.cooldowns[id]-reduction)
+        reduceCooldowns(id => active.includes(id), reduction)
       }
     }
   }
@@ -167,6 +168,18 @@ const ArtifactWayfaring = (() => {
     if(!Number.isInteger(duration) || duration<=0 || cooldownRemaining(id)) return false
     state().cooldowns[id]=turnCount+duration
     return true
+  }
+  // Cooldowns belong to the character. Both domain-specific reductions use
+  // this operation, leaving activation triggers and RNG entirely independent.
+  function reduceCooldowns(eligible, turns) {
+    if (!Number.isInteger(turns) || turns <= 0) return 0
+    let changed = 0
+    for (const [id, expiry] of Object.entries(state().cooldowns)) {
+      if (expiry <= turnCount || !eligible(id)) continue
+      state().cooldowns[id] = Math.max(turnCount, expiry - turns)
+      changed++
+    }
+    return changed
   }
   function effectiveMining() {
     const bonus=has('prospector') && state().miningUntil>turnCount ? rule('prospector','miningBonus') : 0
@@ -575,7 +588,9 @@ const ArtifactWayfaring = (() => {
     const r=caveSurvey(x,y)
     if(r) log(`${playerKnowsArtifactAbility('spelunker')?'Spelunker:':'You sense a'} ${r.size.toLowerCase()} cave. ${r.deeper?'A passage leads deeper.':'No deeper passage.'} ${r.otherExit?'There is another way out.':'No other exit.'}`,'info')
   }
-  function activeItem(item) { return item?.kind==='artifact' && item.artifactSlot==='trinket' && rule(item.abilityId,'active')===true }
+  function activeItem(item) { return item?.kind==='artifact' && item.artifactSlot==='trinket' &&
+    ARTIFACT_ABILITIES.domains.wayfaring.includes(item.abilityId) &&
+    ARTIFACT_ABILITIES.abilities[item.abilityId]?.enabled && rule(item.abilityId,'active')===true }
   function activationTargets(id) {
     return id==='farsight'?farsightTargets():id==='blink'?blinkTargets():id==='backtrack'?[backtrackTarget()].filter(Boolean):id==='phantom_trail'?[position()]:DIRS8.map(([dx,dy])=>({x:player.x+dx,y:player.y+dy})).filter(p=>rushOpen(p.x,p.y))
   }
@@ -709,6 +724,6 @@ const ArtifactWayfaring = (() => {
   function forgetEnemy(e) {state().stealth.observers=state().stealth.observers.filter(o=>o.id!==e.id);const i=state().phantomSurprise.indexOf(e.id);if(i>=0)state().phantomSurprise.splice(i,1)}
   return {farsightSize,farsightTargets,farsightRegion,farsightEnemies,caveSurvey,describeCave,moved,reconcileTruce,stopTrucePursuit,exposedTo,beginStealthTurn,fighting,coverAvailable,forestGap,unseenActive,ignoresCover,cachedUnseen,rememberUnseen,forestBonus,ambushChance,forestSuccess,takeForestDodge,truce,playerAggression,peace,exhaustWaterWalking,ruleWaterDuration,waterRemaining,walkingOnWater,waterLand,lavaEntry,lavaWalk,lavaImmune,environmentalTurn,rechargeCastaway,rescueCastaway,baselinePosition,rememberPosition,activeItem,canActivate,activate,rushStep,finishRush,rushRemaining,phantomPosition,divert,distractPursuer,attackPhantomMelee,attackPhantomRanged,takeSurprise,forgetEnemy,blinkTargets,backtrackTarget,freshState, validate, templeCap, discover, visitDepth, effectiveMining, restEvery,
     rootImmune, clearRoot, webPullDistance, countOrdinaryStep, enemyPhases, onDodge, clearFreeStep, clearCombat, stepContext, onStep, takeCritBonus,
-    cooldownRemaining, startCooldown, regenAmount, damage, ordinaryStep, finishTurn, resetEndurance, coldTerrain, positionStats, maxHpPct, adrenalineSpeed, homecomingBlocker, drifterMagicFind,
+    cooldownRemaining, startCooldown, reduceCooldowns, regenAmount, damage, ordinaryStep, finishTurn, resetEndurance, coldTerrain, positionStats, maxHpPct, adrenalineSpeed, homecomingBlocker, drifterMagicFind,
     terrainDefense, terrainSpeed, extraDownhillPush, syncHealth, clearFreezing, inventoryChanged}
 })()

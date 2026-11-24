@@ -115,6 +115,38 @@ describe('Tactical consumables', () => {
       cy.window().then(win => {
         expect(win.eval('player.inventory[0].count')).to.equal(1)
         expect(win.eval('turnCount')).to.equal(win.fireballTurn+1)
+        win.eval(`(() => {
+          const power=id=>({...makeArtifactTrinket('Stone',
+            ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id),identified:true})
+          player.inventory.push(power('burst_bending'),power('aftershock'))
+          const cross=fireballBlastTiles(44,40)
+          if(cross.length!==17 || cross.some(p=>p.x===45&&p.y===41))
+            throw Error('Burst Bending must shape the same aim into a cross')
+          const buffer=document.createElement('canvas')
+          buffer.width=buffer.height=9*TILE_PX
+          const originalCtx=ctx,visible=undergroundTileVisible
+          const oldX=camX,oldY=camY
+          try {
+            ctx=buffer.getContext('2d')
+            camX=40;camY=36
+            undergroundTileVisible=()=>true
+            drawFireballBurst({x:44,y:40,cross:true,visualTiles:cross},FIREBALL_BURST_MS*0.70)
+            const pixels=ctx.getImageData(0,0,buffer.width,buffer.height).data
+            for(let y=0;y<9;y++) for(let x=0;x<9;x++) {
+              const center=(Math.floor((y+0.5)*TILE_PX)*buffer.width+
+                Math.floor((x+0.5)*TILE_PX))*4
+              if(Boolean(pixels[center+3])!==(x===4||y===4))
+                throw Error('Burst Bending flame must reach each cardinal tile center only')
+            }
+          } finally {ctx=originalCtx;camX=oldX;camY=oldY;undergroundTileVisible=visible}
+          if(!ArtifactGeomancy.scheduleAftershock(cross,itemDefinition('scrollOfFireball').effect))
+            throw Error('Aftershock must persist the targeted footprint')
+          const save=structuredClone(buildSaveObject())
+          loadGameFromObject(save,{isReplayInit:true})
+          const stored=ArtifactGeomancy.serialize().aftershocks
+          if(stored.length!==1 || stored[0].tiles.length!==17)
+            throw Error('Aftershock footprint lost during save/load')
+        })()`)
       })
     })
   }

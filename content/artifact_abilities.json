@@ -17,23 +17,152 @@
     "trinket": []
   },
   "baseDomains": {
-    "Feather": ["wayfaring"],
-    "Girdle": ["wayfaring"],
-    "Tippet": ["wayfaring"],
-    "Scarf": ["wayfaring"],
-    "Anklet": ["wayfaring"],
-    "Flint": ["wayfaring"],
-    "Sextant": ["wayfaring"],
-    "Shoehorn": ["wayfaring"],
-    "Adze": ["wayfaring"],
-    "Amphora": ["wayfaring"],
-    "Jug": ["wayfaring"],
-    "Rope": ["wayfaring"],
-    "Bridle": ["wayfaring"],
-    "Saddle": ["wayfaring"]
+    "Feather": [
+      "wayfaring"
+    ],
+    "Girdle": [
+      "wayfaring"
+    ],
+    "Tippet": [
+      "wayfaring"
+    ],
+    "Scarf": [
+      "wayfaring"
+    ],
+    "Anklet": [
+      "wayfaring"
+    ],
+    "Flint": [
+      "wayfaring",
+      "geomancy"
+    ],
+    "Sextant": [
+      "wayfaring"
+    ],
+    "Shoehorn": [
+      "wayfaring"
+    ],
+    "Adze": [
+      "wayfaring"
+    ],
+    "Amphora": [
+      "wayfaring"
+    ],
+    "Jug": [
+      "wayfaring"
+    ],
+    "Rope": [
+      "wayfaring"
+    ],
+    "Bridle": [
+      "wayfaring"
+    ],
+    "Saddle": [
+      "wayfaring"
+    ],
+    "Tome": [
+      "geomancy"
+    ],
+    "Orb": [
+      "geomancy"
+    ],
+    "Grimoire": [
+      "geomancy"
+    ],
+    "Rune": [
+      "geomancy"
+    ],
+    "Hexagram": [
+      "geomancy"
+    ],
+    "Circlet": [
+      "geomancy"
+    ],
+    "Sealstone": [
+      "geomancy"
+    ],
+    "Diadem": [
+      "geomancy"
+    ],
+    "Bangle": [
+      "geomancy"
+    ],
+    "Muddler": [
+      "geomancy"
+    ],
+    "Bonefolder": [
+      "geomancy"
+    ],
+    "Scriber": [
+      "geomancy"
+    ],
+    "Cauldron": [
+      "geomancy"
+    ],
+    "Stone": [
+      "geomancy"
+    ],
+    "Chisel": [
+      "geomancy"
+    ],
+    "Gong": [
+      "geomancy"
+    ],
+    "Seal": [
+      "geomancy"
+    ],
+    "Idol": [
+      "geomancy"
+    ],
+    "Crozier": [
+      "geomancy"
+    ],
+    "Grindstone": [
+      "geomancy"
+    ],
+    "Mallet": [
+      "geomancy"
+    ],
+    "Trowel": [
+      "geomancy"
+    ]
   },
   "domains": {
-    "wayfaring": ["highlander", "adrenaline", "permafrost", "exile", "drifter", "troglodyte", "pilgrim", "trailblazer", "expedition", "prospector", "firekeeper", "endurance", "nomads_curse", "longstrider", "never_look_back", "windwalker", "skirmisher", "tidefang", "escape_artist", "rush", "backtrack", "blink", "phantom_trail", "water_walking", "emberwalker", "ashen_wanderer", "castaway", "frostwalker", "forestwalker", "unseen", "one_with_the_wild", "farsight", "spelunker"],
+    "wayfaring": [
+      "highlander",
+      "adrenaline",
+      "permafrost",
+      "exile",
+      "drifter",
+      "troglodyte",
+      "pilgrim",
+      "trailblazer",
+      "expedition",
+      "prospector",
+      "firekeeper",
+      "endurance",
+      "nomads_curse",
+      "longstrider",
+      "never_look_back",
+      "windwalker",
+      "skirmisher",
+      "tidefang",
+      "escape_artist",
+      "rush",
+      "backtrack",
+      "blink",
+      "phantom_trail",
+      "water_walking",
+      "emberwalker",
+      "ashen_wanderer",
+      "castaway",
+      "frostwalker",
+      "forestwalker",
+      "unseen",
+      "one_with_the_wild",
+      "farsight",
+      "spelunker"
+    ],
     "martial": [
       "shadow_strike",
       "flurry",
@@ -111,6 +240,23 @@
       "counterguard",
       "shield_bash",
       "vengeful_precision"
+    ],
+    "geomancy": [
+      "burst_bending",
+      "aftershock",
+      "petrify",
+      "lodestone",
+      "resonance",
+      "stonemaker",
+      "stone_circle",
+      "stonepress",
+      "cragbowl",
+      "earthmaw",
+      "grounding",
+      "sounding_stone",
+      "runic_fuse",
+      "runebound_aegis",
+      "spell_cairn"
     ]
   },
   "abilities": {
@@ -396,7 +542,24 @@
       "name": "Spelunker",
       "description": "Sense the size of the cave beyond an entrance, whether it descends deeper, and whether there are other exits.",
       "enabled": true,
-      "sizes": [{"name":"Tiny","max":99},{"name":"Small","max":249},{"name":"Medium","max":499},{"name":"Large","max":999}],
+      "sizes": [
+        {
+          "name": "Tiny",
+          "max": 99
+        },
+        {
+          "name": "Small",
+          "max": 249
+        },
+        {
+          "name": "Medium",
+          "max": 499
+        },
+        {
+          "name": "Large",
+          "max": 999
+        }
+      ],
       "priceBonus": 200
     },
     "shadow_strike": {
@@ -880,6 +1043,194 @@
       "hpPerDef": 5,
       "durationTurns": 5,
       "priceBonus": 380
+    },
+    "burst_bending": {
+      "name": "Burst Bending",
+      "description": "Transforms aimed area-damage spells into a cross. Fireball extends four tiles from its epicenter in each cardinal direction.",
+      "fireballArmLength": 4,
+      "enabled": true,
+      "priceBonus": 350
+    },
+    "aftershock": {
+      "name": "Aftershock",
+      "description": "Tiles struck by an aimed area-damage spell crack, then strike their current occupants one turn later for half of a fresh damage roll.",
+      "delay": 1,
+      "damageFraction": 0.5,
+      "enabled": true,
+      "priceBonus": 500
+    },
+    "petrify": {
+      "name": "Petrify",
+      "description": "A direct, damaging melee weapon hit has a 10% chance to petrify even a boss for 15 turns. Petrified foes cannot act or take damage.",
+      "chance": 0.1,
+      "duration": 15,
+      "enabled": true,
+      "priceBonus": 600
+    },
+    "lodestone": {
+      "name": "Lodestone",
+      "description": "Grows heavy whenever actually buried treasure lies within three tiles on the same level.",
+      "radius": 3,
+      "enabled": true,
+      "priceBonus": 200
+    },
+    "resonance": {
+      "name": "Resonance",
+      "description": "Activating a Geomancy power reduces the remaining cooldowns of all other Geomancy powers by 20 + floor(DEF / 2) turns.",
+      "baseReduction": 20,
+      "defDivisor": 2,
+      "enabled": true,
+      "priceBonus": 400
+    },
+    "stonemaker": {
+      "name": "Stonemaker",
+      "description": "Summon a temporary boulder in a random legal adjacent tile for five turns.",
+      "active": true,
+      "duration": 5,
+      "cooldown": 500,
+      "enabled": true,
+      "priceBonus": 325
+    },
+    "stone_circle": {
+      "name": "Stone Circle",
+      "description": "Surround yourself with temporary boulders for six turns, leaving one chosen traversable exit.",
+      "active": true,
+      "duration": 6,
+      "cooldown": 500,
+      "enabled": true,
+      "priceBonus": 375
+    },
+    "stonepress": {
+      "name": "Stonepress",
+      "description": "Push an adjacent boulder four tiles, damaging creatures and crushing them against obstacles.",
+      "active": true,
+      "maxSteps": 4,
+      "hitDamage": [
+        10,
+        20
+      ],
+      "crushDamage": [
+        20,
+        30
+      ],
+      "cooldown": 500,
+      "enabled": true,
+      "priceBonus": 400
+    },
+    "cragbowl": {
+      "name": "Cragbowl",
+      "description": "Hurl the nearest visible boulder toward the nearest visible enemy, damaging and knocking back a chain of creatures.",
+      "active": true,
+      "damage": [
+        30,
+        50
+      ],
+      "chainFraction": 0.5,
+      "knockback": 2,
+      "cooldown": 500,
+      "enabled": true,
+      "priceBonus": 475
+    },
+    "earthmaw": {
+      "name": "Earthmaw",
+      "description": "Swallow grounded, non-ethereal tier 1-4 enemies within 3 tiles of you (a 7 by 7 square, including diagonals) for three turns, sometimes dropping them one floor lower. The quake alerts eligible enemies and deals 5–10 damage to each that fails to resist.",
+      "active": true,
+      "radius": 3,
+      "duration": 3,
+      "maxTier": 4,
+      "damage": [5, 10],
+      "resistChance": 0.1,
+      "depthTransferChance": 0.2,
+      "cooldown": 500,
+      "enabled": true,
+      "priceBonus": 550
+    },
+    "grounding": {
+      "name": "Grounding",
+      "description": "Arm your next direct damaging hit to permanently suppress one random active ability of that enemy.",
+      "active": true,
+      "cooldown": 500,
+      "enabled": true,
+      "priceBonus": 475,
+      "suppressibleAbilities": [
+        "thief",
+        "charge",
+        "summon",
+        "wrestler",
+        "root",
+        "jump",
+        "healSelf",
+        "invisibility",
+        "haste",
+        "pull",
+        "mummyCurse",
+        "wail",
+        "petrifyingGaze",
+        "weaken",
+        "slow",
+        "disarm",
+        "dispel",
+        "deathBolt",
+        "immunity",
+        "lowHpTeleport",
+        "sacrifice",
+        "burrow",
+        "rupture",
+        "wallAmbush",
+        "consumeHealingItem",
+        "shellRetreat"
+      ]
+    },
+    "sounding_stone": {
+      "name": "Sounding Stone",
+      "description": "Make noise and reveal only the locations of moving, grounded creatures through rock for one turn.",
+      "active": true,
+      "radius": 6,
+      "duration": 1,
+      "cooldown": 500,
+      "enabled": true,
+      "priceBonus": 300
+    },
+    "runic_fuse": {
+      "name": "Runic Fuse",
+      "description": "Inscribe a Fear, Fireball or Chaos scroll into a one-use proximity rune.",
+      "active": true,
+      "scrolls": [
+        "scrollOfFear",
+        "scrollOfFireball",
+        "scrollOfChaos"
+      ],
+      "cooldown": 500,
+      "enabled": true,
+      "priceBonus": 425
+    },
+    "runebound_aegis": {
+      "name": "Runebound Aegis",
+      "description": "Inscribe a Fear scroll onto an equipped shield, releasing it on the next successful melee block.",
+      "active": true,
+      "scrolls": [
+        "scrollOfFear"
+      ],
+      "cooldown": 500,
+      "enabled": true,
+      "priceBonus": 425
+    },
+    "spell_cairn": {
+      "name": "Spell Cairn",
+      "description": "Store up to two compatible scrolls; release them sequentially in one action.",
+      "active": true,
+      "slots": 2,
+      "cooldown": 500,
+      "enabled": true,
+      "priceBonus": 550,
+      "scrolls": [
+        "scrollOfFear",
+        "scrollOfChaos",
+        "scrollOfInvisibility",
+        "scrollOfDeathShield",
+        "homecomingscroll",
+        "wayfaringscroll"
+      ]
     }
   },
   "pricing": {

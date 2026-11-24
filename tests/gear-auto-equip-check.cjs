@@ -40,12 +40,18 @@ async function main(){
         prepareEnemyEquipment(enemy)
         return enemy
       }
-      const gorgon=spawn('Gorgon'),kobold=spawn('Kobold'),goblin=spawn('Goblin')
+      const gorgon=spawn('Gorgon'),kobold=spawn('Kobold'),goblin=spawn('Goblin'),cyclops=spawn('Cyclops'),monkey=spawn('Monkey')
       check(!gorgon.shooterAbility&&!gorgon.equipment?.rangedAtk,'nonshooter cannot roll a bow')
       check(kobold.shooterAbility==='shooterArrows'&&kobold.equipment?.rangedAtk,
         'arrow shooter can roll a bow')
       check(goblin.shooterAbility==='shooterStones'&&!goblin.equipment?.rangedAtk,
         'stone shooter cannot roll a bow')
+      check(cyclops.shooterAbility==='shooterBigStones'&&!cyclops.equipment?.rangedAtk,
+        'large stone shooter cannot roll a bow')
+      check(shooterDefinition(cyclops).projectile==='bigStone'&&
+        shooterDefinition(goblin).projectile==='stone'&&shooterDefinition(monkey).projectile==='stone'&&
+        shooterDefinition(cyclops).atk===shooterDefinition(goblin).atk,
+        'stone throwers use distinct art with identical projectile ATK')
       const bow={kind:'weapon',name:'Hunting Bow',base:'Hunting Bow',atk:2,
         grace:1,rangedAtk:7,rangedRange:6}
       check(applyEnemyEquipment(gorgon,bow)===false,'stealing or corpse pickup cannot equip forbidden bow')
@@ -60,12 +66,15 @@ async function main(){
       const save=buildSaveObject()
       save.enemies=[{...invalid,equipment:bow,atk:25,
         gearBonuses:{atk:2,def:0,spd:0,hp:0,maxHp:0},
-        level:0,alive:true,x:10,y:10,baseName:'Gorgon',name:'Gorgon'}]
+        level:0,alive:true,x:10,y:10,baseName:'Gorgon',name:'Gorgon',geomancyBuriedUntil:0,groundingLostAbilities:[],geomancyPetrifiedUntil:0},
+        {...cyclops,level:0,alive:true,x:11,y:10,geomancyBuriedUntil:0,groundingLostAbilities:[],geomancyPetrifiedUntil:0,shotsRemaining:7}]
       const beforeRng=rngState
       loadGameFromObject(save,{isReplayInit:true})
       check(enemies[0].equipment===null&&enemies[0].atk===23&&
         enemies[0].stolenItem?.name==='Hunting Bow',
         'saved nonshooter is normalized, with stolen loot retained')
+      check(enemies[1].shooterAbility==='shooterBigStones'&&enemies[1].shotsRemaining===7&&
+        shooterDefinition(enemies[1]).projectile==='bigStone','large stone role persists on load')
       check(rngState===beforeRng,'save normalization consumes no RNG')
     } finally {chance=oldChance;rng=oldRng;pickEquipmentBase=oldPick}
   })()`)

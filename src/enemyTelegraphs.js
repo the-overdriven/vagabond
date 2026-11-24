@@ -393,7 +393,7 @@ function resolveEnemyRupture(e, pending) {
   for (const target of enemies.slice()) {
     if (target===e || !target.alive || !onCurrentLevel(target) ||
         enemyHasAbility(target,'fly') || enemyHasAbility(target,'ethereal') ||
-        !marked.has(keyXY(target.x,target.y))) continue
+        !marked.has(keyXY(target.x,target.y)) || enemyImmunityActive(target)) continue
     const damage=damageRoll(enemyAtk(e)*cfg.damageMultiplier,enemyDef(target))
     target.hp-=damage
     spawnDamageNumber(target.x,target.y,damage,RENDER_STYLE.damage.enemyHit)
@@ -445,6 +445,26 @@ function resolveEnemyTelegraphIfPending(e) {
 
 // Warnings are floor-scoped and drawn below actors; a full border plus a small
 // upper-right marker survive sprite overlaps and are readable in ASCII mode.
+function drawRuptureCracks(px,py) {
+  const image=RENDER_STYLE.overlays?.ruptureWarningImage
+  if (USE_TILE_IMAGES && image) drawImageVisual(px,py,{image,scale:1},0.9)
+  else {
+    const s=TILE_PX
+    ctx.strokeStyle='#bd7043'
+    ctx.lineWidth=Math.max(2,Math.round(s*0.045))
+    ctx.beginPath()
+    ctx.moveTo(px+s*0.24,py+s*0.12)
+    ctx.lineTo(px+s*0.45,py+s*0.37)
+    ctx.lineTo(px+s*0.35,py+s*0.58)
+    ctx.lineTo(px+s*0.58,py+s*0.83)
+    ctx.moveTo(px+s*0.45,py+s*0.37)
+    ctx.lineTo(px+s*0.76,py+s*0.29)
+    ctx.moveTo(px+s*0.35,py+s*0.58)
+    ctx.lineTo(px+s*0.13,py+s*0.76)
+    ctx.stroke()
+  }
+}
+
 function drawEnemyTelegraphWarnings(undergroundVisible, foreground=false) {
   const warned=new Set()
   for (const e of enemies) {
@@ -478,23 +498,7 @@ function drawEnemyTelegraphWarnings(undergroundVisible, foreground=false) {
       if (type==='rupture') {
         // Cracks are the whole warning: no yellow frame, marker or tint.
         if (!foreground) {
-          const image=RENDER_STYLE.overlays?.ruptureWarningImage
-          if (USE_TILE_IMAGES && image) drawImageVisual(px,py,{image,scale:1},0.9)
-          else {
-            const s=TILE_PX
-            ctx.strokeStyle='#bd7043'
-            ctx.lineWidth=Math.max(2,Math.round(s*0.045))
-            ctx.beginPath()
-            ctx.moveTo(px+s*0.24,py+s*0.12)
-            ctx.lineTo(px+s*0.45,py+s*0.37)
-            ctx.lineTo(px+s*0.35,py+s*0.58)
-            ctx.lineTo(px+s*0.58,py+s*0.83)
-            ctx.moveTo(px+s*0.45,py+s*0.37)
-            ctx.lineTo(px+s*0.76,py+s*0.29)
-            ctx.moveTo(px+s*0.35,py+s*0.58)
-            ctx.lineTo(px+s*0.13,py+s*0.76)
-            ctx.stroke()
-          }
+          drawRuptureCracks(px,py)
         }
         ctx.restore()
         continue

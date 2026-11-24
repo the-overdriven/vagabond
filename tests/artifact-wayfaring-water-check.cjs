@@ -13,7 +13,7 @@ const eq=(code,val,msg)=>assert.deepEqual(JSON.parse(JSON.stringify(run(code))),
     resetSwimming();player.wayfaring=ArtifactWayfaring.freshState();
     for(let y=25;y<=55;y++)for(let x=25;x<=55;x++){map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))}
     discovered.forEach(r=>r.fill(false));discoverPlayerSight('arrival');
-    globalThis.sampleE=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id);
+    globalThis.sampleE=id=>makeArtifactTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id);
     };cleanE();globalThis.actualPhase=resolveEnemyPhase;resolveEnemyPhase=()=>{}`)
   // Non-swimmer can cross water; normal actions use the same reserve, no practice.
   run(`player.inventory=[sampleE('water_walking'),createItem('herb')];map[40][41]='water';map[40][42]='water'`)

@@ -1225,6 +1225,34 @@ body.hint-collapsed #hint .panel-toggle {
   overflow-wrap: anywhere;
 }
 
+/* Two-slot Cairns stay one inventory row; the native picker works on touch. */
+.invitem .cairn-slot-state {
+  display: inline-block;
+  max-width: min(20ch, 100%);
+  margin-left: 5px;
+  color: var(--parchment-dim);
+  font-size: calc(10px * var(--ui-font-scale));
+  vertical-align: bottom;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#invList .inventory-actions .cairn-scroll-picker {
+  flex: 0 1 126px;
+  width: 126px;
+  min-width: 72px;
+  max-width: 126px;
+  background: #2a1c10;
+  color: var(--ember-bright);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 3px;
+  font: inherit;
+  font-size: calc(10px * var(--ui-font-scale));
+  cursor: pointer;
+}
+
 .invitem .inventory-food-detail:not([hidden]) {
   display: block;
   margin-top: 3px;

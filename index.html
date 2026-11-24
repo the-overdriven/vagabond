@@ -1144,6 +1144,10 @@ more difficult:
 
   const preloadedImageUrls = new Map()
   const preloadedImages = new Map()
+  const GEOMANCY_UNDERGROUND_BOULDER_IMAGES = Object.freeze([
+    'img/tiles/boulder-underground-1.png', 'img/tiles/boulder-underground-2.png',
+    'img/tiles/boulder-underground-3.png', 'img/tiles/boulder-underground-4.png'
+  ])
   const failedImagePaths = new Set()
   const imagePreloadsInFlight = new Map()
   let imagePreloadingStopped = false
@@ -1243,6 +1247,7 @@ more difficult:
       for (const visual of Object.values(RENDER_STYLE?.enemies?.tiles || {})) {
         if (visual?.image) paths.push(visual.image)
       }
+      paths.push(...GEOMANCY_UNDERGROUND_BOULDER_IMAGES)
       paths.push(...Object.values(PLAYER_RACE_IMAGES))
       paths.push(...Object.values(RACE_SELECTION_IMAGES))
       for (const variants of Object.values(PLAYER_TERRAIN_BACKGROUNDS)) paths.push(...variants)
@@ -1627,11 +1632,14 @@ more difficult:
 
   // A creature on the destination floor yields the exact landing, never the
   // player. Search destination geometry without consulting active occupancy.
-  function clearTransitionLanding({x,y,z}, destinationMap, kind) {
+  function clearTransitionLanding({x,y,z}, destinationMap, kind, dryRun = false) {
     const matches=e=>(e.level??0)===z && (!e.levelKind || e.levelKind===kind)
     const actors=enemies.filter(e=>e.alive && matches(e))
     if(kind==='surface')actors.push(...npcs)
     const occupants=actors.filter(e=>e.x===x && e.y===y)
+    // Earthmaw mounds reserve the exact square; stair travel must not shove
+    // one aside and desynchronize its emergence or replay.
+    if(occupants.some(e=>ArtifactGeomancy.buried(e)))return false
     if(!occupants.length)return true
     const level=kind==='chain'?deepLevels[chainDepthForZ(z)-2]:null
     const blocked=new Set(actors.map(e=>keyXY(e.x,e.y)))
@@ -1658,6 +1666,7 @@ more difficult:
       if(!free)return false // Never overlap actors or relocate the player instead.
       moves.push({actor,free})
     }
+    if(dryRun)return true
     for(const {actor,free} of moves){
       cancelPreparedEnemyAbility(actor)
       actor.x=free.x;actor.y=free.y
@@ -1813,6 +1822,22 @@ more difficult:
     if (TowerMaze.switchStairs()) return true
     if (enterMausoleum()) return true
     const tile = map[player.y] && map[player.y][player.x]
+    // Some legacy stairs let a normal creature step aside at the destination.
+    // An Earthmaw mound is different: its exact XY is reserved until emergence.
+    const targetZ = tile==='caveentrance' ? (currentZ===0?-1:0) :
+      tile==='dwarvengate' ? (currentZ===0?-3:0) :
+      tile==='dwarvenfortexit' ? 0 :
+      ['cavedown','dwarvenstairsdown','dwarvenhole'].includes(tile) ? currentZ-1 :
+      ['caveup','dwarvenstairsup'].includes(tile) ? currentZ+1 :
+      tile==='cryptstairsdown' ? -2 : tile==='cryptstairsup' ? -1 : null
+    const targetKind=tile==='cryptstairsdown'?'crypt2':
+      targetZ===0?'surface':targetZ===null?null:'chain'
+    if(targetZ!==null && enemies.some(e=>e.alive && ArtifactGeomancy.buried(e) &&
+        (e.level||0)===targetZ && (e.levelKind||targetKind)===targetKind &&
+        e.x===player.x && e.y===player.y)) {
+      log('The stair landing is blocked.','info')
+      return true
+    }
     if (currentZ === 0) {
       if (tile !== 'caveentrance' && tile !== 'dwarvengate') return false
       if (tile === 'dwarvengate' && deepLevels[1]) {
@@ -2254,6 +2279,31 @@ more difficult:
     return {damage, broken, lootKind: broken ? target.crate.lootKind : null}
   }
 
+  // One authoritative mutation for stones on a *specific* global Z level.
+  // Never synthesize a separate dungeon or touch legacy Crypt at z:-2 when
+  // modifying the chain map. The local cave masks mirror that same cell.
+  function mutateGeomancyTile(position, expected, replacement) {
+    const {x,y,z,levelKind}=position
+    let terrain=null, masks=[]
+    if (levelKind==='surface' && z===0) terrain=surfaceMap
+    else if (levelKind==='tower' && z>0) terrain=towerLevels[z-1]?.map
+    else if (levelKind==='crypt2' && z===-2) terrain=cryptLevel2?.map
+    else if (levelKind==='chain' && z===-1) {terrain=undergroundMap;masks=caveMaps}
+    else if (levelKind==='chain' && z<-1) {
+      const level=deepLevels[chainDepthForZ(z)-2]
+      terrain=level?.map;masks=level?.caveMaps || []
+    }
+    if (!terrain || terrain[y]?.[x]!==expected) return false
+    terrain[y][x]=replacement
+    for(const cm of masks) if (cm!==terrain && cm[y]?.[x]===expected) cm[y][x]=replacement
+    if (terrain===map) {
+      invalidateUndergroundFov()
+      repaintMinimapTiles([{x,y}])
+      if (replacement==='boulder') clearAutoPath()
+    }
+    return true
+  }
+
   // Clearing rubble changes the authoritative floor tile on this Z level.
   // Cave maps are kept in sync for save/load and future floor inspection.
   // One pickaxe blow resolves instantly; no additional per-rubble HP or RNG.
@@ -2347,6 +2397,7 @@ more difficult:
 <script src="src/replay.js"></script>
 <script src="src/version.js"></script>
 <script src="src/artifactWayfaring.js"></script>
+<script src="src/artifactGeomancy.js"></script>
 <script src="src/saveLoad.js"></script>
 <script src="src/supabase.js"></script>
 <script src="src/graveyard.js"></script>
@@ -2868,13 +2919,19 @@ more difficult:
     const roll = item.abilityId === 'drifter' ? ` (Rolled: MF +${item.drifterMf})` : item.abilityId === 'berserkers_oath' && item.berserkerOathRoll
       ? ` (Rolled: ATK +${item.berserkerOathRoll}, DEF -${item.berserkerOathRoll})` : ''
     const rescue = item.identified && item.abilityId==='castaway' ? (player.wayfaring.castawaySpent ? 'Castaway: spent until a Temple visit.' : 'Castaway: ready.') : ''
-    return [item.description, rescue, ability && `${ability.name}: ${ability.description}${roll}`, item.identified && ArtifactWayfaring.activeItem(item) ? `Cooldown remaining: ${ArtifactWayfaring.cooldownRemaining(item.abilityId)} turns.` : ''].filter(Boolean).join('\n')
+    const cairnContents = item.identified && item.abilityId==='spell_cairn'
+      ? `Stored scrolls: ${ArtifactGeomancy.cairnSlots(item).map(p=>
+        p.kind==='homecomingscroll'?'Homecoming':p.kind==='wayfaringscroll'?'Wayfaring':
+        (itemDefinition(p.kind)?.name || p.kind).replace(/^Scroll of /,'')).join(' → ') || 'none'}.`
+      : ''
+    return [item.description, rescue, ability && `${ability.name}: ${ability.description}${roll}`, cairnContents, item.identified && (ArtifactWayfaring.activeItem(item) || (item.artifactSlot === 'trinket' && ARTIFACT_ABILITIES.abilities[item.abilityId]?.enabled && ARTIFACT_ABILITIES.abilities[item.abilityId]?.active && ARTIFACT_ABILITIES.domains.geomancy.includes(item.abilityId))) ? `Cooldown remaining: ${ArtifactWayfaring.cooldownRemaining(item.abilityId)} turns.` : ''].filter(Boolean).join('\n')
   }
 
   // Relocation is gameplay state, never tied to camera animation. It covers
   // voluntary moves, forced movement, teleportation, and global-Z changes.
   function markPlayerPositionChanged(voluntary = false, teleport = false) {
     ArtifactWayfaring.moved(teleport)
+    ArtifactGeomancy.syncLodestone()
     player.lastPositionChangeTurn = turnCount
     if (!deepSwimmingWater(player.x,player.y)) ArtifactWayfaring.waterLand()
     if (playerHasArtifactAbility('troglodyte')) ArtifactWayfaring.syncHealth()
@@ -2968,7 +3025,7 @@ more difficult:
   // Additional targets take their own DEF reduction and one ordinary seeded
   // damage roll. A splash is never another direct weapon hit.
   function artifactSplashDamage(target, strength, cause, message) {
-    if (!target.alive || target.hp <= 0 || !onCurrentLevel(target)) return
+    if (!target.alive || target.hp <= 0 || !onCurrentLevel(target) || enemyImmunityActive(target)) return
     ArtifactWayfaring.playerAggression(target)
     const damage = damageRoll(strength, twoHandedDefence(enemyDef(target)))
     target.hp -= damage
@@ -3140,6 +3197,7 @@ more difficult:
       onCurrentLevel(other) && Math.max(Math.abs(other.x-e.x),Math.abs(other.y-e.y))===1)
     if (!others.length) return true
     const target=pick(others)
+    if (enemyImmunityActive(target)) return true
     const damage=damageRoll(enemyAtk(e),twoHandedDefence(enemyDef(target)),e)
     target.hp-=damage
     absorbEnemyFatalHit(target)
@@ -3186,14 +3244,21 @@ more difficult:
 
   // Forced knockback shares normal enemy tile legality and on-entry effects.
   // It may not cross obstacles/actors or connect two different Z levels.
+  function enemyKnockbackTerrainOpen(e,x,y) {
+    // Unlike deliberate ethereal movement, forced displacement cannot pass
+    // walls, even when a monster has ethereal or flying movement.
+    return !ArtifactGeomancy.buried(e) &&
+      (isWalkable(x,y) || (map[y]?.[x] === 'water' && enemyCanTraverse(e,x,y))) &&
+      enemyCanTraverse(e,x,y) && !enemySanctuaryTileForbidden(e,x,y)
+  }
+
   function enemyKnockbackTileOpen(e,x,y) {
-    // Unlike deliberate ethereal movement, knockback must never pass walls.
-    return (isWalkable(x,y) || (map[y]?.[x] === 'water' && enemyCanTraverse(e,x,y))) &&
-      enemyCanTraverse(e,x,y) && enemyTileOpen(e,x,y) && !enemySanctuaryTileForbidden(e,x,y)
+    return enemyKnockbackTerrainOpen(e,x,y) && enemyTileOpen(e,x,y)
   }
 
   function pushEnemyFromPlayer(e, source = 'critical strike') {
-    if (!e.alive || e.hp <= 0 || !onCurrentLevel(e)) return false
+    if (!e.alive || e.hp <= 0 || !onCurrentLevel(e) ||
+        ArtifactGeomancy.petrified(e) || ArtifactGeomancy.buried(e)) return false
     const dx=Math.sign(e.x-player.x), dy=Math.sign(e.y-player.y)
     if (!dx && !dy) return false
     const initialX=e.x, initialY=e.y
@@ -3481,6 +3546,7 @@ more difficult:
 
   function artifactShieldBash(e) {
     if (!playerHasArtifactAbility('shield_bash') || !player.equip.shield || !e.alive ||
+        enemyImmunityActive(e) ||
         !onCurrentLevel(e) || Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y)) !== 1 ||
         !chance(artifactRule('shield_bash','chance'))) return false
     const wasEnraged = enemyIsEnraged(e)
@@ -3616,6 +3682,7 @@ more difficult:
     if (testAbilityId !== null && !artifactAbilityPool(item).includes(testAbilityId))
       throw new Error('Ineligible test artifact ability: ' + testAbilityId)
     item.abilityId = testAbilityId ?? rollArtifactAbility(item)
+    if(item.abilityId==='spell_cairn')item.geomancyCairn=[]
     if (item.abilityId === 'berserkers_oath') {
       const min = artifactRule('berserkers_oath','rollMin')
       const max = artifactRule('berserkers_oath','rollMax')
@@ -3659,7 +3726,7 @@ more difficult:
     if (!eligibleGearNames.includes(noun) && !trinketNouns.includes(noun)) noun = pick(trinketNouns)
     const gear = artifactGearBase(noun)
     const slot = gear?.slot || 'trinket'
-    if (slot === 'trinket') return makeWayfaringTrinket(noun, effect, mf)
+    if (slot === 'trinket') return makeArtifactTrinket(noun, effect, mf)
     const {name, possessor, ownerLore, curse} = rollArtifactIdentity(noun, slot, mf)
 
     const item = {
@@ -3690,7 +3757,7 @@ more difficult:
 
   // Uses the same eligibility and pricing metadata as equipment artifacts.
   // The effect supplies the tier and base price only; it grants no stats.
-  function makeWayfaringTrinket(noun, effect, mf = 0, testAbilityId = null) {
+  function makeArtifactTrinket(noun, effect, mf = 0, testAbilityId = null) {
     const item = initializeArtifactAbility({kind:'artifact', artifactSlot:'trinket', noun,
       tier:effect.tier, effectId:effect.id, baseValue:effect.baseValue, identified:false,
       bonuses:{}, maxHpPct:0, curseTimer:0}, testAbilityId)
@@ -4208,6 +4275,7 @@ more difficult:
     curseDebuffs: [],
     lastPositionChangeTurn: -2,
     artifactBraveryCharge: false,
+    groundingArmed: false,
     artifactRiposteReady: false, artifactRetributionStored: 0,
     artifactBloodReservoirStored: 0, artifactPainEaterHits: 0,
     artifactPainAttackBonus: 0, artifactRhythmHitsThisAction: 0,
@@ -4598,11 +4666,22 @@ more difficult:
   /* ============================== ENEMY CREATION ============================== */
   let nextEnemyId = 1
 
+  function enemyAbilityDisplayName(id) {
+    const labels = {
+      mummyCurse: 'Curse',
+      consumeHealingItem: 'Consumable healing',
+      lowHpTeleport: 'Low-HP Teleport'
+    }
+    return labels[id] || id.replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/^./, letter => letter.toUpperCase())
+  }
+
   function enemyHasAbility(enemy, ability) {
     if (ability === 'ethereal' && enemy?.adaptiveEventId === 'forest_spirit') return false
     // Binding suppresses these behaviors temporarily; it never edits the
     // monster's actual ability catalog, so the powers return after movement.
     if (enemy?.artifactBound && (ability === 'flee' || ability === 'thief')) return false
+    if (enemy?.groundingLostAbilities?.includes(ability)) return false
     return !(ability === 'fly' && enemy?.sleeping) && !!enemy?.abilities?.includes(ability)
   }
 
@@ -4813,6 +4892,9 @@ more difficult:
       typeof enemy.hiddenLeaderGroupId === 'string' ? enemy.hiddenLeaderGroupId : null
     enemy.family = tmpl?.family
     enemy.abilities = [...(enemy.abilities ?? tmpl?.abilities ?? [])]
+    // Permanent Grounding affects this monster, never its species template.
+    enemy.groundingLostAbilities = Array.isArray(enemy.groundingLostAbilities)
+      ? [...new Set(enemy.groundingLostAbilities)] : []
     initializeEnemySleep(enemy)
     initializeEnemyGearScale(enemy)
     enemy.gearBonuses = enemy.gearBonuses || null
@@ -4829,6 +4911,10 @@ more difficult:
     enemy.artifactFearAuraOnly = enemy.artifactFearAuraOnly === true
     enemy.artifactFearAuraCheckedTurn = Number.isInteger(enemy.artifactFearAuraCheckedTurn) ? enemy.artifactFearAuraCheckedTurn : -1
     enemy.artifactPetrified = enemy.artifactPetrified === true
+    enemy.geomancyBuriedUntil = Number.isInteger(enemy.geomancyBuriedUntil)
+      ? Math.max(0,enemy.geomancyBuriedUntil) : 0
+    enemy.geomancyPetrifiedUntil = Number.isInteger(enemy.geomancyPetrifiedUntil)
+      ? Math.max(0,enemy.geomancyPetrifiedUntil) : 0
     enemy.artifactSilencedUntilTurn = Number.isInteger(enemy.artifactSilencedUntilTurn) ? Math.max(0,enemy.artifactSilencedUntilTurn) : 0
     enemy.artifactConfusedUntilTurn = Number.isInteger(enemy.artifactConfusedUntilTurn) ? Math.max(0,enemy.artifactConfusedUntilTurn) : 0
     enemy.artifactDisarmed = enemy.artifactDisarmed === true
@@ -6180,7 +6266,7 @@ more difficult:
     }
     const equipped = new Set(Object.values(player.equip).filter(Boolean))
     const candidates = player.inventory.map((item, index) => ({item, index}))
-      .filter(entry => !equipped.has(entry.item) && (entry.item.count ?? 1) > 0)
+      .filter(entry => !equipped.has(entry.item) && !ArtifactGeomancy.boundCairn(entry.item) && (entry.item.count ?? 1) > 0)
     // Ineligible turns consume no theft RNG, including empty packs and corners.
     if (!candidates.length) return false
     revealEnemyInvisibility(e)
@@ -6286,7 +6372,7 @@ more difficult:
     // Keep existing callers that pass true for a GRACE follow-up working.
     if (extraAttackKind === true) extraAttackKind = 'grace'
     const isExtraAttack = extraAttackKind !== null && extraAttackKind !== false
-    if (rareFleeBlocksAttack(e)) return false
+    if (ArtifactGeomancy.buried(e) || rareFleeBlocksAttack(e)) return false
     artifactGrowingMaliceTarget(e)
     const vengefulBonus = artifactTakeVengefulPrecision()
     const tidefangBonus = ArtifactWayfaring.takeCritBonus('tidefang')
@@ -6396,6 +6482,8 @@ more difficult:
     if (targetWasInvisible) revealEnemyInvisibility(e)
     absorbEnemyFatalHit(e)
     const executeFollowUp = artifactOnLandedMeleeStrike(e, beforeHitHp, effectiveDamage)
+    ArtifactGeomancy.groundingHit(e,effectiveDamage)
+    ArtifactGeomancy.petrifyOnMelee(e,effectiveDamage)
     if (dmg > 0) {
       breakEnemyFear(e)
       const dread = ARTIFACT_ABILITIES.abilities.dreadful_strike
@@ -6515,6 +6603,7 @@ more difficult:
     const glancing = armor && chance(missChance(enemySpd(e), playerSpd()))
     const shieldBlockChance = !glancing && shieldingBlockChance(e)
     const blocked = shieldBlockChance > 0 && chance(shieldBlockChance)
+    const shieldAtBlock=blocked ? player.equip.shield : null
     let dmg = damageRoll(enemyAtk(e) * (charge?.atkMultiplier ?? 1), playerDef(), e)
     const criticalRoll = chance(enemyCriticalHitChance(e))
     const critical = !glancing && !blocked && criticalRoll && !playerHasArtifactAbility('gods_chosen')
@@ -6582,6 +6671,7 @@ more difficult:
       applyEnemyContactStatuses(e)
     }
     if (player.hp > 0 && options?.onHit) options.onHit()
+    if (blocked && player.hp > 0) ArtifactGeomancy.releaseAegis(shieldAtBlock)
     if (blocked && player.hp > 0) artifactShieldBash(e)
     updateHud()
     if (player.hp <= 0) {
@@ -6745,6 +6835,7 @@ more difficult:
         if (dmg > 0) breakEnemyFear(e)
         if (scrollInvisibleShot) AdaptivePlayerTrolling.onPlayerInvisibleHit(e, turnCount)
         absorbEnemyFatalHit(e)
+        ArtifactGeomancy.groundingHit(e,directDamage)
         triggerEnemyShellRetreat(e)
         alarmEnemiesNearHit(e)
         if (critical) {
@@ -6952,7 +7043,7 @@ more difficult:
       if (e.artifactSoulGhost) awardArtifactSoulFed()
     }
     spawnDeathAnim(e, deathFxDelay)
-    occupied.delete(keyXY(e.x, e.y))
+    if (onCurrentLevel(e)) occupied.delete(keyXY(e.x, e.y))
     enemies = enemies.filter(x => x !== e)
     if (playerCredit) gainXp(xpForEnemy(e))
     if (playerCredit) artifactSoulEaterOnKill(e)
@@ -6978,7 +7069,8 @@ more difficult:
     }
     if (!e.artifactSoulGhost && cause !== 'sacrifice' && !Mimics.deathLoot(e, visibleAtDeath)) {
       const distance = Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y))
-      lootFromEnemy(e, cause === 'drowning' || (playerCredit && ['arrow', 'fireball', 'poison'].includes(cause) && distance > ATTACK_RANGE),
+      lootFromEnemy(e, cause === 'drowning' || (cause === 'aftershock' && !onCurrentLevel(e)) ||
+        (playerCredit && ['arrow', 'fireball', 'poison', 'aftershock'].includes(cause) && distance > ATTACK_RANGE),
         visibleAtDeath, deathFxDelay, deathContext)
     }
     if (mobileInfoPanel?._inspectedEnemy === e) updateMobileInfoPanel(e.x, e.y)
@@ -7013,6 +7105,7 @@ more difficult:
     ArtifactWayfaring.waterLand()
     if (wasDead) {
       player.artifactBraveryCharge = false
+      player.groundingArmed = false
       player.artifactRiposteReady = false
       player.artifactRetributionStored = 0
       player.artifactBloodReservoirStored = 0
@@ -7099,7 +7192,7 @@ more difficult:
     const equipped = new Set(Object.values(player.equip).filter(Boolean))
     const candidates = player.inventory
       .map((item, index) => ({item, index}))
-      .filter(entry => !equipped.has(entry.item))
+      .filter(entry => !equipped.has(entry.item) && !ArtifactGeomancy.boundCairn(entry.item))
     if (!candidates.length) return null
     const dropped = pick(candidates)
     const item = {...dropped.item}
@@ -7177,6 +7270,7 @@ more difficult:
       wayfaring: ArtifactWayfaring.freshState(player.wayfaring),
       lastPositionChangeTurn: turnCount,
       artifactBraveryCharge: false,
+      groundingArmed: false,
       artifactRiposteReady: false, artifactRetributionStored: 0,
       artifactBloodReservoirStored: 0, artifactPainEaterHits: 0,
       artifactPainAttackBonus: 0, artifactRhythmHitsThisAction: 0,
@@ -7324,6 +7418,7 @@ more difficult:
     player.artifactAlchemistTempHp = 0
     player.artifactAlchemistGuardDef = 0
     player.artifactAlchemistGuardUntilTurn = 0
+    player.groundingArmed = false
     player.poisonTurns = 0
     player.berryRegenTurns = 0
     player.campRestProgress = 0
@@ -7466,7 +7561,7 @@ more difficult:
         e.alarmedLevelKind=levelKind
         continue
       }
-      if (!e.alarmed) continue
+      if (!e.alarmed || ArtifactGeomancy.buried(e)) continue
       // A burrowed monster has no occupied map tile; sense from its last
       // surface position until it emerges, not its off-map sentinel.
       const location=e.pendingAbility?.type==='burrow' ? e.pendingAbility.origin : e
@@ -8584,7 +8679,9 @@ more difficult:
     const adjacent=new Set([currentZ-1,currentZ+1])
     for(const e of enemies) {
       const z=e.level??0
-      if(!e.alive||Frostwalker.stranded(e)||!adjacent.has(z)||e.aware||e.sleeping||e.pendingAbility||
+      if(!e.alive||ArtifactGeomancy.petrified(e)||ArtifactGeomancy.buried(e)||
+          Frostwalker.stranded(e)||
+          !adjacent.has(z)||e.aware||e.sleeping||e.pendingAbility||
           e.wallAmbushHidden||enemyWanderMode(e)===false||
           (z===0&&enemyWanderMode(e)==='far')||
           Math.max(Math.abs(e.x-player.x),Math.abs(e.y-player.y))>ENEMY_WANDER_ACTIVE_RADIUS) continue
@@ -8788,6 +8885,7 @@ more difficult:
   function tickEnemyPoison() {
     for (const enemy of enemies.slice()) {
       if (!enemy.alive || !onCurrentLevel(enemy) || enemy.poisonTurns <= 0 ||
+          enemyImmunityActive(enemy) || ArtifactGeomancy.buried(enemy) ||
           turnCount <= enemy.poisonAppliedTurn + 1) continue
       const damage = Math.min(enemy.poisonDamagePerTurn, enemy.poisonDamageRemaining)
       enemy.poisonDamageRemaining -= damage
@@ -8912,6 +9010,7 @@ more difficult:
     const phases = ArtifactWayfaring.enemyPhases()
     updateAlarmedEnemies()
     turnCount++
+    ArtifactGeomancy.tick() // time belongs to world turns, not animation frames
     ArtifactWayfaring.visitDepth()
     discoverPlayerSight()
     if (playerHasArtifactAbility('troglodyte')) ArtifactWayfaring.syncHealth()
@@ -9002,6 +9101,7 @@ more difficult:
     for (const e of enemies.slice()) {
       if (map !== turnMap || player.hp <= 0 || deathTransition) return
       if (!e.alive || !onCurrentLevel(e) || e.summonedTurn === turnCount) continue
+      if (ArtifactGeomancy.petrified(e) || ArtifactGeomancy.buried(e)) continue
       if (Frostwalker.enemyAction(e)) continue
       ArtifactWayfaring.stopTrucePursuit(e)
       if (e.mimicSkipTurn === turnCount) continue
@@ -9330,6 +9430,7 @@ more difficult:
   // Catalog data never becomes executable code. These handlers are shared with replay.
   const ITEM_ACTION_HANDLERS_BASE = {
     wayfaringPower: idx => ArtifactWayfaring.activate(idx),
+    geomancyPower: (idx, direction) => ArtifactGeomancy.activate(idx, direction),
     potion: idx => usePotion(idx),
     speedpotion: idx => useSpeedPotion(idx),
     strangeGreenPotion: idx => useStrangeGreenPotion(idx),
@@ -9376,7 +9477,7 @@ more difficult:
     'scrollOfChaos','stoneSkinPotion','berserkPotion','herb','mushroom','ediblemushroom',
     'berries','fish','cookedFood','scrollOfInvisibility','homecomingscroll','wayfaringscroll','echoBlightHorn','venomGland'])
   const ITEM_ACTION_HANDLERS = Object.fromEntries(Object.entries(ITEM_ACTION_HANDLERS_BASE).map(([action, fn]) => [action,
-    async idx => {
+    async (idx, ...args) => {
       const item = player.inventory[idx]
       const frenzyEligible = FRENZY_ITEM_ACTIONS.has(action) && item &&
         !(action === 'homecomingscroll' && ArtifactWayfaring.homecomingBlocker()) &&
@@ -9396,7 +9497,7 @@ more difficult:
         }
         if (replayRecording && !replayPlaying) skipPreRecordedItemAction = true
       }
-      try { return await fn(idx) }
+      try { return await fn(idx, ...args) }
       finally { skipPreRecordedItemAction = false }
     }]))
 
@@ -9462,7 +9563,7 @@ more difficult:
   }
 
   function canDropInventoryItem(item) {
-    return !!item && item.droppable !== false && itemDefinition(item.kind)?.droppable !== false
+    return !!item && !ArtifactGeomancy.boundCairn(item) && item.droppable !== false && itemDefinition(item.kind)?.droppable !== false
   }
 
   function dropInventoryItem(idx) {
@@ -9847,6 +9948,7 @@ more difficult:
     }
     if (options.recordReplay !== false) recordReplayAction({type:'dig'})
     dugSandTiles.add(key)
+    ArtifactGeomancy.syncLodestone()
     // The base minimap is cached, so repaint the changed pixel immediately.
     if (typeof miniBases !== 'undefined') {
       ensureMiniBases()
@@ -11272,7 +11374,8 @@ more difficult:
     const target = enemies.find(e => onCurrentLevel(e) && e.x === nx && e.y === ny && e.alive)
     if (target) {
       clearAutoPath()
-      if (target.wallAmbushHidden || target.pendingAbility?.type === 'burrow') {
+      if (ArtifactGeomancy.buried(target) || target.wallAmbushHidden ||
+          target.pendingAbility?.type === 'burrow') {
         if (player.rootTurns > 0 && (dx !== 0 || dy !== 0)) {
           log(ROOT_CONFIG.flavors?.[player.rootFlavor]?.struggle ||
             ROOT_CONFIG.flavors?.generic?.struggle || 'You struggle to move.', 'bad')
@@ -12159,8 +12262,14 @@ more difficult:
   }
 
   function brownDeepCaveAt(x, y) {
+    // A boulder is an overlay, not a different geological floor. Use its
+    // recorded underlay so the brown grotto/mine artwork stays continuous.
+    const floor = map[y]?.[x] === 'boulder'
+      ? (ArtifactGeomancy.temporaryAt(x, y)?.underlay ||
+        tileUnderlays[tileUnderlayKey(x, y, currentZ)])
+      : map[y]?.[x]
     if (currentZ < 0 && deepLevels[chainDepthForZ(currentZ)-2]?.kind === 'dwarvenMines')
-      return map[y]?.[x] === 'cavefloor2' && !Mining.excavatedAt(Mining.activeLevel(), x, y)
+      return floor === 'cavefloor2' && !Mining.excavatedAt(Mining.activeLevel(), x, y)
     if (currentZ !== -2 || currentLevelKind() !== 'chain') return false
     const deep = deepLevels[0]
     return !!deep?.caves?.some((cave, i) => cave.brownFloor &&
@@ -12466,6 +12575,15 @@ more difficult:
     if (tileKey === 'snowmountain') return 'snow'
     if ((tileKey === 'hill' || tileKey === 'boulder') && terrain === surfaceMap)
       return surfaceRockGroundAt(x,y,terrain)
+    if (tileKey === 'boulder' && currentZ < 0 && terrain !== surfaceMap) {
+      // The rock PNG has transparent corners. Paint the *exact* saved cave,
+      // fort or mine floor underneath, not the opaque boulder tile background.
+      // Temporary stones own their underlay; natural stones use tileUnderlays.
+      const underlay = ArtifactGeomancy.temporaryAt(x, y)?.underlay ||
+        tileUnderlays[tileUnderlayKey(x, y, currentZ)]
+      return underlay && underlay !== 'boulder' && TILE[underlay]?.walk
+        ? underlay : null
+    }
     if (tileKey === 'marble') return null
     if (isLakeIce(tileKey)) return null
     // Opaque ground is already its own base. Recursing into a guessed biome
@@ -12577,6 +12695,29 @@ more difficult:
   }
 
   const surfaceGroundBlendCache = new Map()
+  // Pixel sampling is rare compared with normal drawing. Read through a
+  // dedicated CPU-backed canvas, never the main (GPU-friendly) game context.
+  // Cache by source canvas so the same grass/sand/snow texture is not read
+  // hundreds of times as different shoreline combinations are composed.
+  const terrainPixelCache = new WeakMap()
+  let terrainReadbackCanvas = null
+  function terrainPixels(source) {
+    const cached = terrainPixelCache.get(source)
+    if (cached) return cached
+    const size = source.width
+    if (!terrainReadbackCanvas) {
+      terrainReadbackCanvas = document.createElement('canvas')
+      terrainReadbackCanvas.getContext('2d', {willReadFrequently:true})
+    }
+    terrainReadbackCanvas.width = size
+    terrainReadbackCanvas.height = source.height
+    const readback = terrainReadbackCanvas.getContext('2d', {willReadFrequently:true})
+    readback.imageSmoothingEnabled = false
+    readback.drawImage(source, 0, 0)
+    const pixels = readback.getImageData(0, 0, size, source.height).data
+    terrainPixelCache.set(source, pixels)
+    return pixels
+  }
 
   function surfaceBlendBiomes(center,x,y,terrain=map) {
     const biomes=[]
@@ -12601,7 +12742,7 @@ more difficult:
       for (const name of names) {
         const image=resolveVisualImage(RENDER_STYLE.terrainTiles[name])
         if (!image) return null
-        textures.push(scaledVisualCanvas(image,1).getContext('2d').getImageData(0,0,size,size).data)
+        textures.push(terrainPixels(scaledVisualCanvas(image,1)))
       }
       canvas=document.createElement('canvas');canvas.width=canvas.height=size
       const cctx=canvas.getContext('2d'), pixels=cctx.createImageData(size,size)
@@ -12676,7 +12817,8 @@ more difficult:
       canvas = document.createElement('canvas')
       canvas.width = canvas.height = size
       const cctx = canvas.getContext('2d')
-      const pixels = ground.getContext('2d').getImageData(0,0,size,size)
+      const pixels = cctx.createImageData(size,size)
+      pixels.data.set(terrainPixels(ground))
       for (let y=0; y<size; y++) for (let x=0; x<size; x++) {
         pixels.data[(y*size+x)*4+3] *= shorelineAlpha(biomes,shoreX,shoreY,
           (x+0.5)/size,(y+0.5)/size,size,visual.riverBank,visual.enclosedBank)
@@ -12837,6 +12979,10 @@ more difficult:
       : RENDER_STYLE.specialTiles?.coffin
     const visual = RENDER_STYLE.terrainTiles?.[tileKey]
     if (!visual) return null
+    // All four round cavern stones use a deterministic coordinate variant.
+    // Tile art never consumes world RNG and ASCII uses the normal boulder glyph.
+    if (tileKey==='boulder' && terrain!==surfaceMap) return {...visual,
+      image:tileVariantImage(GEOMANCY_UNDERGROUND_BOULDER_IMAGES,x,y)}
     // Marble wear is a Ruins-only visual variation; the tower keeps clean
     // marble. Concealed pressure plates must match the same tile coordinates
     // so a different floor pattern cannot reveal them before inspection.
@@ -13030,8 +13176,12 @@ more difficult:
   }
 
   function drawEnemyVisual(px, py, enemy, shimmers = false) {
-    if (drawImageVisual(px, py, RENDER_STYLE.enemies.tiles?.[enemy.baseName || enemy.name])) return
-    drawCreature(px, py, enemyGlyph(enemy), shimmers ? '#d8caef' : enemyColor(enemy))
+    const image=RENDER_STYLE.enemies.tiles?.[enemy.baseName || enemy.name]
+    const stone=ArtifactGeomancy.petrified(enemy)
+    // Reuse the existing scale/filter cache; never process pixels per frame.
+    if (image && drawImageVisual(px,py,stone?{...image,filter:'grayscale(1)'}:image)) return
+    drawCreature(px, py, enemyGlyph(enemy), stone ? '#99999f' :
+      shimmers ? '#d8caef' : enemyColor(enemy))
   }
 
   function drawEnemyStatusOutlines(e, px, py) {
@@ -13374,6 +13524,9 @@ more difficult:
     DungeonHazards.onActorEntered(e, fromX, fromY)
     if (!e.alive) return
     if (forced) Frostwalker.forcedEntry(e)
+    ArtifactGeomancy.recordEnemyMove(e,fromX,fromY)
+    ArtifactGeomancy.onEnemyEntered(e,fromX,fromY)
+    if (!e.alive || player.hp<=0 || deathTransition) return
     // Passive swimming is announced only when entering deep water, not on
     // each subsequent water tile. No RNG or persistent entry flag is needed.
     if (enemyHasAbility(e, 'swim') && map[fromY]?.[fromX] !== 'water' &&
@@ -13526,7 +13679,7 @@ more difficult:
   }
 
   function animationsPending() {
-    return !!moveAnim || enemyAttackPresentationPending() || playerProjectileDodges.length > 0 || rareStampedeAnims.length > 0 || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0 || fireballAnims.length > 0
+    return !!moveAnim || enemyAttackPresentationPending() || playerProjectileDodges.length > 0 || rareStampedeAnims.length > 0 || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0 || fireballAnims.length > 0 || ArtifactGeomancy.earthmawAnimating()
   }
 
   // A single shared rAF loop drives every in-progress animation. Having one loop
@@ -14363,6 +14516,7 @@ more difficult:
         for (let x=vision.x;x<vision.x+vision.size;x++) undergroundVisible.add(keyXY(x,y))
     } else currentSurfaceTowerFov()
     const visibleAt = vision ? (x,y)=>undergroundVisible.has(keyXY(x,y)) : undergroundTileVisible
+    const pressFrame=vision ? null : ArtifactGeomancy.stonepressFrame(now)
     const distantTowerRoof = towerShowsSummit()
     const mineRadialTerrain = !vision && USE_TILE_IMAGES && !!Mining.activeLevel()
     const mountainSpringTiles = USE_TILE_IMAGES && currentZ>=0 &&
@@ -14450,7 +14604,9 @@ more difficult:
           drawTile(px, py, RENDER_STYLE.specialTiles.outOfBounds.glyph, TILE.water.color, TILE.water.bg)
           continue
         }
-        const tileKey = (surfaceTowerCell && distantTowerRoof ? towerLevels[3].map[my][mx] : terrainSource[my]?.[mx]) || 'crypt2floor'
+        let tileKey = (surfaceTowerCell && distantTowerRoof ? towerLevels[3].map[my][mx] : terrainSource[my]?.[mx]) || 'crypt2floor'
+        if (pressFrame && tileKey==='boulder' && mx===pressFrame.slide.x && my===pressFrame.slide.y)
+          tileKey=pressFrame.slide.underlay
         const t = TILE[tileKey] || TILE.cavewall || TILE.grass
         const px = Math.round((mx - camX) * TILE_PX)
         const py = Math.round((my - camY) * TILE_PX)
@@ -14680,6 +14836,39 @@ more difficult:
         }
       }
     }
+    const inscribedRune=ArtifactGeomancy.runeAtCurrentLevel()
+    if (inscribedRune && undergroundTileVisible(inscribedRune.x,inscribedRune.y)) {
+      const px=Math.round((inscribedRune.x-camX)*TILE_PX)
+      const py=Math.round((inscribedRune.y-camY)*TILE_PX)
+      if(px>=-TILE_PX && py>=-TILE_PX && px<=canvas.width && py<=canvas.height){
+        ctx.save()
+        ctx.fillStyle='#b68ccb';ctx.strokeStyle='#633e80'
+        ctx.lineWidth=Math.max(1,TILE_PX*.045)
+        ctx.beginPath();ctx.arc(px+TILE_PX*.5,py+TILE_PX*.5,TILE_PX*.23,0,Math.PI*2)
+        ctx.fill();ctx.stroke()
+        ctx.fillStyle='#321746'
+        ctx.font=`${Math.max(9,Math.round(TILE_PX*.28))}px serif`
+        ctx.textAlign='center';ctx.textBaseline='middle'
+        ctx.fillText('ᚱ',px+TILE_PX*.5,py+TILE_PX*.5)
+        ctx.restore()
+      }
+    }
+    // Transient ground-vibration markers reveal positions, never identity or
+    // statistics. These do not change FOV or the discovered map.
+    for (const p of ArtifactGeomancy.soundingTraces()) {
+      const vx=Math.round((p.x-camX)*TILE_PX),vy=Math.round((p.y-camY)*TILE_PX)
+      if (vx < 0 || vy < 0 || vx >= canvas.width || vy >= canvas.height) continue
+      ctx.save()
+      ctx.strokeStyle='#d6ba8a'
+      ctx.lineWidth=Math.max(1.5,TILE_PX*0.07)
+      ctx.beginPath()
+      ctx.arc(vx+TILE_PX/2,vy+TILE_PX/2,TILE_PX*0.30,0,Math.PI*2)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(vx+TILE_PX/2,vy+TILE_PX/2,TILE_PX*0.10,0,Math.PI*2)
+      ctx.fillStyle='#e5d3a9';ctx.fill()
+      ctx.restore()
+    }
     if (vision) {
       for (const e of ArtifactWayfaring.farsightEnemies()) {
         const px=(e.x-camX)*TILE_PX, py=(e.y-camY)*TILE_PX
@@ -14698,6 +14887,7 @@ more difficult:
       return
     }
     drawEnemyTelegraphWarnings(undergroundVisible)
+    ArtifactGeomancy.drawAftershockWarnings(undergroundVisible)
     // fx animations: symbol bumps up/down, shrinks, and fades out
     if (fxAnims.length) {
       for (let i = fxAnims.length - 1; i >= 0; i--) {
@@ -14769,10 +14959,29 @@ more difficult:
         ctx.restore()
       }
     }
+    if (pressFrame && visibleAt(Math.round(pressFrame.x),Math.round(pressFrame.y))) {
+      const px=Math.round((pressFrame.x-camX)*TILE_PX)
+      const py=Math.round((pressFrame.y-camY)*TILE_PX)
+      const origin=pressFrame.slide.steps[0]
+      const visual=terrainVisual('boulder',origin.fromX,origin.fromY)
+      ctx.save()
+      if (!(USE_TILE_IMAGES && visual && drawImageVisual(px,py,visual)))
+        drawCreature(px,py,TILE.boulder.ch,TILE.boulder.color)
+      ctx.restore()
+    }
+    // Mark the occupied burial cell until the creature emerges.
+    for (const e of renderLevelObjects('enemies')) {
+      if (!ArtifactGeomancy.buried(e) || ArtifactGeomancy.hidingEarthmawMound(e) || !undergroundTileVisible(e.x,e.y)) continue
+      const px=Math.round((e.x-camX)*TILE_PX),py=Math.round((e.y-camY)*TILE_PX)
+      if (px<-TILE_PX || py<-TILE_PX || px>canvas.width || py>canvas.height) continue
+      ctx.save()
+      drawRuptureCracks(px,py)
+      ctx.restore()
+    }
     // Gather animated enemy positions, then tint before drawing any glyphs.
     const visibleEnemies = []
     for (const e of renderLevelObjects('enemies')) {
-      if (!e.alive) continue
+      if (!e.alive || ArtifactGeomancy.buried(e)) continue
       let ex = e.x, ey = e.y
       const charge = e.chargeAnim
       const haste = e.hasteAnim
@@ -14809,6 +15018,15 @@ more difficult:
           const target = e.attackVisualTargets?.get(start)
           ex = e.x + ((target?.x ?? charge?.targetX ?? player.x) - e.x) * lunge
           ey = e.y + ((target?.y ?? charge?.targetY ?? player.y) - e.y) * lunge
+        }
+      }
+      if (pressFrame) {
+        const {slide,index,t}=pressFrame
+        const nextPush=slide.steps.slice(index).find(step=>step.victim===e && step.push)
+        if (nextPush) {
+          const offset=nextPush===slide.steps[index] ? t : 0
+          ex=nextPush.toX+(nextPush.toX-nextPush.fromX)*offset
+          ey=nextPush.toY+(nextPush.toY-nextPush.fromY)*offset
         }
       }
       if (charge && now >= charge.start + charge.duration + 220) e.chargeAnim = undefined
@@ -14893,7 +15111,7 @@ more difficult:
         ctx.restore()
       }
 
-      if (enemyImmunityActive(e)) {
+      if (enemyImmunityActive(e) && !ArtifactGeomancy.petrified(e)) {
         // Persistent violet rune makes the protection visible on the map in
         // both tile and ASCII modes, not only in the combat log/inspection.
         ctx.save()
@@ -15152,6 +15370,7 @@ more difficult:
     // Draw after the player and enemies, above their sprites and tree canopy.
     drawSpiderWebOverlay(now, viewPlayerX, viewPlayerY)
     drawEnemyTelegraphWarnings(undergroundVisible,true)
+    ArtifactGeomancy.drawEarthmawCast(now,undergroundVisible)
     if (currentZ !== 0) {
       const depthRect = depthLabelRect()
       ctx.save()
@@ -15477,34 +15696,35 @@ more difficult:
       ${(e.artifactBlindAtkPenalty > 0 || e.artifactBlindAggroPenalty) ? `<div class="pfx">Blinded · ${Math.round(e.artifactBlindAtkPenalty || 0)} ATK lost${e.artifactBlindAggroPenalty ? ', −1 AGGRO' : ''}</div>` : ''}
       ${e.fearTurns > 0 ? `<div class="pfx" style="color:#d99bff">Frightened · ${e.fearTurns} turns</div>` : ''}
       ${e.artifactPetrified ? '<div class="pfx">Petrified · next action lost</div>' : ''}
+      ${ArtifactGeomancy.petrified(e) ? `<div class="pfx">Stone statue · ${e.geomancyPetrifiedUntil-turnCount} turns</div>` : ''}
       ${(e.artifactSilencedUntilTurn || 0) > turnCount ? `<div class="pfx">Silenced · ${e.artifactSilencedUntilTurn-turnCount} turns</div>` : ''}
       ${(e.artifactConfusedUntilTurn || 0) > turnCount ? `<div class="pfx">Confused · ${e.artifactConfusedUntilTurn-turnCount} turns</div>` : ''}
       ${e.artifactDisarmed ? '<div class="pfx">Disarmed</div>' : ''}
       ${enemyHasAbility(e, 'deathShield') ? `<div class="pfx">Death Shield · ${e.deathShieldUsed ? 'spent' : 'ready'}</div>` : ''}
-      ${enemyHasAbility(e, 'immunity') ? `<div class="pfx" style="color:#c7a5f6">Immunity · ${enemyImmunityActive(e) ? `${e.immunityUntilTurn - turnCount} turns` : e.immunityUsed ? 'spent' : 'ready'}</div>` : ''}
-      ${enemyHasAbility(e, 'lowHpTeleport') ? `<div class="pfx">Low-HP Teleport · ${e.lowHpTeleportUsed ? 'used' : 'ready below 25% HP'}</div>` : ''}
-      ${enemyHasAbility(e, 'sacrifice') ? '<div class="pfx">Sacrifice · below 50% HP</div>' : ''}
-      ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">Wrestler · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
-      ${enemyHasAbility(e, 'root') ? `<div class="pfx">Root · ${turnCount >= e.rootReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
+      ${enemyHasAbility(e, 'immunity') ? `<div class="pfx" style="color:#c7a5f6">${enemyAbilityDisplayName('immunity')} · ${enemyImmunityActive(e) ? `${e.immunityUntilTurn - turnCount} turns` : e.immunityUsed ? 'spent' : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'lowHpTeleport') ? `<div class="pfx">${enemyAbilityDisplayName('lowHpTeleport')} · ${e.lowHpTeleportUsed ? 'used' : 'ready below 25% HP'}</div>` : ''}
+      ${enemyHasAbility(e, 'sacrifice') ? `<div class="pfx">${enemyAbilityDisplayName('sacrifice')} · below 50% HP</div>` : ''}
+      ${enemyHasAbility(e, 'wrestler') ? `<div class="pfx">${enemyAbilityDisplayName('wrestler')} · ${turnCount >= e.wrestleReadyTurn ? 'ready' : `cooldown ${Math.max(1, e.wrestleReadyTurn - turnCount - 1)}t`}</div>` : ''}
+      ${enemyHasAbility(e, 'root') ? `<div class="pfx">${enemyAbilityDisplayName('root')} · ${turnCount >= e.rootReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
       ${enemyHasAbility(e, 'blind') ? '<div class="pfx">Blind</div>' : ''}
       ${e.adaptiveEventId === 'uninvited_guest' ? `<div class="pfx" style="color:${e.guestDisposition === 'friendly' ? '#a5e0ac' : '#e88469'}">${e.guestDisposition === 'friendly' ? 'Offers a cooked meal · use Forage when adjacent' : e.guestDisposition === 'warning' ? 'Drawn blade · one turn to retreat' : 'Hostile traveler'}</div>` : ''}
       ${e.adaptiveEventId === 'mushroom_prophet' ? `<div class="pfx" style="color:#c9bf83">Prophecy · ${Number.isInteger(e.prophetWarnedAtTurn) ? e.prophetWarnedAtTurn === turnCount ? 'one turn to retreat' : 'hostile' : 'waiting to speak'}</div>` : ''}
-      ${enemyHasAbility(e, 'rupture') ? `<div class="pfx" style="color:#ffcc61">Rupture · ${e.pendingAbility?.type==='rupture' ? 'warning active' : enemyAbilityCooldown(e,'rupture') ? `cooldown ${enemyAbilityCooldown(e,'rupture')}t` : 'ready'}</div>` : ''}
-      ${enemyHasAbility(e, 'burrow') ? `<div class="pfx">Burrow · ${e.pendingAbility?.type==='burrow' ? 'underground' : enemyAbilityCooldown(e,'burrow') ? `cooldown ${enemyAbilityCooldown(e,'burrow')}t` : 'ready'}</div>` : ''}
-      ${enemyHasAbility(e, 'jump') ? `<div class="pfx">Jump · ${e.pendingAbility?.type==='jump' ? 'preparing' : enemyAbilityCooldown(e,'jump') ? `cooldown ${enemyAbilityCooldown(e,'jump')}t` : 'ready'}</div>` : ''}
-      ${enemyHasAbility(e, 'wallAmbush') ? `<div class="pfx">Wall Ambush · ${e.wallAmbushSpent ? 'revealed' : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'rupture') ? `<div class="pfx" style="color:#ffcc61">${enemyAbilityDisplayName('rupture')} · ${e.pendingAbility?.type==='rupture' ? 'warning active' : enemyAbilityCooldown(e,'rupture') ? `cooldown ${enemyAbilityCooldown(e,'rupture')}t` : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'burrow') ? `<div class="pfx">${enemyAbilityDisplayName('burrow')} · ${e.pendingAbility?.type==='burrow' ? 'underground' : enemyAbilityCooldown(e,'burrow') ? `cooldown ${enemyAbilityCooldown(e,'burrow')}t` : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'jump') ? `<div class="pfx">${enemyAbilityDisplayName('jump')} · ${e.pendingAbility?.type==='jump' ? 'preparing' : enemyAbilityCooldown(e,'jump') ? `cooldown ${enemyAbilityCooldown(e,'jump')}t` : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'wallAmbush') ? `<div class="pfx">${enemyAbilityDisplayName('wallAmbush')} · ${e.wallAmbushSpent ? 'revealed' : 'ready'}</div>` : ''}
       ${enemyHasAbility(e, 'collectiveMind') ? `<div class="pfx">Collective Mind · ${e.collectiveMindRetreat ? 'regrouping' : collectiveMindFloors[collectiveMindFloorKey(e)]?.secured ? 'alert secured' : collectiveMindAlertActive(e) ? 'alert sent' : collectiveMindFloors[collectiveMindFloorKey(e)]?.spent ? 'alert canceled' : 'ready'}</div>` : ''}
-      ${enemyHasAbility(e, 'petrifyingGaze') ? `<div class="pfx">Petrifying Gaze · ${turnCount >= e.gazeReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
-      ${enemyHasAbility(e, 'wail') ? `<div class="pfx">Wail · ${turnCount >= e.wailReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
-      ${enemyHasAbility(e, 'mummyCurse') ? '<div class="pfx">Curse · −2 ATK</div>' : ''}
+      ${enemyHasAbility(e, 'petrifyingGaze') ? `<div class="pfx">${enemyAbilityDisplayName('petrifyingGaze')} · ${turnCount >= e.gazeReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
+      ${enemyHasAbility(e, 'wail') ? `<div class="pfx">${enemyAbilityDisplayName('wail')} · ${turnCount >= e.wailReadyTurn ? 'ready' : 'cooldown'}</div>` : ''}
+      ${enemyHasAbility(e, 'mummyCurse') ? `<div class="pfx">${enemyAbilityDisplayName('mummyCurse')} · −2 ATK</div>` : ''}
       ${enemyHasAbility(e, 'swim') ? '<div class="pfx">Swimming</div>' : ''}
-      ${enemyHasAbility(e, 'haste') ? `<div class="pfx">Haste · ${turnCount >= e.hasteReadyTurn ? 'ready' : `cooldown ${e.hasteReadyTurn - turnCount}t`}</div>` : ''}
-      ${enemyHasAbility(e, 'consumeHealingItem') ? `<div class="pfx">Consumable healing · ${e.consumableHealUsed ? 'spent' : 'ready below 50% HP'}</div>` : ''}
-      ${enemyHasAbility(e, 'healSelf') ? `<div class="pfx">HealSelf · ${e.healSelfUsed ? 'used' : 'ready at low HP'}</div>` : ''}
+      ${enemyHasAbility(e, 'haste') ? `<div class="pfx">${enemyAbilityDisplayName('haste')} · ${turnCount >= e.hasteReadyTurn ? 'ready' : `cooldown ${e.hasteReadyTurn - turnCount}t`}</div>` : ''}
+      ${enemyHasAbility(e, 'consumeHealingItem') ? `<div class="pfx">${enemyAbilityDisplayName('consumeHealingItem')} · ${e.consumableHealUsed ? 'spent' : 'ready below 50% HP'}</div>` : ''}
+      ${enemyHasAbility(e, 'healSelf') ? `<div class="pfx">${enemyAbilityDisplayName('healSelf')} · ${e.healSelfUsed ? 'used' : 'ready at low HP'}</div>` : ''}
       ${enemyHasAbility(e, 'exposed') ? `<div class="pfx" style="color:#ffbb71">Exposed · ${enemyExposed(e) ? 'DEF reduced until next action' : 'after melee attack'}</div>` : ''}
-      ${enemyHasAbility(e, 'shellRetreat') ? `<div class="pfx" style="color:#b2d4e8">Shell Retreat · ${enemyShellRetreating(e) ? `${Math.min(e.shellRetreatTurns,ENEMY_DEFENSE_CONFIG.shellRetreat.durationTurns)} turns, +${Math.round(ENEMY_DEFENSE_CONFIG.shellRetreat.defBonus)} DEF` : e.shellRetreatUsed ? 'spent' : 'ready below 40% HP'}</div>` : ''}
+      ${enemyHasAbility(e, 'shellRetreat') ? `<div class="pfx" style="color:#b2d4e8">${enemyAbilityDisplayName('shellRetreat')} · ${enemyShellRetreating(e) ? `${Math.min(e.shellRetreatTurns,ENEMY_DEFENSE_CONFIG.shellRetreat.durationTurns)} turns, +${Math.round(ENEMY_DEFENSE_CONFIG.shellRetreat.defBonus)} DEF` : e.shellRetreatUsed ? 'spent' : 'ready below 40% HP'}</div>` : ''}
       ${enemyHasAbility(e, 'regen') ? `<div class="pfx" style="color:#82e49b">Regen · +${Math.round(ENEMY_DEFENSE_CONFIG.regen.healAmount)} HP every ${ENEMY_DEFENSE_CONFIG.regen.intervalTurns} turns</div>` : ''}
-      ${enemyHasAbility(e, 'invisibility') ? `<div class="pfx">Invisibility · ${enemyInvisibleActive(e) ? `${e.invisibleUntilTurn - turnCount}t remaining` : turnCount < e.invisibilityReadyTurn ? `cooldown ${e.invisibilityReadyTurn - turnCount}t` : 'ready'}</div>` : ''}
+      ${enemyHasAbility(e, 'invisibility') ? `<div class="pfx">${enemyAbilityDisplayName('invisibility')} · ${enemyInvisibleActive(e) ? `${e.invisibleUntilTurn - turnCount}t remaining` : turnCount < e.invisibilityReadyTurn ? `cooldown ${e.invisibilityReadyTurn - turnCount}t` : 'ready'}</div>` : ''}
       ${e.prefix !== 'Champion' && inspiringChampionFor(e) ? '<div class="pfx" style="color:#ebcc69">Inspired · +2 ATK, +1 DEF</div>' : ''}
       ${terrainHtml}
       ${e.sleeping ? '<div class="pfx">Sleeping · AGGRO ×0.5 · grounded</div>' : ''}
@@ -16710,6 +16930,7 @@ more difficult:
     element.className = 'val' + (tier !== null ? ' ' + tierColorClass(tier) : '')
     element.textContent = item ? artifactDisplayName(item) : fallback
     if (item?.venomCoated) element.appendChild(venomMarker())
+    if(item?.geomancyAegis)element.textContent+=' • Aegis charged'
     const line = item && itemStatLine(item)
     if (line) {
       const details = document.createElement('span')
@@ -16797,6 +17018,8 @@ more difficult:
       ? Math.min(below, window.innerHeight - height - margin) : above
     tooltip.style.top = `${Math.max(margin, top)}px`
   }
+
+  let geomancyChoosingIndex = -1 // UI-only; never affects RNG or a save
 
   function renderInventory() {
     consolidateConsumableStacks()
@@ -16989,7 +17212,8 @@ more difficult:
       nm.textContent = prefix + artifactDisplayName(it)
       if (it.venomCoated) nm.appendChild(venomMarker())
       const suffix = document.createElement('span')
-      suffix.textContent = countTag + (cookedFood ? '' : (line ? ' | ' + line : '')) + visibleItemTierTag(it)
+      suffix.textContent = countTag + (cookedFood ? '' : (line ? ' | ' + line : '')) +
+        (it.geomancyAegis ? ' | Aegis charged' : '') + visibleItemTierTag(it)
       nm.appendChild(suffix)
       if (cookedFood) {
         const detail = document.createElement('span')
@@ -17039,6 +17263,111 @@ more difficult:
             useBtn.onclick=()=>ITEM_ACTION_HANDLERS.wayfaringPower(idx)
             row.appendChild(useBtn)
           }
+          if (it.artifactSlot==='trinket' && ARTIFACT_ABILITIES.domains.geomancy.includes(it.abilityId) &&
+              ARTIFACT_ABILITIES.abilities[it.abilityId]?.enabled &&
+              ARTIFACT_ABILITIES.abilities[it.abilityId]?.active) {
+            if(it.abilityId==='spell_cairn') {
+              const slots=ArtifactGeomancy.cairnSlots(it)
+              const remaining=ArtifactGeomancy.cooldownRemaining(it.abilityId)
+              // The inventory row stays compact even when carrying many scrolls.
+              // Exact contents are available from Inspect and on hover.
+              const contents=slots.map(p=>p.kind==='homecomingscroll'?'Homecoming':
+                p.kind==='wayfaringscroll'?'Wayfaring':
+                (itemDefinition(p.kind)?.name || p.kind).replace(/^Scroll of /,''))
+              const status=document.createElement('span')
+              status.className='cairn-slot-state'
+              status.textContent=`${slots.length}/2${contents.length?' · '+contents.join(' → '):''}`
+              status.title=`Stored scrolls: ${contents.join(' → ') || 'none'}`
+              status.setAttribute('aria-label',status.title)
+              nm.appendChild(status)
+              if(slots.length<2) {
+                const compatible=ArtifactGeomancy.compatibleCairnScrolls(it)
+                if(compatible.length) {
+                  const picker=document.createElement('select')
+                  picker.className='cairn-scroll-picker'
+                  picker.setAttribute('aria-label','Choose scroll to store in Spell Cairn (costs one turn)')
+                  picker.title='Choose a scroll to store (costs one turn)'
+                  const placeholder=document.createElement('option')
+                  placeholder.value=''
+                  placeholder.textContent='+ Scroll'
+                  picker.appendChild(placeholder)
+                  for(const scroll of compatible) {
+                    const option=document.createElement('option')
+                    option.value=String(player.inventory.indexOf(scroll))
+                    option.textContent=artifactDisplayName(scroll)
+                    picker.appendChild(option)
+                  }
+                  picker.value=''
+                  picker.onchange=()=>{
+                    if(picker.value==='')return
+                    const scroll=player.inventory[Number(picker.value)]
+                    if(!scroll)return
+                    ensureReplayItemIds()
+                    ITEM_ACTION_HANDLERS.geomancyPower(idx,{op:'load',scrollReplayId:scroll.replayId})
+                  }
+                  row.appendChild(picker)
+                }
+              }
+              if(slots.length) {
+                const release=document.createElement('button')
+                release.textContent=remaining?`Release (${remaining})`:'Release'
+                release.disabled=remaining>0
+                release.onclick=()=>ITEM_ACTION_HANDLERS.geomancyPower(idx,{op:'release'})
+                row.appendChild(release)
+              }
+            } else {
+            const useBtn=document.createElement('button'),remaining=ArtifactGeomancy.cooldownRemaining(it.abilityId)
+            useBtn.textContent=remaining?`Use (${remaining})`: 'Use'
+            useBtn.disabled=remaining>0
+            useBtn.onclick=()=>{
+              if(['stone_circle','stonepress','runic_fuse','runebound_aegis'].includes(it.abilityId)) {
+                geomancyChoosingIndex=geomancyChoosingIndex===idx?-1:idx
+                renderInventory()
+              } else ITEM_ACTION_HANDLERS.geomancyPower(idx)
+            }
+            row.appendChild(useBtn)
+            if (['runic_fuse','runebound_aegis'].includes(it.abilityId) &&
+                geomancyChoosingIndex===idx && !remaining) {
+              ensureReplayItemIds()
+              for(const scroll of ArtifactGeomancy.eligibleScrolls(it.abilityId)) {
+                const btn=document.createElement('button')
+                btn.textContent=`Inscribe ${artifactDisplayName(scroll)}`
+                btn.onclick=()=>{geomancyChoosingIndex=-1;ITEM_ACTION_HANDLERS.geomancyPower(idx,
+                  {op:'inscribe',scrollReplayId:scroll.replayId})}
+                row.appendChild(btn)
+              }
+              const cancel=document.createElement('button')
+              cancel.textContent='×';cancel.title='Cancel without using a turn'
+              cancel.onclick=()=>{geomancyChoosingIndex=-1;renderInventory()}
+              row.appendChild(cancel)
+            }
+            if (['stone_circle','stonepress'].includes(it.abilityId) && geomancyChoosingIndex===idx && !remaining) {
+              // Directions are ordinary inventory buttons: touch-friendly,
+              // no native prompt or unreplayable keyboard state.
+              const directions = new Map([['-1,-1','↖'],['0,-1','↑'],['1,-1','↗'],
+                ['-1,0','←'],['1,0','→'],['-1,1','↙'],['0,1','↓'],['1,1','↘']])
+              for(const direction of (it.abilityId==='stone_circle' ?
+                ArtifactGeomancy.availableCircleDirections() : ArtifactGeomancy.availablePressDirections())) {
+                const dirBtn=document.createElement('button')
+                dirBtn.textContent=directions.get(direction.join(','))
+                dirBtn.title=it.abilityId==='stone_circle' ? 'Leave an opening in this direction' : 'Push the boulder in this direction'
+                dirBtn.setAttribute('aria-label',
+                  (it.abilityId==='stone_circle'?'Stone Circle opening ':'Stonepress direction ')+direction.join(','))
+                dirBtn.type='button'
+                dirBtn.onclick=event=>{
+                  event.stopPropagation()
+                  geomancyChoosingIndex=-1
+                  ITEM_ACTION_HANDLERS.geomancyPower(idx,direction)
+                }
+                row.appendChild(dirBtn)
+              }
+              const cancel=document.createElement('button')
+              cancel.textContent='×';cancel.title='Cancel without using a turn'
+              cancel.onclick=()=>{geomancyChoosingIndex=-1;renderInventory()}
+              row.appendChild(cancel)
+            }
+            }
+          }
 
           // Equippable artifacts also get an Equip button.
           if (it.artifactSlot && it.artifactSlot !== 'trinket') {
@@ -17066,11 +17395,11 @@ more difficult:
         btn.onclick = () => ITEM_ACTION_HANDLERS.dropItem(idx)
         row.appendChild(btn)
       }
-      const buttons = [...row.querySelectorAll('button')]
-      if (buttons.length) {
+      const controls = [...row.querySelectorAll('button, select.cairn-scroll-picker')]
+      if (controls.length) {
         const actions = document.createElement('span')
         actions.className = 'inventory-actions'
-        buttons.forEach(button => actions.appendChild(button))
+        controls.forEach(control => actions.appendChild(control))
         row.appendChild(actions)
       }
       list.appendChild(row)
@@ -17124,7 +17453,7 @@ more difficult:
       for (const id of artifactAbilityPool({kind:'artifact',artifactSlot:'trinket',noun,tier:effect.tier})) {
         const key = `trinket:${id}`
         if (represented.has(key)) continue
-        const item = makeWayfaringTrinket(noun,effect,0,id)
+        const item = makeArtifactTrinket(noun,effect,0,id)
         item.replayId = `god_artifact:trinket:${noun}:${id}`
         stock.push(item)
         represented.add(key)
@@ -17375,14 +17704,14 @@ more difficult:
     list.innerHTML = ''
     const sellable = []
     player.inventory.forEach((it, idx) => {
-      if (itemSellValue(it) > 0 && tradeItemMatchesFilter(it, tradeFilters.sell)) sellable.push({it, idx})
+      if (!ArtifactGeomancy.boundCairn(it) && itemSellValue(it) > 0 && tradeItemMatchesFilter(it, tradeFilters.sell)) sellable.push({it, idx})
     })
     if (sellable.length === 0) {
       const d = document.createElement('div')
       d.className = 'invitem'
       const nm = document.createElement('span')
       nm.className = 'nm empty-message'
-      nm.textContent = player.inventory.some(it => itemSellValue(it) > 0)
+      nm.textContent = player.inventory.some(it => !ArtifactGeomancy.boundCairn(it) && itemSellValue(it) > 0)
         ? 'No items in this category.' : 'You have nothing worth selling.'
       d.appendChild(nm)
       list.appendChild(d)
@@ -17462,6 +17791,7 @@ more difficult:
   }
 
   function sellItem(idx, all = false) {
+    if(ArtifactGeomancy.boundCairn(player.inventory[idx]))return
     ensureReplayItemIds()
     const it = player.inventory[idx]
     if (!it) return
@@ -17816,38 +18146,42 @@ more difficult:
     it.count = (it.count || 1) - 1
     if (it.count <= 0) player.inventory.splice(idx, 1)
     AdaptivePlayerTrolling.onScrollUsed('scrollOfInvisibility')
-    player.invisibleTurns = itemEffectPower('scrollOfInvisibility', itemDefinition('scrollOfInvisibility').effect.durationTurns)
-    log('You read the Scroll of Invisibility. The shadows swallow you.', 'good')
+    resolveScrollEffect({kind:'scrollOfInvisibility'},{source:'read'})
     consumeItemTurn()
   }
 
+  function commitHomecomingEffect(responsive = false, source = 'read') {
+    const destination={x:player.x,y:player.y,z:currentZ,
+      levelKind:currentLevelKind(),caveIndex:currentCave}
+    const owned=ArtifactGeomancy.carriedWayfaring()
+    // A Wayfaring stored inside any Cairn retains its loaded destination.
+    // Never create a second instance just because the loose inventory is empty.
+    if(owned?.item)owned.item.destination=destination
+    else if(!owned)carryItem(createItem('wayfaringscroll',{destination}))
+    log(source==='cairn' ? 'Homecoming returns you to the Temple.' :
+      'You read the Scroll of Homecoming. Darkness swallows you - and the temple takes you back.', 'good')
+    return returnPlayerToTemple(responsive)
+  }
+
   function useHomecomingScroll(idx, responsive = false) {
-    if (surfaceCatchupBusy) return
-    const it = player.inventory[idx]
-    if (!it || it.kind !== 'homecomingscroll') return
-    const blocker = ArtifactWayfaring.homecomingBlocker()
-    if (blocker) {
-      const source = playerKnowsArtifactAbility(blocker) ? ARTIFACT_ABILITIES.abilities[blocker].name : 'A strange power'
-      log(`${source} prevents you from reading the Scroll of Homecoming.`, 'info')
+    if(surfaceCatchupBusy)return
+    const it=player.inventory[idx]
+    if(!it || it.kind!=='homecomingscroll')return
+    const blocker=ArtifactWayfaring.homecomingBlocker()
+    if(blocker) {
+      log(`${playerKnowsArtifactAbility(blocker) ? ARTIFACT_ABILITIES.abilities[blocker].name : 'A strange power'} prevents you from reading the Scroll of Homecoming.`, 'info')
       return
     }
-    if (!canUseItemsWhileSwimming()) return
-    ensureReplayItemIds(); const scope = recordReplayAction({type:'useItem', action:'homecomingscroll', idx, replayId:player.inventory[idx]?.replayId})
-    const destination = {x:player.x, y:player.y, z:currentZ,
-      levelKind:currentLevelKind(), caveIndex:currentCave}
-    // One return journey can be pending. A new Homecoming replaces its
-    // destination, not a second independent teleport anchor.
-    const returnScroll = player.inventory.find(item => item.kind === 'wayfaringscroll')
-    it.count = (it.count || 1) - 1
-    if (it.count <= 0) player.inventory.splice(idx, 1)
-    if (returnScroll) returnScroll.destination = destination
-    else player.inventory.push(createItem('wayfaringscroll', {destination}))
+    if(!canUseItemsWhileSwimming())return
+    ensureReplayItemIds()
+    const scope=recordReplayAction({type:'useItem',action:'homecomingscroll',idx,replayId:it.replayId})
+    it.count=(it.count||1)-1
+    if(it.count<=0)player.inventory.splice(idx,1)
     AdaptivePlayerTrolling.onScrollUsed('homecomingscroll')
-    log('You read the Scroll of Homecoming. Darkness swallows you - and the temple takes you back.', 'good')
-    const finish = () => { toggleInv(false); consumeItemTurn() }
-    const catchup = returnPlayerToTemple(responsive)
-    if (catchup?.then) return catchup.then(finish).finally(() => finishRecordedReplayAction(scope))
-    finish()
+    const finish=()=>{toggleInv(false);consumeItemTurn()}
+    const catchup=commitHomecomingEffect(responsive)
+    if(catchup?.then)return catchup.then(finish).finally(()=>finishRecordedReplayAction(scope))
+    try {return finish()}finally {finishRecordedReplayAction(scope)}
   }
 
   function wayfaringDestination(item) {
@@ -17876,29 +18210,15 @@ more difficult:
     return {d,terrain,seen}
   }
 
-  function useWayfaringScroll(idx, responsive = false) {
-    if (surfaceCatchupBusy) return
-    const it=player.inventory[idx]
-    if (!it || it.kind!=='wayfaringscroll' || !canUseItemsWhileSwimming()) return
-    const target=wayfaringDestination(it)
-    if (!target) { log('The way back is obstructed. The scroll remains intact.', 'info'); return }
+  function commitWayfaringEffect(item, responsive = false, source = 'read') {
+    const target=wayfaringDestination(item)
+    if(!target)return false
     const {d,terrain,seen}=target
-    const departureZ=currentZ, departureKind=currentLevelKind(), departureCave=currentCave
+    const departureZ=currentZ,departureKind=currentLevelKind(),departureCave=currentCave
     const changedFloor=d.z!==departureZ || d.levelKind!==departureKind
-    const fromX=player.x, fromY=player.y
-    if (!changedFloor && d.x===fromX && d.y===fromY) {
-      log('You are already at the place the scroll remembers.', 'info'); return
-    }
-    // The landing resolver is deterministic, and failed searches have no
-    // effects. Never spend the scroll or move the player to a substitute tile.
-    if (!clearTransitionLanding(d,terrain,d.levelKind)) {
-      log('The way back is obstructed. The scroll remains intact.', 'info'); return
-    }
-    ensureReplayItemIds()
-    const scope=recordReplayAction({type:'useItem',action:'wayfaringscroll',idx,replayId:it.replayId})
-    player.inventory.splice(idx,1)
-    // This derivative scroll is not eligible for merchant scroll resupply.
-    AdaptivePlayerTrolling.onScrollUsed('wayfaringscroll')
+    const fromX=player.x,fromY=player.y
+    if(!changedFloor && d.x===fromX && d.y===fromY)return false
+    if(!clearTransitionLanding(d,terrain,d.levelKind))return false
     currentZ=d.z;currentCave=d.caveIndex;map=terrain;undergroundDiscovered=seen
     player.x=d.x;player.y=d.y
     markPlayerPositionChanged(false,true)
@@ -17912,18 +18232,38 @@ more difficult:
       spawnUnseenBestiaryEncounter()
       AdaptivePlayerTrolling.onFloorChanged({fromZ:departureZ,fromKind:departureKind,fromCave:departureCave})
     }
-    log('You read the Scroll of Wayfaring. The familiar world folds around you.', 'good')
+    log(source==='cairn'?'Wayfaring carries you to the remembered place.':
+      'You read the Scroll of Wayfaring. The familiar world folds around you.', 'good')
     const finish=()=>{
-      toggleInv(false)
-      // Entering a trigger by magic still activates it; do not grant a free
-      // step or automatically activate stairs, doors or other interactions.
       DungeonTraps.onEntry(player,changedFloor?-1:fromX,changedFloor?-1:fromY)
-      if(player.hp>0 && !deathTransition)DungeonHazards.onActorEntered(player,changedFloor?-1:fromX,changedFloor?-1:fromY)
-      if(player.hp>0 && !deathTransition)consumeItemTurn()
+      if(player.hp>0 && !deathTransition)
+        DungeonHazards.onActorEntered(player,changedFloor?-1:fromX,changedFloor?-1:fromY)
+      return true
     }
     const catchup=updateSurfaceAbsence(departureZ,responsive)
+    return catchup?.then ? catchup.then(finish) : finish()
+  }
+
+  function useWayfaringScroll(idx, responsive = false) {
+    if(surfaceCatchupBusy)return
+    const it=player.inventory[idx]
+    if(!it || it.kind!=='wayfaringscroll' || !canUseItemsWhileSwimming())return
+    const target=wayfaringDestination(it)
+    if(!target || (it.destination.z===currentZ &&
+      it.destination.levelKind===currentLevelKind() &&
+      it.destination.x===player.x && it.destination.y===player.y) ||
+      !clearTransitionLanding(it.destination,target.terrain,it.destination.levelKind,true)) {
+      log('The way back is obstructed. The scroll remains intact.', 'info')
+      return
+    }
+    ensureReplayItemIds()
+    const scope=recordReplayAction({type:'useItem',action:'wayfaringscroll',idx,replayId:it.replayId})
+    player.inventory.splice(idx,1)
+    AdaptivePlayerTrolling.onScrollUsed('wayfaringscroll')
+    const finish=()=>{toggleInv(false);consumeItemTurn()}
+    const catchup=commitWayfaringEffect(it,responsive)
     if(catchup?.then)return catchup.then(finish).finally(()=>finishRecordedReplayAction(scope))
-    try{return finish()}finally{finishRecordedReplayAction(scope)}
+    try {return finish()}finally {finishRecordedReplayAction(scope)}
   }
 
   function useStrangeGreenPotion(idx) {
@@ -18550,7 +18890,10 @@ more difficult:
     if (next) { closeNpcMenu(); cancelFireballTargeting() }
     if (next && mapOpen) toggleMap(false)
     if (next && bestiaryOpen) toggleBestiary(false)
-    if (!next) document.getElementById('invOverlay').classList.remove('character-sheet')
+    if (!next) {
+      geomancyChoosingIndex=-1
+      document.getElementById('invOverlay').classList.remove('character-sheet')
+    }
     invOpen = next
     document.getElementById('invOverlay').classList.toggle('show', invOpen)
     if (invOpen) renderInventory()
@@ -19276,6 +19619,7 @@ more difficult:
       player.characterId = Graveyard.newCharacterId()
       player.lastPositionChangeTurn = turnCount
       player.artifactBraveryCharge = false
+      player.groundingArmed = false
       player.artifactRiposteReady = false
       player.artifactRetributionStored = 0
       player.artifactBloodReservoirStored = 0
@@ -19350,6 +19694,7 @@ more difficult:
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
     player.wayfaring = ArtifactWayfaring.freshState()
+    ArtifactGeomancy.resetWorld()
     AdaptivePlayerTrolling.reset()
     // A newly generated world always begins on the surface, even when this
     // page previously loaded or played an underground/tower character. The
@@ -19455,7 +19800,6 @@ more difficult:
       Mimics.initialize()
       rotateGeneratedWorld(randInt(0, 3))
       initializeDwarvenCrates()
-      TowerMaze.guaranteeChaosScroll()
       player.x = spawnPoint.x
       player.y = spawnPoint.y
       // Decorations are hashed against final coordinates so regeneration is

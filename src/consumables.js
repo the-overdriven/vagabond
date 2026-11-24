@@ -72,18 +72,19 @@ function applyEnemyFear(enemy, duration) {
   return true
 }
 
-function applyFearScroll(effect) {
+function applyFearScroll(effect, context = {}) {
+  const origin = context.origin || player
   const duration = consumablePower(effect.durationTurns)
   // Expose dormant mimics before collecting victims of this same Fear cast.
-  Mimics.revealBySpell((x,y) => Math.max(Math.abs(x-player.x),Math.abs(y-player.y)) <= effect.radius)
+  Mimics.revealBySpell((x,y) => Math.max(Math.abs(x-origin.x),Math.abs(y-origin.y)) <= effect.radius)
   let affected = 0
   for (const enemy of enemies) {
     if (!enemy.alive || enemy.hp <= 0 || !onCurrentLevel(enemy) ||
-        enemy.tier < 1 || enemy.tier > effect.maxTier ||
-        Math.max(Math.abs(enemy.x - player.x), Math.abs(enemy.y - player.y)) > effect.radius) continue
+        ArtifactGeomancy.buried(enemy) || enemy.tier < 1 || enemy.tier > effect.maxTier ||
+        Math.max(Math.abs(enemy.x - origin.x), Math.abs(enemy.y - origin.y)) > effect.radius) continue
     if (applyEnemyFear(enemy, duration)) affected++
   }
-  log(affected ? `Terror seizes ${affected} creature${affected === 1 ? '' : 's'}!` : 'The scroll finds no creature it can frighten.', 'info')
+  log(affected ? `Terror seizes ${affected} creature${affected === 1 ? '' : 's'}!` : context.source==='read' ? 'The scroll finds no creature it can frighten.' : 'The spell finds no creature it can frighten.', 'info')
 }
 
 // Flood each movement class's connected component once per cast. Occupants do
@@ -113,29 +114,18 @@ function chaosReachable(actor, cache) {
   return seen
 }
 
-function applyChaosScroll(effect) {
-  const origin = {x: player.x, y: player.y}
-  const actors = [player, ...enemies.filter(e => e.alive && e.hp > 0 && onCurrentLevel(e) &&
+function applyChaosScroll(effect, context = {}) {
+  const origin = context.origin || {x: player.x, y: player.y}
+  const actors = [...(context.includePlayer===false ? [] : [player]),
+    ...enemies.filter(e => e.alive && e.hp > 0 && onCurrentLevel(e) &&
+    !ArtifactGeomancy.buried(e) &&
     Math.max(Math.abs(e.x - origin.x), Math.abs(e.y - origin.y)) <= effect.radius)]
   // Reserve original locations as well: a stranded actor always retains its tile.
   const reserved = new Set(enemies.filter(e => e.alive && onCurrentLevel(e)).map(e => keyXY(e.x, e.y)))
   reserved.add(keyXY(player.x, player.y))
   if (currentZ === 0) for (const npc of npcs) reserved.add(keyXY(npc.x, npc.y))
   const cache = new Map(), moves = []
-  // The Tower alone is an exception to Chaos connectivity. An exterior cast
-  // adjacent to masonry must land inside, even when its main door is sealed.
-  // If every safe interior destination is occupied, exchange places with an
-  // interior monster, resolving both actors in the same deterministic step.
-  const forced = TowerMaze.chaosTarget(origin, reserved)
-  const swappedActor = forced?.actor || null
-  if (forced) {
-    moves.push({actor:player,fromX:origin.x,fromY:origin.y,x:forced.x,y:forced.y})
-    if(swappedActor) moves.push({actor:swappedActor,fromX:forced.x,fromY:forced.y,
-      x:origin.x,y:origin.y})
-    reserved.add(keyXY(forced.x,forced.y))
-  }
   for (const actor of actors) {
-    if ((forced && actor===player) || actor===swappedActor) continue
     const reachable = chaosReachable(actor, cache), options = [], radius = effect.destinationRadius
     for (let y = Math.max(0, actor.y - radius); y <= Math.min(MAP_H - 1, actor.y + radius); y++)
       for (let x = Math.max(0, actor.x - radius); x <= Math.min(MAP_W - 1, actor.x + radius); x++) {
@@ -166,22 +156,62 @@ function applyChaosScroll(effect) {
       actor.forestConcealX = null; actor.forestConcealY = null
     }
   }
-  stopCameraAnimation(); stopAttackAnimation()
-  clearAutoPath(); pendingMove = null
-  resetSwimming()
-  invalidateUndergroundFov()
-  currentUndergroundFov()
-  minimapDirty = true
-  checkGroundAt(player.x, player.y)
-  log('Space twists. Everyone is scattered by chaos!', 'info')
+  // A completed Chaos swap is one atomic occupancy update. Traps may only
+  // fire once the destinations are fully reserved for all participants.
+  for (const move of moves) if (move.actor !== player && move.actor.alive)
+    ArtifactGeomancy.onEnemyEntered(move.actor,move.fromX,move.fromY)
+  // A rune which scrambles only enemies cannot interrupt swimming, camera,
+  // player auto-path, or pickup checks. Ordinary reads still update the view.
+  if (moves.some(m=>m.actor===player && (m.fromX!==m.x || m.fromY!==m.y))) {
+    stopCameraAnimation();stopAttackAnimation()
+    clearAutoPath();pendingMove=null;resetSwimming()
+    invalidateUndergroundFov();currentUndergroundFov()
+    minimapDirty=true;checkGroundAt(player.x,player.y)
+  }
+  log(moves.length ? 'Space twists. Creatures scatter in chaos!' :
+    'Space shudders, but nothing moves.', 'info')
+}
+
+// The scroll effect core is independent of inventory, turn count, cooldowns
+// and replay. Prepared runes/shields/cairns can reuse the same rules later.
+// Validation must never change RNG or world state.
+function validateScrollEffect(payload, context = {}) {
+  const kind=payload?.kind
+  if (kind==='scrollOfDeathShield') return {valid:!player.deathShieldReady,
+    reason:'Your death shield is already ready.'}
+  if (['scrollOfFear','scrollOfChaos','scrollOfInvisibility'].includes(kind))
+    return {valid:true}
+  if (kind==='scrollOfFireball') return {valid:Number.isInteger(context.x) &&
+    Number.isInteger(context.y) && (context.source==='rune'
+      ? !!map[context.y]?.[context.x] : validFireballTarget(context.x,context.y))}
+  return {valid:false,reason:'This scroll needs a different action.'}
+}
+
+function resolveScrollEffect(payload, context = {}) {
+  const validation=validateScrollEffect(payload,context)
+  if (!validation.valid) return {executed:false,blocked:true,reason:validation.reason}
+  const kind=payload.kind,effect=itemDefinition(kind).effect
+  if (kind==='scrollOfFear') applyFearScroll(effect,context)
+  else if (kind==='scrollOfChaos') applyChaosScroll(effect,context)
+  else if (kind==='scrollOfDeathShield') {
+    player.deathShieldReady=true
+    log('A death shield surrounds you.','good')
+    spawnDamageNumber(player.x,player.y,'Shield ready!','#a9d5ff')
+  } else if (kind==='scrollOfInvisibility') {
+    player.invisibleTurns=itemEffectPower(kind,effect.durationTurns)
+    log(context.source==='read' ? 'You read the Scroll of Invisibility. The shadows swallow you.' : 'The shadows swallow you.','good')
+  } else if (kind==='scrollOfFireball') return {executed:true,blocked:false,
+    ...resolveFireballEffect(context)}
+  else return {executed:false,blocked:true,reason:'A target is required.'}
+  return {executed:true,blocked:false}
 }
 
 function useTacticalConsumable(idx, kind) {
   const item = player.inventory[idx]
   if (!item || item.kind !== kind || !canUseItemsWhileSwimming()) return
-  if (kind === 'scrollOfDeathShield' && player.deathShieldReady) {
-    log('Your death shield is already ready.', 'info')
-    return
+  if (kind.startsWith('scrollOf')) {
+    const validation=validateScrollEffect({kind})
+    if(!validation.valid){if(validation.reason) log(validation.reason,'info');return}
   }
   ensureReplayItemIds()
   recordReplayAction({type: 'useItem', action: kind, idx, replayId: item.replayId})
@@ -190,12 +220,7 @@ function useTacticalConsumable(idx, kind) {
   if (kind.startsWith('scrollOf')) AdaptivePlayerTrolling.onScrollUsed(kind)
   else AdaptivePlayerTrolling.onPotionDrunk()
   const effect = itemDefinition(kind).effect
-  if (kind === 'scrollOfFear') applyFearScroll(effect)
-  else if (kind === 'scrollOfDeathShield') {
-    player.deathShieldReady = true
-    log('A death shield surrounds you.', 'good')
-    spawnDamageNumber(player.x, player.y, 'Shield ready!', '#a9d5ff')
-  } else if (kind === 'scrollOfChaos') applyChaosScroll(effect)
+  if (kind.startsWith('scrollOf')) resolveScrollEffect({kind},{source:'read'})
   else {
     const stone = kind === 'stoneSkinPotion'
     const stat = Math.max(0, stone ? playerDef(false, true) : playerAtk(false, true))

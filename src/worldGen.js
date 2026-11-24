@@ -1040,6 +1040,103 @@ function carveShallowEntranceTrail(cm, from, to) {
   return true
 }
 
+// Geomancy obstacles belong to the existing global Z maps, not local
+// virtual rooms. Preserve mandatory transitions and connectivity even when
+// cavern masks overlap. All placement uses world RNG at generation time.
+function placeGeomancyStoneObstacles() {
+  const cfg = WORLD_GEN_CONFIG.geomancyStones
+  if (!cfg || !Array.isArray(cfg.shallowCaves) || !Array.isArray(cfg.deepCaves))
+    throw Error('Missing Geomancy obstacle-generation configuration')
+  const dirs = DIRS8
+  const floorTile = new Set(['cavefloor', 'cavefloor2', 'marble'])
+  const safety = (terrain, x, y, z, specialRubble = false) => {
+    const tile = terrain[y]?.[x]
+    if (!floorTile.has(tile)) return false
+    if (groundItems.some(g => g.x === x && g.y === y && (g.level ?? 0) === z &&
+        (g.levelKind || (z === 0 ? 'surface' : 'chain')) === 'chain')) return false
+    if (z <= -9 && deepLevels[chainDepthForZ(z) - 2]?.mineExcavations?.some(d =>
+        d.x === x && d.y === y && !d.removed)) return false
+    const radius = cfg.landingClearance
+    for (let yy = Math.max(0,y-radius); yy <= Math.min(MAP_H-1,y+radius); yy++)
+      for (let xx = Math.max(0,x-radius); xx <= Math.min(MAP_W-1,x+radius); xx++) {
+        const neighbor = terrain[yy]?.[xx]
+        if (CAVE_TRANSITION_TILES.has(neighbor) ||
+            ['dwarvenkey','dwarvenstove','dwarvenlever','dwarvenleverpulled','dwarventhrone',
+              'dwarvencrate','dwarvenpressureplate','dwarvencrusherpinch'].includes(neighbor)) return false
+      }
+    const open = (xx,yy) => (xx !== x || yy !== y) && !!TILE[terrain[yy]?.[xx]]?.walk
+    const neighbors = dirs.filter(([dx,dy]) => !!TILE[terrain[y+dy]?.[x+dx]]?.walk)
+    if (neighbors.length < (specialRubble ? 2 : 3)) return false
+    // A new obstruction must not disconnect any adjacent passages. Check a
+    // local neighborhood, accepting only a conservative safe placement.
+    const start = {x:x+neighbors[0][0],y:y+neighbors[0][1]}
+    const seen = new Set([keyXY(start.x,start.y)]), queue = [start]
+    const range = cfg.neighborSearchRadius
+    for (let at=0;at<queue.length;at++) {
+      const point=queue[at]
+      for (const [dx,dy] of dirs) {
+        const xx=point.x+dx,yy=point.y+dy, key=keyXY(xx,yy)
+        if (Math.abs(xx-x)>range || Math.abs(yy-y)>range || seen.has(key) || !open(xx,yy)) continue
+        // Don't count corner-squeezing through two occupied orthogonal cells.
+        if (dx && dy && !open(point.x+dx,point.y) && !open(point.x,point.y+dy)) continue
+        seen.add(key);queue.push({x:xx,y:yy})
+      }
+    }
+    return neighbors.every(([dx,dy])=>seen.has(keyXY(x+dx,y+dy)))
+  }
+  const place = (terrain, localMasks, z, range, floorFilter, rubble = false) => {
+    const desired = randInt(range[0],range[1]), candidates=[]
+    for (let y=2;y<MAP_H-2;y++) for (let x=2;x<MAP_W-2;x++) {
+      if (!floorTile.has(terrain[y]?.[x]) ||
+          !floorFilter(x,y,terrain[y][x])) continue
+      const neighbors = DIRS8.map(([dx,dy])=>terrain[y+dy]?.[x+dx])
+      const walls = neighbors.filter(tile=>!TILE[tile]?.walk).length
+      // Rocks favor chamber edges; a few open-room candidates remain.
+      if (walls >= (rubble ? 1 : 1) || (x+y)%7===0) candidates.push({x,y})
+    }
+    let built=0
+    while (candidates.length && built<desired) {
+      const idx=randInt(0,candidates.length-1),{x,y}=candidates.splice(idx,1)[0]
+      if (!safety(terrain,x,y,z,rubble)) continue
+      const underlay=terrain[y][x],to=rubble?'dwarvenrubble':'boulder'
+      terrain[y][x]=to
+      for (const local of localMasks || []) if (local !== terrain && local[y]?.[x] === underlay)
+        local[y][x]=to
+      tileUnderlays[tileUnderlayKey(x,y,z)]=underlay
+      built++
+    }
+    // The range is a density target, not a mandatory feature or route. A
+    // confined cave may have fewer safe placements than requested. Never
+    // discard otherwise valid world geometry to satisfy optional rocks.
+    return built
+  }
+  // Each local cave mask refers to a region of the same global map.
+  for (const [index,cm] of caveMaps.entries()) {
+    if (caves[index]?.crypt) continue // legacy Crypt is deliberately excluded
+    place(undergroundMap,caveMaps,-1,cfg.shallowCaves,(x,y,t)=>cm[y]?.[x]===t)
+  }
+  const deep = deepLevels[0]
+  for (const cm of deep?.caveMaps || []) {
+    place(deep.map,deep.caveMaps,-2,cfg.deepCaves,(x,y,t)=>cm[y]?.[x]===t)
+  }
+  for (let i=1;i<deepLevels.length;i++) {
+    const level=deepLevels[i],z=chainZForDepth(i+2)
+    if (!level || level.kind === 'unused') continue
+    const mine=level.kind==='dwarvenMines'
+    const range=mine?cfg.mines:cfg.fortAndRuins
+    // Reserve entire transit halls and gallery firing lanes before picking
+    // optional rocks. Other safe candidates on this same floor fill the quota.
+    const reserved = new Set()
+    for (const room of level.rooms || []) {
+      if (room.stairRoom || room.gallery)
+        for (const {x,y} of dwarvenRoomInterior(room)) reserved.add(keyXY(x,y))
+    }
+    place(level.map,level.caveMaps,z,range,(x,y)=>!reserved.has(keyXY(x,y)))
+    if (mine) place(level.map,level.caveMaps,z,cfg.mineRubble,()=>true,true)
+  }
+  return true
+}
+
 function generateCaves() {
   dungeonShortcuts = []
   const cfg = WORLD_GEN_CONFIG.caves.shallow
@@ -1156,6 +1253,7 @@ function generateCaves() {
   if (!buildDwarvenMinesStratum()) return false
   placeDwarvenFortHole()
   initializeMausoleum()
+  if (!placeGeomancyStoneObstacles()) return false
   undergroundDiscovered = undergroundDiscoveredL1
   return !cryptInvalid
 }
@@ -5656,7 +5754,7 @@ function deepCaveThreatCost(t, pos, prefix, nearby, ec) {
   const tierCost = ({1:1,2:2,3:4,4:12})[t.tier] || 20
   let result = tierCost + [...abilities].reduce((a,b)=>a+(weights[b]||0),0)
   if(prefix==='Champion')result+=ec.championThreatCost
-  const ranged=a=>a.has('shooterArrows')||a.has('shooterStones')
+  const ranged=a=>a.has('shooterArrows')||a.has('shooterStones')||a.has('shooterBigStones')
   const control=a=>a.has('root')||a.has('wail')||a.has('pull')||a.has('mummyCurse')||a.has('petrifyingGaze')
   for (const e of nearby) {
     if(!e.alive || e.level!==-2 || e.levelKind!=='chain' ||

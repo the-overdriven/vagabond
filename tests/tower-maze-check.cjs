@@ -94,7 +94,7 @@ async function main() {
       !g.identified && ['weapon','shield','armor'].includes(g.artifactSlot) &&
       !!g.abilityId).length`),1,'merchant stocks one unidentified gear artifact')
     assert.equal(d.positions.length,2)
-    assert.ok(d.looseChaos.length>=1,'a loose surface Chaos scroll is guaranteed')
+    assert.equal(typeof d.looseChaos.length,'number','ordinary random Chaos drops remain legal')
     const pool = run(`JSON.stringify(ENEMY_TEMPLATES.filter(t=>t.tier>=2&&t.tier<=4&&
       t.rarity>0&&!t.adaptiveOnly&&!t.abilities?.includes('fly')&&
       !t.abilities?.includes('ethereal')&&
@@ -220,44 +220,8 @@ async function main() {
     assert.equal(run('undergroundMap[towerMaze.gate.y][towerMaze.gate.x]'),'mazegateopen')
     assert.equal(run('deepLevels[0].map[towerMaze.down.y][towerMaze.down.x]'),'caveup')
     assert.equal(run('groundItems.filter(g=>g.towerMazeTreasure).length'),1)
-    assert.equal(run(`(()=>{
-      currentZ=0;map=surfaceMap
-      const targets=[]
-      for(let y=tower.y-1;y<=tower.y+tower.size;y++)for(let x=tower.x-1;x<=tower.x+tower.size;x++){
-        if(towerContains(x,y)||!TILE[map[y]?.[x]]?.walk)continue
-        if(DIRS8.some(([dx,dy])=>towerContains(x+dx,y+dy)&&
-          ['dwarvenwall','towerwindow','towerentrancesealed','dwarvendoorclosed','dwarvendooropen']
-          .includes(map[y+dy]?.[x+dx])))targets.push({x,y})
-      }
-      if(!targets.length)return false
-      const t=TowerMaze.chaosTarget(targets[0],new Set())
-      return t&&towerInterior(t.x,t.y)&&Math.max(Math.abs(t.x-targets[0].x),
-        Math.abs(t.y-targets[0].y))<=8
-    })()`),true,'tower Chaos always lands inside at the same z')
-    assert.equal(run(`(()=>{
-      currentZ=0;map=surfaceMap
-      let origin=null
-      for(let y=tower.y-1;y<=tower.y+tower.size&&!origin;y++)
-        for(let x=tower.x-1;x<=tower.x+tower.size;x++){
-          if(towerContains(x,y)||!TILE[map[y]?.[x]]?.walk)continue
-          if(DIRS8.some(([dx,dy])=>towerContains(x+dx,y+dy)&&
-            ['dwarvenwall','towerwindow','towerentrancesealed','dwarvendoorclosed','dwarvendooropen']
-            .includes(map[y+dy]?.[x+dx]))){origin={x,y};break}
-        }
-      if(!origin)return false
-      const original=enemies
-      try{
-        const blocker=[]
-        for(let y=tower.y+1;y<tower.y+tower.size-1;y++)
-          for(let x=tower.x+1;x<tower.x+tower.size-1;x++)
-            if(towerInterior(x,y)&&surfaceMap[y][x]==='marble')
-              blocker.push({x,y,level:0,levelKind:'surface',alive:true})
-        enemies=blocker
-        const p=TowerMaze.chaosTarget(origin,new Set())
-        return p&&p.actor&&p.actor.x===p.x&&p.actor.y===p.y&&
-          towerInterior(p.x,p.y)
-      }finally{enemies=original}
-    })()`),true,'fully occupied Tower interior uses the agreed monster swap')
+    assert.equal(run("typeof TowerMaze.chaosTarget === 'undefined' && typeof TowerMaze.guaranteeChaosScroll === 'undefined'"),true,
+      'the Tower has no bespoke Chaos bypass or mandatory scroll placement')
     // The final chest must not also trigger an ordinary chest loot roll.
     assert.equal(run(`(()=>{
       currentZ=-2;map=deepLevels[0].map;currentCave=-1

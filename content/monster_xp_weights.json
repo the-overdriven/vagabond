@@ -45,6 +45,7 @@
     "shellRetreat": 12,
     "shooterArrows": 3,
     "shooterStones": 3,
+    "shooterBigStones": 3,
     "slow": 9,
     "summon": 20,
     "swim": 2,

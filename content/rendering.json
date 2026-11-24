@@ -1484,6 +1484,12 @@
       "color": "#9a9184",
       "image": "img/projectiles/stone.png",
       "scale": 1
+    },
+    "bigStone": {
+      "glyph": "●",
+      "color": "#9a9184",
+      "image": "img/projectiles/big-stone.png",
+      "scale": 1
     }
   },
   "caveDecorations": {

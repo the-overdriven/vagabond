@@ -2,7 +2,7 @@
 async function wayfaringScoutingChecks(fixture) {
   const check=(v,msg)=>{if(!v)throw Error(msg)}
   const restore=save=>{loadGameFromObject(structuredClone(save),{isReplayInit:true});replayRecording=false;replayPlaying=false;replaySimulationMode=false;replayAnimationsDisabled=true}
-  const sample=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
+  const sample=id=>makeArtifactTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
   restore(fixture)
   enemies=[];npcs=[];groundItems=[];occupied=new Set();player.inventory=['farsight','spelunker','pilgrim','trailblazer'].map(sample)
   player.equip={weapon:null,shield:null,armor:null};player.race='human';player.baseMf=0;player.hp=200;player.maxHp=200;player.godMode=false

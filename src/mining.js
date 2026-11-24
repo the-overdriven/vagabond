@@ -553,7 +553,7 @@ const Mining = (() => {
   function canTarget(x, y) {
     // Reinforced maze masonry is immutable even when struck from a neighboring cave.
     if (TowerMaze.isProtectedWall(currentZ, x, y)) return false
-    if (currentZ === 0) return map[y]?.[x] === 'boulder'
+    if (map[y]?.[x] === 'boulder') return true
     const level = activeLevel()
     if (!level) return false
     // God mode already permits walking through walls. Do not intercept a
@@ -618,6 +618,9 @@ const Mining = (() => {
       return 'warn'
     }
     const level = activeLevel(), target = level ? find(level, x, y) : null
+    const conjuredStone = ArtifactGeomancy.temporaryAt(x,y)
+    const naturalStone = map[y]?.[x]==='boulder' && !conjuredStone
+    const ordinaryStone = !!conjuredStone || naturalStone
     let extractedMineral = false
     let brokenOrdinaryMineWall = false
     const keyTarget = `${currentZ}:${x},${y}`
@@ -628,35 +631,43 @@ const Mining = (() => {
       return 'warn'
     }
     player.miningArmedTarget = null
-    const valid = currentZ === 0 || !!target
-    const hardness = currentZ === 0 ? 'weak' : target?.hardness || 'hard'
-    const surfaceKey = key(x, y)
+    const valid = ordinaryStone || !!target
+    const hardness = ordinaryStone ? 'weak' : target?.hardness || 'hard'
+    const surfaceKey = currentZ===0 ? key(x,y) : `${currentZ}:${key(x,y)}`
     if (!valid) {
       log('Your pickaxe rings against solid rock. There is no opening here.', 'info')
     } else {
-      const progress = currentZ === 0 ? (miningSurfaceProgress[surfaceKey] || 0) : target.progress
-      if (currentZ === 0) miningSurfaceProgress[surfaceKey] = progress + 1
+      const progress = conjuredStone ? conjuredStone.progress : naturalStone ?
+        (miningSurfaceProgress[surfaceKey] || 0) : target.progress
+      if (conjuredStone) conjuredStone.progress++
+      else if (naturalStone) miningSurfaceProgress[surfaceKey] = progress + 1
       else target.progress++
       if (progress + 1 >= cost(hardness)) {
         const strainCfg = config().skill.strain
         const strain = Math.max(0, strainCfg[hardness] -
           Math.floor(ArtifactWayfaring.effectiveMining() / strainCfg.skillReductionEvery) * strainCfg.skillReductionAmount)
         if (strain > 0 && player.hp <= strain) {
-          if (currentZ === 0) miningSurfaceProgress[surfaceKey] = progress
+          if (conjuredStone) conjuredStone.progress = progress
+          else if (naturalStone) miningSurfaceProgress[surfaceKey] = progress
           else target.progress = progress
           log('You are too exhausted to finish mining this rock safely.', 'bad')
           return 'warn'
         }
         artifactLosePlayerHp(strain,{cost:true})
         if (strain) log(`The work strains you for ${strain} HP.`, 'bad')
-        if (currentZ === 0) {
-          map[y][x] = tileUnderlays[surfaceKey] || 'grass'
-          delete tileUnderlays[surfaceKey]
+        if (conjuredStone) {
+          // Summoned obstacles are not geological deposits. Mining does not
+          // award skill XP, minerals or Flint from player-created rocks.
+          if (!ArtifactGeomancy.removeTemporaryAt(x,y)) return 'warn'
+          log('You break apart the summoned boulder.', 'good')
+        } else if (naturalStone) {
+          const underlayKey=tileUnderlayKey(x,y,currentZ)
+          const underlay=tileUnderlays[underlayKey]
+          if (!TILE[underlay]?.walk || !mutateGeomancyTile(
+              {x,y,z:currentZ,levelKind:currentLevelKind()},'boulder',underlay)) return 'warn'
+          delete tileUnderlays[underlayKey]
           delete miningSurfaceProgress[surfaceKey]
-          // The cached map identities do not change when a boulder clears.
-          // Repaint its pixel now, as with dug sand and foraged forest.
-          repaintMinimapTiles([{x,y}])
-          grantXp(0, true)
+          grantXp(0,true)
           log('You clear the boulder.', 'good')
           Campfires.findFlint(0.025)
         } else {

@@ -12,7 +12,7 @@ const eq=(code,val,msg)=>assert.deepEqual(JSON.parse(JSON.stringify(run(code))),
     currentZ=0;map=surfaceMap;player.x=40;player.y=40;turnCount=0;
     for(let y=29;y<=52;y++)for(let x=29;x<=52;x++)map[y][x]='grass';
     discovered.forEach(row=>row.fill(false));player.wayfaring=ArtifactWayfaring.freshState();
-    globalThis.sample=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id);
+    globalThis.sample=id=>makeArtifactTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id);
     globalThis.clean=()=>{player.wayfaring=ArtifactWayfaring.freshState();player.inventory=[];player.hp=50;player.maxHp=200;player.lvl=1;player.xp=0;player.totalXpEarned=0;player.lastTempleHealXp=0;player.race='elf';player.berryRegenTurns=0;player.campRestProgress=0;turnCount=0;currentZ=0;map=surfaceMap;player.x=40;player.y=40;player.godMode=false};`)
   eq('discoverPlayerSight("arrival")',197,'fixed circular radius 8')
   eq('discovered[40][48]',true);eq('discovered[40][49]',false);eq('discovered[48][48]',false)

@@ -67,7 +67,9 @@ function tickEnemyDefensiveTimers() {
 function tickEnemyRegeneration() {
   const cfg=ENEMY_DEFENSE_CONFIG.regen
   for(const e of enemies) {
-    if(!e.alive || e.hp<=0 || !onCurrentLevel(e) || !enemyHasAbility(e,'regen'))continue
+    if(!e.alive || e.hp<=0 || !onCurrentLevel(e) ||
+       ArtifactGeomancy.petrified(e) || ArtifactGeomancy.buried(e) ||
+       !enemyHasAbility(e,'regen'))continue
     e.regenPhase++
     if(e.regenPhase<cfg.intervalTurns)continue
     e.regenPhase=0

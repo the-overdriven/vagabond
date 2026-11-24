@@ -460,8 +460,10 @@ async function runReplayAction(action) {
       // otherwise use the recorded id, then a deterministic fallback that does
       // not steal an artifact reserved by a later identification action.
       let idx = -1
-      if(action.action==='wayfaringPower') {
-        idx=player.inventory.findIndex(item=>item?.replayId===action.replayId && item.identified && ArtifactWayfaring.activeItem(item))
+      if (action.action==='wayfaringPower' || action.action==='geomancyPower') {
+        idx=player.inventory.findIndex(item=>item?.replayId===action.replayId && item.identified &&
+          (action.action==='geomancyPower' ? item.artifactSlot==='trinket' &&
+            ARTIFACT_ABILITIES.domains.geomancy.includes(item.abilityId) : ArtifactWayfaring.activeItem(item)))
       } else if (action.action === 'identifyArtifact') {
         if (Number.isInteger(action.idx)) {
           const indexedItem = player.inventory[action.idx]
@@ -501,7 +503,7 @@ async function runReplayAction(action) {
       const fn = action.action === 'identifyArtifact' ? identifyArtifact
         : Object.hasOwn(ITEM_ACTION_HANDLERS, action.action) ? ITEM_ACTION_HANDLERS[action.action] : null
       if (!fn) return replayDesync(`Replay desynchronized: unknown item action ${action.action}.`)
-      await fn(idx)
+      await fn(idx, action.action==='geomancyPower' ? action.direction : undefined)
       break
     }
     default:

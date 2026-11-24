@@ -437,6 +437,9 @@ const TowerMaze = (() => {
       (!e.levelKind || e.levelKind===(target===0?'surface':'chain'))) ||
       (target===0?npcs.find(n=>n.x===player.x&&n.y===player.y):null)
     if(occupant){
+      if(ArtifactGeomancy.buried(occupant)) {
+        log('The stair landing is blocked.','info');return true
+      }
       const blocked=new Set(enemies.filter(e=>e.alive&&e!==occupant&&e.level===target)
         .map(e=>key(e.x,e.y)))
       if(target===0)for(const n of npcs)if(n!==occupant)blocked.add(key(n.x,n.y))
@@ -467,60 +470,11 @@ const TowerMaze = (() => {
     return true
   }
 
-  function chaosTarget(origin,reserved) {
-    if(!tower || currentZ!==0 || towerContains(origin.x,origin.y))return null
-    let alongside=false
-    for(const [dx,dy] of DIRS8){
-      const x=origin.x+dx,y=origin.y+dy,tile=surfaceMap[y]?.[x]
-      if(towerContains(x,y)&&['dwarvenwall','towerwindow','towerentrancesealed',
-        'dwarvendoorclosed','dwarvendooropen'].includes(tile)){alongside=true;break}
-    }
-    if(!alongside)return null
-    const open=[],swap=[]
-    for(let y=tower.y+1;y<tower.y+tower.size-1;y++)for(let x=tower.x+1;x<tower.x+tower.size-1;x++){
-      if(Math.max(Math.abs(x-origin.x),Math.abs(y-origin.y))>8||!towerInterior(x,y))continue
-      if(surfaceMap[y]?.[x]!=='marble' ||
-        groundItems.some(g=>g.kind==='dwarvenstove'&&g.level===0&&g.x===x&&g.y===y) ||
-        npcs.some(n=>n.x===x&&n.y===y))continue
-      const target=enemies.find(e=>e.alive&&e.level===0&&e.x===x&&e.y===y)
-      if(target)swap.push({x,y,actor:target})
-      else if(!reserved.has(key(x,y)))open.push({x,y})
-    }
-    if(open.length)return {...pick(open),actor:null}
-    if(swap.length)return pick(swap)
-    // A valid Tower has marble floor; a landable square must exist. Refuse
-    // silently changing the Tower geometry rather than cheating through Z.
-    throw new Error('Tower Chaos has no safe interior landing')
-  }
-
-  function guaranteeChaosScroll() {
-    if(!towerMaze)return
-    const reachable=surfaceReachableFromTemple(),candidates=[]
-    // A locked-away, submerged or unreachable existing scroll does not satisfy
-    // the guaranteed *loose accessible* surface scroll.
-    if(groundItems.some(g=>g.kind==='scrollOfChaos'&&(g.level??0)===0 &&
-      reachable.has(key(g.x,g.y)) && !towerContains(g.x,g.y) &&
-      TILE[surfaceMap[g.y]?.[g.x]]?.walk &&
-      !['water','river','ice','frozenriver'].includes(surfaceMap[g.y][g.x])))return
-    for(let y=2;y<MAP_H-2;y++)for(let x=2;x<MAP_W-2;x++){
-      if(!reachable.has(key(x,y)) || !TILE[surfaceMap[y]?.[x]]?.walk ||
-        towerFootprintDistance(x,y,tower.x,tower.y)<5 ||
-        ['water','river','ice','frozenriver'].includes(surfaceMap[y][x]) ||
-        groundItems.some(g=>(g.level??0)===0&&g.x===x&&g.y===y) ||
-        npcs.some(n=>n.x===x&&n.y===y) ||
-        enemies.some(e=>e.alive&&(e.level??0)===0&&e.x===x&&e.y===y))continue
-      candidates.push({x,y})
-    }
-    if(!candidates.length)throw new Error('No safe, reachable loose Chaos scroll spawn')
-    const p=pick(candidates)
-    groundItems.push({...p,kind:'scrollOfChaos'})
-  }
-
   function populationMetrics() {
     if(!towerMaze)return null
     return towerMaze.levels.map(l=>({z:l.z,...l.metrics,monsters:l.enemySpots.length}))
   }
   return {candidateScanner,generate,restore,inRegion,isProtectedWall,isMazeActor,populate,
     sampleMazeEnemy,weakerThanMinotaur,
-    atLever,toggle,switchStairs,chaosTarget,guaranteeChaosScroll,populationMetrics}
+    atLever,toggle,switchStairs,populationMetrics}
 })()

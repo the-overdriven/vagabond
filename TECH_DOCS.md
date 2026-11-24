@@ -721,12 +721,13 @@ mining interactions. Most mine walls are unbreakable. Each generated weak seam
 or mineral deposit is finite and keeps its identity even while concealed from an
 inexperienced miner. Partial damage persists across interruptions. Opening a
 mine wall leaves gray excavated floor; extracting a crystal already exposed on a
-mine floor leaves its original brown floor. Completing an overworld boulder has
-a **2.5%** chance to yield one reusable Flint Stone; individual strikes and
-underground deposits do not roll for flint. Clearing an overworld boulder
-restores its underlying surface terrain (grass, forest, hill or sand), even
-after world rotation or save/load. Both minimaps immediately reflect the cleared
-tile, as does the full-world map when opened.
+mine floor leaves its original brown floor. Completing a **natural boulder**
+has a **2.5%** chance to yield one reusable Flint Stone; individual strikes and
+mineral deposits do not roll for flint. Breaking a summoned boulder grants no
+Mining XP, mineral, or Flint. Both natural and summoned boulders restore their
+exact underlying tile, including underground cave or marble floors, even after
+save/load. Both minimaps immediately reflect the cleared tile, as does the
+full-world map when opened.
 
 Mining level determines the number of strikes and the ability to **recognize**
 concealed geological features. A wall may be mineable even before its clue is
@@ -749,13 +750,13 @@ mineral rewards, and XP are configurable in `content/mining_config.json`.
 For skill value `s`, the next level costs `3 × (1 + floor(s / 25))` Mining XP;
 cumulative requirements are **75 / 225 / 450 / 750 XP** at levels **25 / 50 / 75
 / 100**. The experience multiplier is configurable. Normal underground walls and
-minerals grant XP only once when completed. Overworld boulder removal gives 1 XP
-for each of the first five stones, then `1 / n` XP for the *n*th stone.
-Fractional XP is accumulated in deterministic integer units, so endlessly mining
-surface stones barely advances the skill. Surface boulders do not display a
-hover tooltip; their appearance remains the visual cue that a pickaxe may clear
-them. Mining has no stamina meter, tool durability or item refining. Extracted
-gems stack in inventory and can be sold to the village merchant.
+minerals grant XP only once when completed. Natural boulder removal grants
+1 XP for each of the first five such stones, then `1 / n` XP for the *n*th
+stone. Fractional XP is accumulated in deterministic integer units, so
+endlessly mining natural boulders barely advances the skill. Surface boulders
+do not display a hover tooltip; their appearance remains the visual cue that
+a pickaxe may clear them. Mining has no stamina meter, tool durability or item refining. 
+Extracted gems stack in inventory and can be sold to the village merchant.
 
 ---
 
@@ -1503,19 +1504,11 @@ under the usual rules. The chest rolls its reward when opened, including for
 already-generated worlds whose labyrinth chest remains unopened. There is no
 build-matching reward or additional generic chest roll.
 
-**Tower Chaos exception:** a Scroll of Chaos used on the surface while adjacent
-to the Tower's outer masonry (including diagonally) sends the player into a
-safe, dry, ordinary interior square **within radius 8, still on z:0**, even
-through a shut or lever-sealed entrance. If all available interior squares
-are held by monsters, the player exchanges positions with one of them.
-The lever and gate states are not changed. Other Chaos users, locations and
-reachable-area restrictions are unaffected. At world-generation completion,
-if no accessible loose surface Scroll of Chaos already exists outside the
-Tower and reachable from the Temple on dry ground, one is placed there using
-seeded RNG. This check occurs once, never restocks, and does not count scrolls
-hidden in chests, stock or inaccessible terrain. The ordinary save/replay
-system persists maze tiles, stair endpoints, gate state, loot, monsters, fog of
-war and RNG without rerolling world geometry on load.
+Scroll of Chaos does not bypass the sealed Tower entrance or swap the
+player through its masonry. The ordinary reachable-terrain rule applies,
+and world generation does not guarantee a loose surface Chaos scroll. Normal
+loot and merchant sources remain unchanged. Maze gates, stairs, residents,
+loot, fog and RNG still persist through the ordinary save/replay system.
 
 ## Temple
 
@@ -3221,6 +3214,16 @@ whole-world rotation.
 
 ## z:-3: Dwarven Fort
 
+Natural boulders target **3–6 per floor** throughout the Fort and Ruins, mostly
+in halls and side branches, rather than as solid clusters. Safe terrain and
+mandatory accessibility take precedence over the target count. Placement keeps
+progression routes, stairs, mandatory keys, mechanisms and the Pickaxe reachable
+without first mining stone. Obstacles are carved into the existing shared
+global-Z floor, not an isolated dungeon map; overlapping floor content must
+never replace another location's tiles. Stair halls and crossfire galleries
+reserve their entire interiors. Rocks use other safe cells on the same floor. If
+none remain, the floor gets fewer rocks.
+
 Reserved for the Dwarven Fort. It is the third level in the generic depth chain
 and is not generated as a normal random cave. It is also D0, the entrance
 complex for the Dwarven Ruins. Its `dwarvenfortexit` tile leads directly to the
@@ -3265,6 +3268,13 @@ and enemy sight and the same terrain blocker rule used by ranged projectiles.
 Each floor has its own discovery grid.
 
 ## z:-9 and deeper: Dwarven Mines
+
+Each Mine floor targets **5–9 natural boulders** and **1–2 Pickaxe-cleared
+rubble piles**, placing fewer where safe geometry is insufficient. Some
+optional passages may be blocked; mandatory stair and cage landings, plus
+access to the first Pickaxe, remain safe. Natural boulders
+may occur in pairs. All new obstacles retain their exact underlying floor
+and occupy the original shared `x,y,z` world grid.
 
 Dwarven Mines form a separate **4- or 5-floor** dungeon with equal probability,
 always starting at **z:-9**. The established 3–5-floor Dwarven Ruins generator
@@ -3538,6 +3548,19 @@ structures, including sarcophagi, burial niches, rubble, and the crypt trap.
 # 15. Cave Generation
 
 Up to six initial caves are attempted.
+
+Natural round boulders target **1–3 per cave** in each normal shallow
+(`z:-1`) and deep (`z:-2`) cave, favoring wall edges and wider chambers.
+When a cave has fewer safe locations, the generator places fewer rocks rather
+than rejecting otherwise valid world geometry. Placement preserves accessible
+cave stairs, dry paths and neighboring global Z-level connections; it does not
+add separate local gameplay maps. The legacy
+Crypt remains excluded. Underground boulders use the surface boulder's
+collision, projectile-blocking, mining and cover rules. In tile mode, four
+round pixel-art variants are chosen deterministically by position, with
+transparent edges showing the exact recorded floor below each stone, including
+temporary stones and brown grotto/mine floors. ASCII retains the existing
+boulder glyph. Artwork never consumes world RNG.
 
 ## Deep grotto and burrow route variety
 
@@ -4265,10 +4288,10 @@ effect on enemy identity, mechanics, randomness, saves, or replay.
 
 Every monster template and live monster has an `abilities` array. `fly` and
 `evades` are ability IDs rather than separate boolean fields. For example,
-Giant Bat has `["fly", "evades"]`; Wolf has `[]`. Existing shooter eligibility
-IDs (`shooterStones`, `shooterArrows`) remain in the same array. An enemy with
-none of these abilities has an empty array. Each spawned instance owns a copy,
-so changing one monster cannot alter its template or other monsters.
+Giant Bat has `["fly", "evades"]`; Wolf has `[]`. Shooter eligibility IDs
+(`shooterStones`, `shooterBigStones`, `shooterArrows`) use the same array. An
+enemy with none of these abilities has an empty array. Each spawned instance
+owns a copy, so changing one monster cannot alter its template or other monsters.
 
 Movement, evasion, track generation, projectile obstruction, and flying render
 order check this array. This refactor does not change combat chances, terrain
@@ -5173,14 +5196,20 @@ must still wield a weapon to take part in grace checks.
 
 Selected species can roll a ranged combat role when the enemy instance is
 created. The role is instance state, not a separate species and not an inherent
-attack used by every member of that template. Eligible templates declare either
-`shooterStones` or `shooterArrows` in their `abilities` array; the shared chance
-and projectile tuning live in `content/enemy_config.json`.
+attack used by every member of that template. Eligible templates declare
+`shooterStones`, `shooterBigStones` or `shooterArrows` in their `abilities`
+array; the shared chance and projectile tuning live in
+`content/enemy_config.json`.
 
 | Eligible species | Projectile | Projectile ATK |
 |---|---|---:|
-| Monkey, Goblin | Stone | 3 |
+| Monkey, Goblin | Small stone | 3 |
+| Cyclops | Large stone (boulder) | 3 |
 | Kobold, Lizard Man, Nymph, Centaur, Skeleton | Arrow | 5 |
+
+Small and large stone throwers use the same combat rules, XP bonus and
+generation threat weight. Only the projectile sprite and its log name differ;
+Cragbowl uses the large stone sprite as well.
 
 Each eligible spawn has a **50%** seeded-RNG chance to become a shooter and
 starts with **10 shots**. Shooter role and exact remaining ammunition persist
@@ -7258,6 +7287,7 @@ The domain catalog lives in `content/artifact_abilities.json`:
 | Armor | `bulwark`, `armors` |
 | Shield | `bulwark`, `shields` |
 | Feather, Girdle, Tippet, Scarf, Anklet, Flint, Sextant, Shoehorn, Adze, Amphora, Jug, Rope, Bridle, Saddle | `wayfaring` |
+| Tome, Orb, Grimoire, Rune, Hexagram, Circlet, Sealstone, Diadem, Bangle, Flint, Muddler, Bonefolder, Scriber, Cauldron, Stone, Chisel, Gong, Seal, Idol, Crozier, Grindstone, Mallet, Trowel | `geomancy` |
 
 Specific item bases can add more domains. The eligible pool is the **union of
 all enabled, unique ability IDs** in the item's domains: every power in that
@@ -7438,6 +7468,205 @@ qualifying step. These unique charges, Longstrider's count and threshold, and
 free steps are stored on the character and replayed deterministically. Removing
 the granting trinket clears prepared crit/free-step charges; death clears
 prepared combat charges.
+
+### Geomancy — earth and preparation
+
+The Geomancy domain belongs to 23 dwarf-themed trinket bases. Flint belongs
+both to Wayfaring and Geomancy; it draws uniformly from the union of their
+enabled powers, without weighting either domain. The same trinket eligibility,
+identification, pricing and character-owned cooldown rules apply as to
+Wayfaring. God Mode's one-time merchant assortment includes one identified
+example of each eligible Geomancy power. Powers without useful in-game
+behavior are excluded from natural artifact rolls and the testing assortment.
+Resonance becomes eligible alongside its first usable active Geomancy power.
+
+| Power | Effect while carried | Price bonus |
+|---|---|---:|
+| Burst Bending | **Passive.** Changes a targeted Fireball blast to a cross: epicenter plus four cardinal arms, each up to **4 tiles** long (**17 tiles** on open ground). Each arm ends at its first opaque obstruction. Preview, damage, Mimic revelation and visuals use the same shape. | 350g |
+| Aftershock | **Passive.** A damaging targeted area spell leaves cracks in its exact affected tiles. After **one intervening world turn**, each current occupant, including the player, takes **floor(0.5 × a fresh damage roll)**. The spell's original victims need not remain. Shockwaves never trigger further shocks or Grounding. | 500g |
+| Lodestone | Signals when an actual unexcavated treasure lies within Chebyshev distance **3** on the same Z and map. Eligible sources are placed buried gear/artifacts and the buried treasure-map casket; hypothetical rewards from random sand digging do not count. No direction or exact tile is revealed. The signal changes only when proximity changes, not on every frame. | 200g |
+| Resonance | After an active Geomancy power successfully starts its cooldown, reduce the remaining cooldown of **each other** Geomancy power by `20 + floor(effective DEF / 2)` world turns, down to zero. Its own new cooldown stays intact. The reduction occurs once per successful activation, regardless of duplicate trinkets. | 400g |
+| Stonemaker | **Active.** Raises one temporary boulder in a random eligible adjacent tile for **5 turns**; no target selection. If no safe tile exists, activation fails without a turn or cooldown. | 325g |
+| Stone Circle | **Active.** Places temporary boulders for **6 turns** around the player, retaining exactly one explicitly chosen passable adjacent exit. Existing walls and boulders may form part of the ring. If any required placement is occupied or unsafe, the direction is not available. | 375g |
+| Stonepress | **Active.** Choose a direction containing an adjacent boulder. Drive it up to **4 cells** along that direction. A direct collision inflicts **10–20 damage**; a victim trapped against an obstacle takes another **20–30 damage**. Each creature takes the direct impact damage at most once per activation. The boulder stays in the last legal cell. | 400g |
+| Petrify | **Passive.** Every damaging direct hit with an equipped melee weapon has a **10%** chance to turn the surviving target, including a boss, into an invulnerable and inactive stone statue for **15 world turns**. Statue occupancy remains unchanged; no forced movement, damage, telegraphed attacks or DOT damage resolves on it. Sprite (or ASCII glyph) becomes gray. This status is independent of Petrifying Strike and Petrifying Gaze. | 600g |
+| Grounding | **Active.** Arms the player's next direct damaging hit against an enemy. That individual permanently loses one randomly selected active ability from the eligible catalog, or the charge is consumed with no effect if none remains. Melee, arrows, direct spells, Stonepress and Cragbowl can discharge it; poison, damage-over-time, delayed runes and Aftershock cannot. A 500-turn cooldown begins when armed, and one prepared charge cannot be stacked. | 475g |
+| Sounding Stone | **Active.** A noisy strike records the final positions of grounded creatures that actually move within **6 tiles** over the next enemy turn, including behind rock. One-turn ground-ripple markers expose no species, statistics or permanent map discovery; they vanish before the next turn. Flying, ethereal and swimming creatures do not produce echoes. | 300g |
+| Earthmaw | **Active.** Swallows grounded, non-ethereal **T1–T4** enemies within **3 tiles** for **3 world turns**; each has **10%** chance to resist. Active flight and water protect a target, but sleeping flyers can be swallowed. On each success, if the exact **(X,Y,Z−1)** cell exists, is safe, and is unoccupied, a separate **20%** roll transfers the same creature to that global floor. Without a legal landing it stays buried at its original position. The spell may be used in the Tower. | 550g |
+| Cragbowl | **Active.** Launch the **nearest visible boulder** at the **nearest visible enemy**, chosen separately by Chebyshev distance and then Y/X. A blocked route cancels without spending a turn or cooldown; another rock or target is not substituted. The primary victim takes **30–50 damage**, and each creature immediately behind it in the flight direction takes **floor(damage × 0.5)**. The rock shatters; surviving victims are pushed up to **2 cells** if the line has room. | 475g |
+| Runic Fuse | **Active.** Consume Fear, Fireball or Chaos to inscribe a one-use proximity rune at the player's current world position. A creature entering the rune or any of its eight neighboring cells activates it. Fireball can harm the player; Chaos from a rune excludes the player. One armed rune per character, persisting off-floor and through saves. | 425g |
+| Runebound Aegis | **Active.** Consume Fear to inscribe a currently equipped shield. Its next successful melee block releases Fear, even if the shield is later unequipped and re-equipped. One charge per shield, with no overwrite. | 425g |
+| Spell Cairn | **Active.** Hold up to two ordered compatible scrolls. Each loading costs **1 turn** and is allowed during cooldown. Releasing them sequentially takes **1 turn** total; successful first release starts **500 turns** of cooldown. A blocked second spell remains stored, without undoing the first. | 550g |
+
+Burst Bending affects Fireball without changing its single-epicenter
+selection or range. A wall stops an individual arm, not the other three.
+The actual affected cells are captured at the instant of casting; an
+Aftershock uses that saved footprint even if the player removes the trinket,
+leaves the floor or changes equipment before the secondary blow. Cracks are
+shown only on already visible cells and never reveal undiscovered terrain.
+Their appearance is a telegraph, not a second targeting action.
+
+Aftershock is scheduled in absolute world turns. It survives save/load,
+replay, changing floors, and ordinary death without permadeath. Targets are
+looked up on its original global Z and level kind, not on the player's
+current map. Each living occupant receives a new damage roll from the
+original spell's profile. Magical immunity, temporary petrification and
+Earthmaw burial protect their respective creatures. Secondary damage may
+kill enemies and grant normal credit; off-level loot stays at the victim's
+location instead of entering the player's inventory. Neither an Aftershock
+nor a rune's delayed effect discharges Grounding. The quake emits one
+meaningful log message, not one message per cracked tile; an unidentified
+artifact never announces the hidden passive by name.
+
+When identified Grounding strips a visible enemy of an ability, the combat log
+uses its display name, such as **Petrifying Gaze** or **Curse**.
+
+A power's shared cooldown is stored as an absolute character turn, even while
+its trinket is absent; Geomancy activations use a base cooldown of **500 turns**.
+Only a completed active power may begin that cooldown. Cancelled, blocked or
+unidentified uses have no effect on turns, cooldowns or RNG. Resonance does
+not respond to exploration, passive triggers, loading an item, or prepared
+spell effects firing later. Wayfaring's Trailblazer still reduces only
+Wayfaring cooldowns. Lodestone's current signal is derived from the world and
+re-established silently when a save loads; it is not persistent state.
+
+Active powers require identification. Stone Circle and Stonepress present
+legal directions before committing; choosing or cancelling costs no turn,
+cooldown or RNG. Cragbowl selects its rock and foe automatically, with no
+fallback if the chosen line is blocked. Stonepress and Cragbowl cannot attack
+from the Temple's sacred ground. A successful cast spends one player turn.
+The inventory closes before the cast; a stone attack announces its launch
+before any damage, kill, XP or loot messages. Stonepress slides the boulder
+one tile at a time, pushing creatures along its path. Against a pinned victim
+it lunges forward and settles back in its last legal cell. Cragbowl uses the ordinary
+projectile flight and impact-delayed death visuals: the defeated creature
+remains on screen until the stone arrives, but combat, RNG, world turns and
+replay resolve immediately and independently of animation time. One activation
+message and popup appear per cast, plus ordinary combat feedback when
+needed. The same power shares its cooldown across copies; Resonance shortens
+other Geomancy cooldowns only after a committed cast. An impulse that changes
+no other cooldown stays silent. Movement does not create per-tile messages.
+
+Temporary boulders block movement, sight and projectiles like natural stones.
+Both natural and summoned boulders can be driven or thrown. Moving a summoned
+boulder preserves its original expiry, while moving a natural boulder updates
+its exact underlay at every location. A thrown boulder disappears, leaving the
+correct original floor and no mining rewards. Enemies pushed by a thrown stone
+stay on their current Z; blocked diagonal corners, walls and occupied landings
+prevent displacement. On-entry traps and hazards resolve after all displaced
+creatures have distinct reserved coordinates. Both stone attacks deal direct
+artifact damage, not melee-weapon hits; they do not train weapon proficiency.
+Their attacks can discharge a prepared Grounding hit.
+
+Petrify expires by the global world-turn counter even while its victim is
+offscreen or the player changes Z. A statue cannot pursue, receive damage,
+be displaced or execute queued attacks; one transition message marks the end
+when the creature is visible. Petrify does not overwrite other petrification
+statuses, and its timed state is stored on the individual enemy.
+
+Grounding is character-owned while armed and is cleared on death, even
+without permadeath. The suppressed ability list belongs to each surviving
+monster, not to its species or bestiary. It survives saving, loading, replay,
+and movement between global Z-levels. Eligibility is a data-driven list of
+active behaviors; innate traits and passive resistances are not removable.
+Previously prepared actions using the lost ability are cancelled. The power
+is discharged even by a target with no eligible ability, without an extra RNG
+roll. With multiple direct spell targets, the closest actually damaged target
+to the epicenter takes the charge, with stable Y/X ties, independently of the
+spell's normal damage roll and iteration order. Stone collisions discharge it
+on the first damaged victim; damage over time and secondary spell echoes do
+not. Combat feedback occurs once on discharge, not on subsequent turns.
+
+Earthmaw wakes and alerts eligible enemies, including those that resist.
+Each failed resistance roll deals **5–10 damage** before burial. Immunity
+and Death Shield apply. A lethal hit grants normal kill credit on the cast
+floor. A buried survivor retains its alert state even if it falls a floor.
+
+Earthmaw marks swallowed enemies with a world-turn expiry rather than
+creating a separate dungeon or enemy copy. A buried creature is unavailable
+to AI, attacks, spells, poison and forced movement, but its cracked tile reserves
+the actual cell until emergence. It uses the same ground cracks as Duiwel’s
+Rupture and shows no enemy name, statistics or per-turn notifications. At expiration it resurfaces at
+the same X/Y, whether or not the player is on that floor. Mounds do not
+move aside for stair arrivals. A successful depth transfer changes only Z,
+floor identity and the corresponding cave reference. HP, ID, gear, lost powers
+and quest identity survive, and the transfer grants no XP or loot. The
+legacy Crypt map is excluded from transfers. Each eligible target consumes
+one resistance roll; the descent chance is rolled only for a legal lower
+landing. All successes share one cast message and cooldown. An activation
+with no eligible enemies costs no turn, RNG or cooldown.
+
+Casting shakes the view and sends a ground ripple to the edge of the 7×7
+area centered on the caster. Visible victims stay in place through the shake,
+then sink into fissures at their original positions.
+A brief label names the creature and distinguishes burial, a fall to the floor
+below, or resistance.
+
+Sounding Stone records enemy movement during the committed player action,
+then displays only the observed locations until the next world turn. It does
+not scan stationary actors or reveal hidden terrain. Its brief detection
+window and traces survive save/load and replay without extra messages.
+
+Runic Fuse inscribes one prepared spell at the player's current **X/Y/Z**
+and level kind. It consumes the source scroll when inscribed and replaces any
+previous rune only after successful validation. Existing adjacent creatures
+cannot trigger it without entering a qualifying tile. Triggers from ordinary,
+forced, and Chaos movement use settled occupancy; the rune is disarmed before
+resolving its effect, so Chaos cannot trigger the same rune again. Fireball
+captures its exact footprint and whether Burst Bending and Aftershock are
+active at inscription time. Its stored pattern is unchanged if those trinkets
+are lost later. An activated rune uses one readable log message and a brief
+popup, not per-tile messages. Neither the delayed activation nor damage
+starts another cooldown or discharges Grounding.
+
+Runebound Aegis stores its spell on the **specific shield instance**, not the
+trinket or the character. It consumes a Fear scroll during inscription and
+begins cooldown at that time. A real melee block qualifies even when some
+damage penetrates; glancing hits, dodges, and absorbed non-blocks do not.
+The shield finishes handling the initial hit before the stored Fear fires.
+Unequipping, trading, or stealing the shield retains its inscription; merely
+carrying it does not give a monster a player-style shield-block ability.
+
+Spell Cairn stores **two ordered scroll payloads** on each individual trinket.
+Fear, Chaos, Invisibility, Death Shield, Homecoming and Wayfaring qualify;
+Fireball (target selection) and Identification (item selection) do not.
+Two identical non-travel scrolls are allowed, but at most one Homecoming or
+Wayfaring can be loaded into the same Cairn. The character owns at most one
+Wayfaring in total, either loose or inside any Cairn. Loading moves that
+single scroll without duplicating its destination. A Cairn storing Wayfaring
+is bound to the character and cannot be dropped, sold, stolen or left with
+ordinary death remains until the Wayfaring has been released. Reloading a
+second Cairn does not circumvent the shared Spell Cairn cooldown.
+
+In the identified artifact's inventory row, the Cairn shows a compact slot
+count and stored spell names. Choosing a compatible scroll from the single
+`+ Scroll` selector immediately loads it and spends one turn; there is no
+separate Load confirmation or expanded list of per-scroll buttons. **Release**
+uses the stored spells and is disabled during the shared cooldown. **Inspect**
+shows the full ordered contents, including on touch layouts. Unidentified
+artifacts neither expose their slots nor offer these controls.
+
+The first blocked release preserves both scrolls, turn and cooldown. After
+the first spell succeeds, its scroll is removed, the shared Cairn cooldown
+begins, and Resonance triggers once. The second spell checks the *updated*
+world after the first completes, including asynchronous travel and landing
+hazards. A blocked second scroll remains in the first available slot; the
+first spell and single-turn cost are not rolled back. The entire sequence is
+one replay decision, and loading scrolls never triggers Resonance. An
+ordinary Homecoming updates a loose Wayfaring destination or creates one if
+none exists. If Wayfaring is bound inside **any** Cairn, Homecoming preserves
+its original destination. Its travel still respects exact map identity and
+landing rules; no physical vertical connection may change X/Y.
+
+Stones may be mined with a Pickaxe or expire at
+their scheduled world turn. Mining, movement and expiry restore each stone's
+recorded underlying tile, never a guessed default floor. Temporary stone IDs,
+positions, progress and expiry turns belong to the world and persist through
+save/load and replay, including stones left on other Z-levels. Rendering and
+animation never determine expiration or consume game RNG. Each global chain
+level and its matching cave masks share the same terrain mutation; legacy
+Crypt 2 remains a separate map exception. Stone colors and popup presentation
+do not affect gameplay determinism.
 
 ### Enabled powers
 
@@ -8440,7 +8669,9 @@ does not block reading an existing Scroll of Wayfaring.
 Reading Homecoming consumes one unit of its stack and creates a bound Scroll of
 Wayfaring storing the exact departure coordinates (X, Y, Z and level identity,
 including the exceptional Crypt map). Only one return scroll can be held: a
-subsequent Homecoming replaces its remembered destination. Reading Wayfaring
+subsequent Homecoming replaces its remembered destination if it remains
+loose. When Wayfaring is loaded into Spell Cairn, Homecoming preserves that
+stored destination instead of creating a second return scroll. Reading Wayfaring
 consumes it and returns the player to that exact tile from any location; it
 cannot be purchased, sold, dropped or independently generated, and it does not
 qualify for merchant scroll resupply. Both readings follow the normal inventory
@@ -8558,6 +8789,17 @@ heals further nor cures poison. There is no expiry and healing does not recharge
 it. Reading another while ready consumes neither item nor turn. Its ready status
 stays visible, with a distinct shield-breaking message and floating effect.
 
+Scroll effects separate validation and gameplay resolution from the
+inventory action. Reading a scroll owns its item consumption, player turn,
+replay entry and scroll-use telemetry; Fear, Chaos, Death Shield,
+Invisibility and Fireball reuse effect resolvers. Fireball still handles
+manual targeting in its existing interface, with one common resolver for
+its damage, Mimic interactions, shields and delayed death presentation.
+Pure validation does not roll RNG or consume items. A blocked scroll keeps
+its turn and inventory. Homecoming and Wayfaring share their travel-effect 
+resolvers with Spell Cairn while retaining one turn and one 
+replay action per direct reading.
+
 **Chaos:** the affected set is captured before anyone moves. Each actor receives
 a random distinct safe destination within 8 tiles of its own starting position,
 in its currently reachable terrain component on the same map/level. Connectivity
@@ -8570,7 +8812,9 @@ put. The player is resolved first, then monsters in their existing stable order.
 Only actors with valid destinations consume a seeded destination roll. Movement
 resolves together before presentation; exploration, swimming state, occupancy
 and player pickup are updated immediately. Teleportation does not automatically
-enter stairs or another map. Monsters receive their ordinary action after the
+enter stairs or another map. It cannot bypass the Tower's sealed outer
+masonry, and the Tower does not force a monster swap. Ordinary random loot
+may still contain Scrolls of Chaos. Monsters receive their ordinary action after the
 scroll is used.
 
 **Combat potions:** bonuses are sampled when drunk from the corresponding
@@ -8611,15 +8855,24 @@ nothing. The amber range overlay and stronger blast overlay work in tile and
 ASCII modes; the player's tile turns red when inside the blast. Targeting closes
 on save restoration and is never persisted.
 
-The footprint is **5×5 with the four corners removed (21 tiles before
-clipping)**. Relative offsets run from −2 to +2 on each axis, centered on the
-selected tile. The projectile lands at that exact center. Walls, opaque terrain
-and shut opaque doors block both the shot and straight blast rays; two touching
-opaque corners also block diagonal fire. Bars pass fire. The blast does not bend
-around walls. Other creatures do not intercept the shot. Only visible cells are
-previewed; creatures in unseen blast cells still take damage. A disguised Mimic
-inside the clipped blast is revealed and damaged by that same cast, without a
-free opening ambush attack.
+Without Burst Bending, the footprint is **5×5 with the four corners
+removed (21 tiles before clipping)**. Relative offsets run from −2 to +2 on each axis, 
+centered on the selected tile. The projectile lands at that exact center. 
+Walls, opaque terrain and shut opaque doors block both the shot and straight blast rays;
+two touching opaque corners also block diagonal fire. Bars pass fire.
+The blast does not bend around walls. Other creatures do not intercept the shot.
+Only visible cells are previewed; creatures in unseen blast cells still take damage. 
+A disguised Mimic inside the clipped blast is revealed and damaged by that same cast,
+without a free opening ambush attack.
+
+With Burst Bending carried, the blast instead takes a **17-tile cross**
+on open ground: the epicenter and four separate four-tile arms. The same
+footprint controls the preview, damage, hidden Mimic revelation and visuals.
+Four streams of fire spread from a bright central flare. Each stream has a
+flickering edge and tapers at the last tile it reaches.
+Walls stop individual arms; runes retain the shape set when inscribed.
+Aftershock may later re-strike the same recorded cells as a separate
+world-turn effect, not a second immediate fireball.
 
 Each living monster in the footprint and the player independently roll an
 integer from **10 through 50**, uniformly (mean **30**), without armor/DEF
@@ -8650,9 +8903,11 @@ visual and input remains blocked through presentation. Animation frames never
 consume gameplay RNG or resolve damage. Replay records the scroll's identity and
 target coordinates, reusing the same action and seeded damage rolls. Changing
 the blast footprint changes replay outcomes; saves and replay initial states
-require the current save schema. No older-save conversion is provided. No new
-persistent combat status is introduced; inventory, ground drops and stock use
-ordinary item save/replay serialization.
+require the current save schema. No older-save conversion is provided.
+Aftershock is a separate persistent world event; its exact footprint, origin
+level, spell damage profile and expiry are saved
+and replayed independently of animation. Inventory, ground drops and stock
+use ordinary item serialization.
 
 The merchant stocks **three at 250g each**, selling value **125g**. Empty stock
 persists through save/load; selling back replenishes it normally. Fireball
@@ -10039,6 +10294,11 @@ existing floor-tagged entity serialization. Replay initial snapshots contain
 the same data, and stairs replay through the normal inspect action. Background
 terrain is not duplicated. New-world initialization clears the tower registry;
 restoration does not generate or repopulate the tower.
+
+Earthmaw's burial deadline belongs to the individual saved enemy, not the
+active map or transient visual layer. A loaded save and a replay rebuild the
+occupied index from the actual floor and use world turns to resolve emergence.
+Neither transfer nor expiry relocates the player or creates a new level.
 
 The current save version is defined in `src/version.js`. The save format changes
 when stored gameplay data becomes incompatible. Incompatible replay action/turn

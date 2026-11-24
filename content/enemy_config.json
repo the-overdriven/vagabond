@@ -200,6 +200,13 @@
         "verb": "hurls",
         "article": "a"
       },
+      "shooterBigStones": {
+        "projectile": "bigStone",
+        "label": "boulder",
+        "atk": 3,
+        "verb": "hurls",
+        "article": "a"
+      },
       "shooterArrows": {
         "projectile": "arrow",
         "atk": 5,

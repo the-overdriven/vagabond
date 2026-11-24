@@ -212,7 +212,8 @@ function tryEnemySpell(e) {
 // Absolute expiry is checked independently of rendering or animation frames.
 // The five actions after casting are protected; the sixth spent action expires it.
 function enemyImmunityActive(e) {
-  return e.alive !== false && e.hp > 0 && e.immunityUntilTurn > turnCount
+  return e.alive !== false && e.hp > 0 &&
+    (e.immunityUntilTurn > turnCount || ArtifactGeomancy.petrified(e) || ArtifactGeomancy.buried(e))
 }
 
 function expireEnemyImmunities() {

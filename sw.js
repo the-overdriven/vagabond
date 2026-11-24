@@ -12,7 +12,7 @@
 importScripts('./src/version.js');
 const CACHE_PREFIX = 'vagabond-';
 // Independent from the displayed game version; increment for cache refreshes.
-const CACHE_REVISION = 66;
+const CACHE_REVISION = 75;
 const CACHE_VERSION = `${CACHE_PREFIX}${self.VAGABOND_GAME_VERSION}-cache-${CACHE_REVISION}`;
 const PRECACHE = CACHE_VERSION + '-precache';
 const RUNTIME = CACHE_VERSION + '-runtime';
@@ -82,6 +82,11 @@ const PRECACHE_URLS = [
   './src/tracking.js',
   './src/version.js',
   './src/artifactWayfaring.js',
+  './src/artifactGeomancy.js',
+  './img/tiles/boulder-underground-1.png',
+  './img/tiles/boulder-underground-2.png',
+  './img/tiles/boulder-underground-3.png',
+  './img/tiles/boulder-underground-4.png',
   './src/supabase.js',
   './src/graveyard.js',
   './src/highscores.js',
@@ -169,7 +174,9 @@ const PRECACHE_URLS = [
   './img/tiles/dwarven-traps-atlas.png',
   './img/tiles/dwarven-pressure-plate.png',
   './img/tiles/dwarven-crusher-track.png',
-  './img/projectiles/death-bolt.png'
+  './img/projectiles/death-bolt.png',
+  './img/projectiles/stone.png',
+  './img/projectiles/big-stone.png'
 ];
 
 // Ask the server every time (cheap conditional request, 304 if unchanged)

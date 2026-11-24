@@ -93,6 +93,7 @@ function buildSaveObject() {
     collectiveMindFloors: structuredClone(collectiveMindFloors),
     miningSurfaceProgress: {...miningSurfaceProgress},
     miningLastEchoTurn,
+    geomancyWorld: ArtifactGeomancy.serialize(),
     rngState: rngState,
     nextEnemyId,
     inspectedDungeonLocks: [...inspectedDungeonLocks],
@@ -195,6 +196,7 @@ function buildSaveObject() {
       godInvisible: player.godMode ? player.godInvisible !== false : false,
       lastPositionChangeTurn: player.lastPositionChangeTurn,
       artifactBraveryCharge: player.artifactBraveryCharge === true,
+      groundingArmed: player.groundingArmed === true,
       artifactRiposteReady: player.artifactRiposteReady === true,
       artifactRetributionStored: player.artifactRetributionStored,
       artifactBloodReservoirStored: player.artifactBloodReservoirStored,
@@ -294,6 +296,9 @@ function buildSaveObject() {
       artifactExecutionerUsed: e.artifactExecutionerUsed === true,
       artifactBound: e.artifactBound === true,
       artifactPetrified: e.artifactPetrified === true,
+      geomancyBuriedUntil: e.geomancyBuriedUntil || 0,
+      geomancyPetrifiedUntil: e.geomancyPetrifiedUntil || 0,
+      groundingLostAbilities: [...e.groundingLostAbilities],
       artifactSilencedUntilTurn: e.artifactSilencedUntilTurn || 0,
       artifactConfusedUntilTurn: e.artifactConfusedUntilTurn || 0,
       artifactDisarmed: e.artifactDisarmed === true,
@@ -564,6 +569,13 @@ function loadGameFromObject(data, opts = {}) {
     throw new Error('This save uses a different game format. Please start a new world.')
   }
   ArtifactWayfaring.validate(data.player?.wayfaring)
+  ArtifactGeomancy.verifyCairnInventory(data.player?.inventory,data.player?.equip)
+  // Stone lifetime, underlays, and mining progress affect future movement.
+  // Reject missing fields rather than silently accepting an incompatible save.
+  ArtifactGeomancy.restore(data.geomancyWorld)
+  if (!Array.isArray(data.enemies) || data.enemies.some(e=>
+      !Number.isInteger(e.geomancyBuriedUntil) || e.geomancyBuriedUntil<0))
+    throw Error('Invalid saved Earthmaw monster state')
   if (typeof data.player?.highscoresDisqualified !== 'boolean') {
     throw new Error('Save data is missing Highscores eligibility.')
   }
@@ -970,6 +982,8 @@ function loadGameFromObject(data, opts = {}) {
   Object.assign(player, data.player)
   player.wayfaring = structuredClone(data.player.wayfaring)
   Frostwalker.restore()
+  ArtifactGeomancy.resetDerivedState()
+  ArtifactGeomancy.syncLodestone(true)
   miningSurfaceProgress = {...data.miningSurfaceProgress}
   miningLastEchoTurn = data.miningLastEchoTurn
   player.mining = data.player.mining
@@ -1054,6 +1068,8 @@ function loadGameFromObject(data, opts = {}) {
       player.inventory.find(i => i.kind === 'blackkey') || null
   }
   player.invisibleTurns = Number.isFinite(player.invisibleTurns) ? Math.max(0, player.invisibleTurns | 0) : 0
+  if (typeof player.groundingArmed !== 'boolean')
+    throw new Error('Invalid saved Grounding status')
   player.artifactBraveryCharge = player.artifactBraveryCharge === true
   for (const field of ['artifactRetributionStored','artifactBloodReservoirStored','artifactPainEaterHits',
     'artifactPainAttackBonus','artifactRhythmHitsThisAction','artifactLastStandUntilTurn',
@@ -1175,6 +1191,9 @@ function loadGameFromObject(data, opts = {}) {
       artifactExecutionerUsed: e.artifactExecutionerUsed === true,
       artifactBound: e.artifactBound === true,
       artifactPetrified: e.artifactPetrified === true,
+      geomancyBuriedUntil: e.geomancyBuriedUntil || 0,
+      geomancyPetrifiedUntil: e.geomancyPetrifiedUntil || 0,
+      groundingLostAbilities: [...e.groundingLostAbilities],
       artifactSilencedUntilTurn: e.artifactSilencedUntilTurn || 0,
       artifactConfusedUntilTurn: e.artifactConfusedUntilTurn || 0,
       artifactDisarmed: e.artifactDisarmed === true,

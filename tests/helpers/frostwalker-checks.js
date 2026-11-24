@@ -11,7 +11,7 @@ async function frostwalkerChecks(fixture) {
     discovered.forEach(r=>r.fill(false));discoverPlayerSight('arrival');
     player.inventory=[sample('frostwalker')];
   }
-  const sample=id=>makeWayfaringTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
+  const sample=id=>makeArtifactTrinket('Feather',ARTIFACT_EFFECTS.find(e=>e.tier===3),0,id)
   const foe=(x,y,abilities=[])=>{const e=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Goblin,baseName:'Goblin',x,y,level:0,levelKind:'surface',alive:true,hp:100,maxHp:100,aware:true,equipment:null,abilities});occupied.add(keyXY(x,y));return e}
   const tick=t=>{turnCount=t;Frostwalker.tick()}
   try {

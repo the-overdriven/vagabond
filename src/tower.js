@@ -249,6 +249,9 @@ function travelTowerStairs() {
     e.x===player.x&&e.y===player.y) ||
     (destination===0?npcs.find(n=>n.x===player.x&&n.y===player.y):null)
   if(occupant) {
+    if(ArtifactGeomancy.buried(occupant)) {
+      log('The stair landing is blocked.','info');return true
+    }
     const from={x:player.x,y:player.y}
     const otherActors=new Set([
       ...enemies.filter(e=>e!==occupant&&e.alive&&(e.level??0)===destination&&
@@ -301,7 +304,9 @@ function wanderSurfaceBelowTower() {
   const blocked = new Set(npcs.map(n => keyXY(n.x, n.y)))
   for (const e of enemies) if (e.alive && (e.level ?? 0) === 0) blocked.add(keyXY(e.x, e.y))
   for (const e of enemies) {
-    if (!e.alive || Frostwalker.stranded(e) || (e.level ?? 0) !== 0 || (e.levelKind && e.levelKind !== 'surface') ||
+    if (!e.alive || ArtifactGeomancy.petrified(e) ||
+        ArtifactGeomancy.buried(e) || Frostwalker.stranded(e) ||
+        (e.level ?? 0) !== 0 || (e.levelKind && e.levelKind !== 'surface') ||
         towerContains(e.x, e.y) || e.aware || e.sleeping || e.wallAmbushHidden ||
         e.pendingAbility || enemyWanderMode(e) === false || enemyWanderMode(e) === 'far' ||
         Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) > ENEMY_WANDER_ACTIVE_RADIUS) continue
@@ -343,7 +348,8 @@ function towerSurfaceMonsterVisible(e) {
   return currentZ > 0 && e.alive && (e.level ?? 0) === 0 &&
     (!e.levelKind || e.levelKind === 'surface') && !towerContains(e.x, e.y) &&
     map[e.y]?.[e.x] === 'towervoid' && !!discovered[e.y]?.[e.x] &&
-    !e.wallAmbushHidden && e.pendingAbility?.type !== 'burrow' && !enemyInvisibleActive(e)
+    !ArtifactGeomancy.buried(e) && !e.wallAmbushHidden &&
+    e.pendingAbility?.type !== 'burrow' && !enemyInvisibleActive(e)
 }
 
 // Purely visual. These silhouettes are not added to visibleEnemies or any

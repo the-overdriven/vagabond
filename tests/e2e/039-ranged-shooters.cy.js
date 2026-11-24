@@ -54,7 +54,7 @@ describe('Ranged shooter monster variants', () => {
     cy.window().then(win => win.eval(`(() => {
       resetRangedArena()
       const expected = {
-        Monkey:'shooterStones', Goblin:'shooterStones', Kobold:'shooterArrows',
+        Monkey:'shooterStones', Goblin:'shooterStones', Cyclops:'shooterBigStones', Kobold:'shooterArrows',
         'Lizard Man':'shooterArrows', Nymph:'shooterArrows', Centaur:'shooterArrows', Skeleton:'shooterArrows'
       }
       for (const [name, ability] of Object.entries(expected)) {
@@ -62,7 +62,7 @@ describe('Ranged shooter monster variants', () => {
       }
       rangedAssert(shooterAbilityForTemplate(ENEMY_TEMPLATE_BY_NAME.Wolf) === null, 'Wolf must not be eligible')
       rangedAssert(RANGED_CONFIG.shooterChance === 0.5 && RANGED_CONFIG.startingShots === 10, 'configured chance/ammo')
-      rangedAssert(RANGED_CONFIG.abilities.shooterStones.atk === 3 && RANGED_CONFIG.abilities.shooterArrows.atk === 5, 'projectile ATK config')
+      rangedAssert(RANGED_CONFIG.abilities.shooterStones.atk === 3 && RANGED_CONFIG.abilities.shooterBigStones.atk === 3 && RANGED_CONFIG.abilities.shooterArrows.atk === 5, 'projectile ATK config')
 
       const original = rng; let calls = 0
       try {
@@ -197,6 +197,14 @@ describe('Ranged shooter monster variants', () => {
         rangedAssert(tileInspectInfo(e.x,e.y).html.includes('shooter-marker'), 'active tooltip shows bow')
         rangedAssert(RENDER_STYLE.projectiles.arrow.image === 'img/projectiles/arrow.png', 'arrow sprite path')
         rangedAssert(RENDER_STYLE.projectiles.stone.image === 'img/projectiles/stone.png', 'stone sprite path')
+        rangedAssert(RENDER_STYLE.projectiles.bigStone.image === 'img/projectiles/big-stone.png', 'big stone sprite path')
+        for (const [name, projectile] of [['Monkey','stone'],['Goblin','stone'],['Cyclops','bigStone']]) {
+          resetRangedArena(); const thrower=makeShooter(name,3)
+          replayAnimationsDisabled=false; projectileAnims=[]
+          useRolls([0]); enemyRangedAttackPlayer(thrower,clearProjectilePath(thrower))
+          rangedAssert(projectileAnims[0]?.projectile===projectile && thrower.shotsRemaining===9, name+' projectile and ammo')
+        }
+        resetRangedArena(); e=makeShooter('Skeleton',3)
         replayAnimationsDisabled=false; USE_TILE_IMAGES=false; projectileAnims=[]; e.attackStart=undefined; attackAnim=null
         useRolls([0]); enemyRangedAttackPlayer(e,clearProjectilePath(e))
         rangedAssert(projectileAnims.length===1, 'projectile animation exists in ASCII mode')

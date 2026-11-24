@@ -279,6 +279,7 @@ const Frostwalker = (() => {
     state().frostStranded=state().frostStranded.filter(id=>living.has(id))
     for(const e of enemies.slice()){
       if(!e.alive||!onCurrentLevel(e)||!normalizeStranded(e))continue
+      if(enemyImmunityActive(e))continue
       if(escapeStep(e))continue
       const damage=Math.max(1,Math.round(e.maxHp*rule('drowningFraction')))
       e.hp-=damage;absorbEnemyFatalHit(e)
@@ -287,6 +288,7 @@ const Frostwalker = (() => {
     }
   }
   function enemyAction(e) {
+    if(ArtifactGeomancy.petrified(e))return false
     if(!normalizeStranded(e))return false
     const next=escapeStep(e)
     if(next){
