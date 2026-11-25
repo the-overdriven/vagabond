@@ -92,7 +92,13 @@ async function main() {
       g.item?.kind!=='artifact').length`),3,'three ordinary equipment finds remain')
     assert.equal(run(`merchantStock.filter(g=>g.kind==='artifact' &&
       !g.identified && ['weapon','shield','armor'].includes(g.artifactSlot) &&
-      !!g.abilityId).length`),1,'merchant stocks one unidentified gear artifact')
+      !!g.abilityId).length`),2,'merchant stocks two unidentified gear artifacts')
+    assert.equal(run(`merchantStock.filter(g=>g.kind==='artifact' &&
+      !g.identified && g.artifactSlot==='trinket' && !!g.abilityId).length`),1,
+      'merchant stocks one unidentified trinket')
+    assert.equal(run(`new Set(merchantStock.filter(g=>g.kind==='artifact')
+      .map(g=>artifactGearCategory(g.artifactSlot,g))).size`),3,
+      'merchant stocks distinct artifact categories')
     assert.equal(d.positions.length,2)
     assert.equal(typeof d.looseChaos.length,'number','ordinary random Chaos drops remain legal')
     const pool = run(`JSON.stringify(ENEMY_TEMPLATES.filter(t=>t.tier>=2&&t.tier<=4&&

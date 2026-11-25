@@ -9858,10 +9858,14 @@ not player-sold stacks. Wayfaring cannot be traded.
 
 The game's base **sell value** is calculated by `itemSellValue()`.
 
-The Merchant stocks **one guaranteed unidentified gear artifact** from a
-tier-3 source instead of a random trinket-or-gear artifact. It is generated
-once with the normal artifact ability and curse rules and retains the existing
-artifact gambling price: the base price plus **200g** while unidentified.
+The Merchant starts each new world with **two unidentified gear artifacts
+and one unidentified trinket** from a tier-3 source. The two gear categories
+are selected uniformly without replacement from one-handed melee weapons,
+two-handed melee weapons, bows, shields and armor. Their bases, effects,
+abilities and curses follow normal artifact generation rules. All three are
+finite stock: purchases remove them, and neither save restoration nor a new
+character reusing a permadeath world replenishes them. Player-sold artifacts
+remain ordinary buyback stock.
 The Merchant also stocks a Short Bow for **300g** and unlimited separate
 bundles of **10 arrows for 20g**. Bows resell for **30g**, arrows for **1g**
 each. Purchasing a bow includes no free arrows; normal buy/sell and save/replay
@@ -9901,9 +9905,8 @@ discount until it is identified. After the ordinary sell-value discounts, an
 **identified equipment artifact** receives an additional **floor(25% × its
 ability's `priceBonus`)** gold on sale. Unidentified artifacts receive no
 ability premium. The curse reduction applies to the ordinary sell base before
-the premium; it does not reduce the premium again. All 65 enabled powers have an
-individual nonnegative `priceBonus` in `content/artifact_abilities.json`
-(70g–720g).
+the premium; it does not reduce the premium again. Each power has an individual
+nonnegative `priceBonus` in `content/artifact_abilities.json`.
 
 ### Non-tiered items
 
@@ -9932,10 +9935,13 @@ and purchase price remain configured in `merchant_stock.json`.
 
 Every non-gear definition in `content/items.json` and every weapon, shield and
 armor template has a nonnegative `baseValue`, representing the normal per-unit
-purchase value. Naturally generated artifacts take their `baseValue` from their
-selected entry in `artifact_effects.json`; converted gear keeps its original
-purchase base. The common household starting-weapon value and modifier purchase
-increment are configured in `loot_tables.json`.
+purchase value. Naturally generated artifacts store the magical effect's
+`baseValue` from `artifact_effects.json`. For gear artifacts, the purchase
+valuation adds the physical base item's catalog value to the magical effect
+value; trinkets have no physical gear addition. Converted gear already keeps
+its original purchase base and receives no second physical-base charge.
+The common household starting-weapon value and modifier purchase increment are
+configured in `loot_tables.json`.
 
 Initial values preserve the prior pricing: ordinary base purchase values are
 twice the existing sell value; gear modifiers add 10g per modifier point to
@@ -9955,8 +9961,10 @@ itemBaseValue(item)
 ```
 
 However, an item with an explicit `merchantPrice` uses that price instead
-as its **base**. The same `itemBuyValue()` calculation is authoritative for the
-merchant's displayed price and the gold actually charged.
+as its **base**. For natural gear artifacts, an explicit merchant base price
+replaces the magical effect component only; the physical gear value is still
+added. The same `itemBuyValue()` calculation is authoritative for the merchant's
+displayed price and the gold actually charged.
 
 An artifact with a generated power has identification-dependent
 pricing, with mutually exclusive adjustments to its base buy price:
@@ -9965,7 +9973,10 @@ pricing, with mutually exclusive adjustments to its base buy price:
 - **Identified:** +the ability's individual `priceBonus`, with no gambling
   surcharge.
 
-The final artifact purchase price is capped at **1000g**, after the adjustment.
+For example, with a 180g magical effect, an unidentified Dagger (30g physical
+base) costs 410g, while an unidentified Katana (180g physical base) costs 560g.
+A converted Dagger with no modifier costs 230g while unidentified. The final
+artifact purchase price is capped at **1000g**, after the adjustment.
 Sell prices do not include the gambling surcharge. Passive trinkets lacking an
 ability are excluded from this adjustment. Identified artifacts with intrinsic
 curses use the ordinary cursed base resale reduction before adding their ability

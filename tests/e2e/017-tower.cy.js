@@ -108,8 +108,9 @@ describe('Guaranteed elevated tower',()=>{
             ARTIFACT_ABILITIES.abilities[g.item.abilityId]?.enabled),
           merchantArtifactCount:merchantArtifacts.length,
           merchantUnidentifiedGear:merchantArtifacts.every(it=>it.identified===false &&
-            ['weapon','shield','armor'].includes(it.artifactSlot) &&
-            ARTIFACT_ABILITIES.abilities[it.abilityId]?.enabled),
+            ARTIFACT_ABILITIES.abilities[it.abilityId]?.enabled) &&
+            merchantArtifacts.filter(it=>it.artifactSlot==='trinket').length===1 &&
+            new Set(merchantArtifacts.map(it=>artifactGearCategory(it.artifactSlot,it))).size===3,
           mimicInDeadEnd,invisibleApproach,noSpoilers,persisted:towerMaze.active,
           monsters:[count(-1),count(-2)],
           ghost:enemies.some(e=>e.towerMazeResident &&
@@ -122,7 +123,7 @@ describe('Guaranteed elevated tower',()=>{
         sealed:true,basementFeedback:true,towerFeedback:true,
         mimicInDeadEnd:true,invisibleApproach:true,noSpoilers:true,persisted:true,ghost:false,chest:1,
         buriedTotal:5,buriedArtifacts:2,buriedHidden:true,
-        merchantArtifactCount:1,merchantUnidentifiedGear:true,
+        merchantArtifactCount:3,merchantUnidentifiedGear:true,
         upper:'mazestairsup',lower:'caveup'})
       expect(result.monsters[0]).to.be.within(8,15)
       expect(result.monsters[1]).to.be.within(8,15)

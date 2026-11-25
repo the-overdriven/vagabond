@@ -620,6 +620,28 @@ describe('Gear bases on procedural artifacts', () => {
       check(itemBuyValue(item)===350,'cheap power uses its own premium')
       item.identified=false
       check(itemBuyValue(item)===480,'unidentified price is independent of hidden ability')
+      const effect=ARTIFACT_EFFECTS.find(e=>e.tier===4)
+      const natural={kind:'artifact',artifactSlot:'weapon',base:'Dagger',effectId:effect.id,
+        tier:4,baseValue:effect.baseValue,abilityId:'taunt',identified:false}
+      const katana={...natural,base:'Katana'}
+      check(itemBuyValue(natural)===effect.baseValue+30+200,'dagger includes its physical base')
+      check(itemBuyValue(katana)===effect.baseValue+180+200,'katana includes its higher physical base')
+      check(itemBuyValue({...katana,identified:true})===effect.baseValue+180+70,
+        'identified natural gear includes physical price and ability premium')
+      const converted={...natural,effectId:CONVERTED_GEAR_EFFECT.id,baseValue:30}
+      check(itemBuyValue(converted)===230,'converted gear is not charged twice')
+      const oldStock=merchantStock,oldRngState=rngState
+      try {
+        merchantStock=[];ensureMerchantStock();initializeMerchantArtifacts()
+        const stock=merchantStock.filter(i=>i.kind==='artifact')
+        check(stock.length===3&&stock.every(i=>!i.identified&&i.abilityId),
+          'three unidentified artifacts with real abilities')
+        check(stock.filter(i=>i.artifactSlot==='trinket').length===1&&
+          new Set(stock.map(i=>artifactGearCategory(i.artifactSlot,i))).size===3,
+          'one trinket and two different gear categories')
+        merchantStock=merchantStock.filter(i=>i.kind!=='artifact');ensureMerchantStock()
+        check(!merchantStock.some(i=>i.kind==='artifact'),'depleted artifact stock stays depleted')
+      } finally {merchantStock=oldStock;rngState=oldRngState}
       const trinket={kind:'artifact',artifactSlot:'trinket',baseValue:280,identified:false}
       check(itemBuyValue(trinket)===280,'powerless trinket has no gambling surcharge')
       check(itemBuyValue({kind:'weapon',baseValue:80,merchantPrice:60})===60,

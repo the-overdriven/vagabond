@@ -46,7 +46,7 @@ test('artifact noun catalog uses every gear base, including Short Bow', async ()
   assert.notEqual(artifact('Titan Warpick', 3).base, 'Titan Warpick', 'tier-3 artifact must not pick a tier-5 base')
 })
 
-test('test gear artifacts are unidentified and the merchant sells one as a gamble', async () => {
+test('gear artifacts are unidentified and merchant starts with three finite gambles', async () => {
   await ready()
   for (const tier of [3, 4, 5]) {
     const results = JSON.parse(run(`(() => {
@@ -62,25 +62,53 @@ test('test gear artifacts are unidentified and the merchant sells one as a gambl
       assert.equal(run(`[...WEAPONS,...SHIELDS,...ARMORS].some(base=>base.name===${JSON.stringify(item.base)})`),true)
     }
   }
-  const merchant = JSON.parse(run(`(() => {
-    merchantStock=[];ensureMerchantStock()
-    const artifact=merchantStock.filter(i=>i.kind==='artifact')
-    return JSON.stringify({count:artifact.length,item:artifact[0],price:artifact[0]&&itemBuyValue(artifact[0])})
-  })()`))
-  assert.equal(merchant.count, 1)
-  assert.ok(['weapon','shield','armor'].includes(merchant.item.artifactSlot))
-  assert.equal(merchant.item.identified,false)
-  assert.ok(merchant.item.abilityId)
-  assert.equal(merchant.price,
-    Math.min(1000,merchant.item.merchantPrice+200),'gambling markup applies without revealing the power')
-  assert.equal(run('merchantStock.filter(i=>i.kind==="artifact").length'),1,
-    'merchant does not spawn extra artifacts when stock is queried')
+  for (const seed of [1, 23, 23009, 77777, 987654]) {
+    const checkStock = () => JSON.parse(run(`(() => {
+      rngState=${seed};merchantStock=[];ensureMerchantStock();initializeMerchantArtifacts()
+      return JSON.stringify(merchantStock.filter(i=>i.kind==='artifact').map(item=>({
+        item, category:artifactGearCategory(item.artifactSlot,item), price:itemBuyValue(item),
+        base:itemBaseValue(item), physical:artifactPhysicalPrice(item)})))
+    })()`))
+    const stock = checkStock()
+    assert.deepEqual(checkStock(),stock,'same seed yields identical artifact assortment')
+    assert.equal(stock.length,3)
+    assert.equal(stock.filter(entry=>entry.category==='trinket').length,1)
+    assert.equal(new Set(stock.map(entry=>entry.category)).size,3)
+    for (const {item,price,base,physical} of stock) {
+      assert.equal(item.identified,false)
+      assert.ok(item.abilityId)
+      assert.ok(item.tier<=3)
+      assert.equal(base,item.baseValue+physical)
+      assert.equal(price,Math.min(1000,base+200))
+    }
+  }
   const before = run('JSON.stringify(merchantStock)')
   run('ensureMerchantStock()')
   assert.equal(run('JSON.stringify(merchantStock)'),before,'stock is stable under repeated checks')
   const state = run('JSON.stringify(buildSaveObject())')
   run(`loadGameFromObject(${state},{isReplayInit:true})`)
-  assert.equal(run('JSON.stringify(merchantStock)'),before,'unidentified stock survives replay/save restoration')
+  assert.equal(run('JSON.stringify(merchantStock)'),before,'unidentified stock survives replay restoration')
+  // Buy all three with the real purchase code, then verify both load paths.
+  run('window.merchantTestLog=log;log=()=>{}')
+  try {
+    run(`player.gold=10000;replayRecording=false;
+      for(const item of merchantStock.filter(i=>i.kind==='artifact'))buyItem(item)`)
+    assert.equal(run('merchantStock.filter(i=>i.kind==="artifact").length'),0)
+    const depleted = run('JSON.stringify(buildSaveObject())')
+    for (const isReplayInit of [true,false]) {
+      run(`loadGameFromObject(${depleted},{isReplayInit:${isReplayInit}});ensureMerchantStock()`)
+      assert.equal(run('merchantStock.filter(i=>i.kind==="artifact").length'),0,
+        'depleted artifacts are never restocked by restoration')
+    }
+  } finally {run('log=merchantTestLog;delete window.merchantTestLog')}
+  const dagger=artifact('Dagger',4), katana=artifact('Katana',4)
+  assert.equal(dagger.base,'Dagger');assert.equal(katana.base,'Katana')
+  assert.equal(dagger.baseValue,katana.baseValue)
+  assert.equal(run(`itemBuyValue(${JSON.stringify(dagger)})`),410)
+  assert.equal(run(`itemBuyValue(${JSON.stringify(katana)})`),560)
+  assert.equal(run(`itemBuyValue({...${JSON.stringify(katana)},merchantPrice:180})`),560)
+  assert.equal(run(`itemBuyValue({...${JSON.stringify(katana)},identified:true,abilityId:'taunt'})`),430)
+  assert.equal(run(`itemBuyValue(convertEquipmentToArtifact({kind:'weapon',base:'Dagger',name:'Dagger',tier:1,baseValue:30,atk:2,grace:5}))`),230)
   // Exercise the actual replay buy handler and the same instance after a save.
   run('window.originalTradeLog=log')
   try {
@@ -1625,19 +1653,19 @@ test('artifact pricing is identification-dependent, capped and non-profitable on
     const cfg = ARTIFACT_ABILITIES.pricing
     const items = ARTIFACT_EFFECTS.flatMap(effect => Object.keys(powers).map(abilityId => ({
       kind:'artifact',tier:effect.tier,baseValue:effect.baseValue,merchantPrice:effect.baseValue,
-      artifactSlot:'weapon',abilityId,identified:false,curse:null
+      effectId:effect.id,base:'Dagger',artifactSlot:'weapon',abilityId,identified:false,curse:null
     })))
     let examined = 0
     for (const item of items) {
       const hiddenBuy = itemBuyValue(item)
       const hiddenSell = itemSellValue(item)
-      if (hiddenBuy !== Math.min(cfg.maxBuyPrice, item.baseValue + 200)) throw Error('hidden buy')
+      if (hiddenBuy !== Math.min(cfg.maxBuyPrice, item.baseValue + 30 + 200)) throw Error('hidden buy')
       if (hiddenSell > hiddenBuy) throw Error('hidden resale profit')
       item.identified = true
       const premium = powers[item.abilityId].priceBonus
       const identifiedBuy = itemBuyValue(item)
       const identifiedSell = itemSellValue(item)
-      if (identifiedBuy !== Math.min(cfg.maxBuyPrice, item.baseValue + premium)) throw Error('identified buy')
+      if (identifiedBuy !== Math.min(cfg.maxBuyPrice, item.baseValue + 30 + premium)) throw Error('identified buy')
       if (identifiedSell !== (powers[item.abilityId].intrinsicCurse ? Math.floor(SELL_VALUE_BY_TIER[item.tier] / 4) : SELL_VALUE_BY_TIER[item.tier]) + Math.floor(premium * .25))
         throw Error('identified sale')
       if (identifiedSell > identifiedBuy) throw Error('identified resale profit')
@@ -1651,8 +1679,9 @@ test('artifact pricing is identification-dependent, capped and non-profitable on
     if (itemBuyValue(empty) !== 280) throw Error('trinket gambling surcharge')
     return {examined, powerCount:Object.keys(powers).length}
   })()`)
-  assert.equal(result.powerCount, 71)
-  assert.equal(result.examined, 71 * 14)
+  const powerCount=Object.keys(loadJson('artifact_abilities.json').abilities).length
+  assert.equal(result.powerCount,powerCount)
+  assert.equal(result.examined,powerCount*loadJson('artifact_effects.json').length)
 })
 
 test('artifact activations log and animate while concealing unidentified powers', async () => {

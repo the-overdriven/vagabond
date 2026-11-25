@@ -28,7 +28,7 @@
     "priceMultiplier": 2
   },
   "guaranteedGear": {
-    "_note": "One guaranteed item of each kind/tier below is kept in stock; price = itemBaseValue() * priceMultiplier / 2. Existing multiplier 2 uses the normal base purchase value.",
+    "_note": "Ordinary gear uses price = itemBaseValue() * priceMultiplier / 2. Artifacts are finite new-world stock, using normal artifact pricing.",
     "shield": {
       "tier": 1,
       "priceMultiplier": 2
@@ -39,7 +39,9 @@
     },
     "artifact": {
       "tier": 3,
-      "priceMultiplier": 2
+      "gearCount": 2,
+      "trinketCount": 1,
+      "gearCategories": ["oneHandedMelee", "twoHandedMelee", "bow", "shield", "armor"]
     }
   },
   "scrolls": {

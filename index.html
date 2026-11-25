@@ -2709,8 +2709,7 @@ more difficult:
     if (ability.maxTier !== undefined && item.tier !== undefined && item.tier > ability.maxTier) return false
     if (!ability.weaponTypes) return true
     if (item.artifactSlot !== 'weapon') return false
-    const type = item.rangedAtk ? 'bow' : item.twoHanded ? 'twoHandedMelee' : 'oneHandedMelee'
-    return ability.weaponTypes.includes(type)
+    return ability.weaponTypes.includes(artifactGearCategory(item.artifactSlot, item))
   }
 
   function artifactAbilityPool(item) {
@@ -3699,7 +3698,15 @@ more difficult:
     return item
   }
 
-  function makeArtifactItem(tier, mf = 0, {gearOnly = false, nonGearOnly = false} = {}) {
+  // Bows and two-handed melee weapons are distinct merchant gear categories.
+  function artifactGearCategory(slot, base) {
+    if (slot !== 'weapon') return slot
+    if (base.rangedAtk) return 'bow'
+    return base.twoHanded ? 'twoHandedMelee' : 'oneHandedMelee'
+  }
+
+  function makeArtifactItem(tier, mf = 0, {gearOnly = false, nonGearOnly = false, gearCategory = null} = {}) {
+    if (gearCategory !== null) gearOnly = true
     if (gearOnly && nonGearOnly) throw new Error('Conflicting artifact category filters')
     if (!ARTIFACT_EFFECTS || !ARTIFACT_EFFECTS.length) return null
     // Magic Find's "quality" effect on artifacts: a chance to roll the
@@ -3718,7 +3725,9 @@ more difficult:
     // A low-tier artifact must not roll the statistics of a higher-tier
     // base (e.g. a tier-3 artifact with a tier-5 Titan Warpick).
     const eligibleGearNames = [...WEAPONS, ...SHIELDS, ...ARMORS]
-      .filter(base => base.tier <= effect.tier).map(base => base.name)
+      .filter(base => base.tier <= effect.tier && (gearCategory === null ||
+        artifactGearCategory(artifactGearBase(base.name).slot, base) === gearCategory))
+      .map(base => base.name)
     if (gearOnly && !eligibleGearNames.length)
       throw new Error('No eligible equipment bases for artifact tier ' + effect.tier)
     const trinketNouns = gearOnly ? [] : eligibleArtifactTrinketNouns(effect.tier)
@@ -17492,6 +17501,25 @@ more difficult:
     log(`The Merchant now stocks ${stock.length} identified test artifacts.`, 'info')
   }
 
+  // Only a genuinely new world receives the finite artifact assortment.
+  // Save/replay restoration and permadeath world reuse keep the remaining stock.
+  function initializeMerchantArtifacts() {
+    const cfg = MERCHANT_STOCK_CONFIG.guaranteedGear.artifact
+    const categories = cfg.gearCategories.slice()
+    for (let i = 0; i < cfg.gearCount; i++) {
+      const category = pick(categories)
+      categories.splice(categories.indexOf(category), 1)
+      const item = makeArtifactItem(cfg.tier, 0, {gearCategory:category})
+      if (!item) throw new Error('Could not generate merchant artifact: ' + category)
+      merchantStock.push(item)
+    }
+    for (let i = 0; i < cfg.trinketCount; i++) {
+      const item = makeArtifactItem(cfg.tier, 0, {nonGearOnly:true})
+      if (!item) throw new Error('Could not generate merchant trinket')
+      merchantStock.push(item)
+    }
+  }
+
   function ensureMerchantStock() {
     for (const fixedItem of MERCHANT_STOCK_CONFIG.fixedItems) {
       const existing = merchantStock.find(it => it.kind === fixedItem.kind && it.base === fixedItem.base)
@@ -17534,13 +17562,6 @@ more difficult:
       armor.merchantPrice = itemBaseValue(armor) * gear.armor.priceMultiplier / 2
       merchantStock.push(armor)
     }
-    if (!merchantStock.some(it => it.kind === 'artifact' && !it.godTestArtifact)) {
-      const art = makeArtifactItem(gear.artifact.tier, 0, {gearOnly:true})
-      if (art) {
-        art.merchantPrice = itemBaseValue(art) * gear.artifact.priceMultiplier / 2
-        merchantStock.push(art)
-      }
-    }
     for (const cfg of Object.values(MERCHANT_STOCK_CONFIG.scrolls)) {
       if (!merchantStock.some(it => it.kind === cfg.kind && !it.merchantSold)) {
         merchantStock.push(createItem(cfg.kind, {count:cfg.count, merchantPrice:cfg.merchantPrice}))
@@ -17579,11 +17600,20 @@ more difficult:
     return 0
   }
 
+  // Natural gear artifacts store the magical effect's base value. Converted
+  // equipment already stores the physical base, so do not charge it twice.
+  function artifactPhysicalPrice(it) {
+    if (it.kind !== 'artifact' || it.artifactSlot === 'trinket' ||
+        !Number.isFinite(artifactEffectDefinition(it.effectId)?.baseValue)) return 0
+    return artifactGearBase(it.base)?.base.baseValue || 0
+  }
+
   function itemBaseValue(it) {
     const definition = itemDefinition(it.kind)
     if (definition) return definition.baseValue
     const base = it.startingWeapon ? ITEM_BASE_VALUES.startingWeapon : it.baseValue
-    return (base || 0) + (it.mod ? (it.modAmt || 1) * ITEM_BASE_VALUES.modifierPerPoint : 0)
+    return (base || 0) + artifactPhysicalPrice(it) +
+      (it.mod ? (it.modAmt || 1) * ITEM_BASE_VALUES.modifierPerPoint : 0)
   }
 
   // Read, do not mutate, the saved merchantPrice: it always remains a base input.
@@ -17593,7 +17623,7 @@ more difficult:
   }
 
   function itemBuyValue(it) {
-    const base = it.merchantPrice !== undefined ? it.merchantPrice : itemBaseValue(it)
+    const base = it.merchantPrice !== undefined ? it.merchantPrice + artifactPhysicalPrice(it) : itemBaseValue(it)
     if (it.kind !== 'artifact' || !it.abilityId) return base
     const pricing = ARTIFACT_ABILITIES.pricing
     const adjustment = it.identified ? artifactPriceBonus(it) : pricing.unidentifiedBuySurcharge
@@ -19838,7 +19868,9 @@ more difficult:
       undergroundDiscovered = undergroundDiscoveredL1
       invalidateUndergroundFov()
       rebuildMinimapBases()
+      merchantStock = []
       ensureMerchantStock()
+      initializeMerchantArtifacts()
       rebuildActiveLevelOccupancy()
       stopDeathTransition()
       stopAttackAnimation()
