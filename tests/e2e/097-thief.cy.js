@@ -273,8 +273,13 @@ describe('One-time monster theft', () => {
         theftCheck(tryWoundedEnemyFlee(e) && e.x===stalledX && e.theftEscapeSteps===1,
           'hesitation consumes no escape steps')
         chance=()=>false
+        // Blocking the forward tile alone leaves a detour through the open
+        // corridor entrance. Close that entrance too for a genuine dead end.
         map[40][43]='mountain'
-        theftCheck(!tryWoundedEnemyFlee(e) && e.theftEscapeSteps===1,'being cornered consumes no steps')
+        for(let y=39;y<=41;y++) map[y][41]='mountain'
+        theftCheck(!tryWoundedEnemyFlee(e) && e.x===stalledX && e.y===40 &&
+          e.theftEscapeSteps===1,'being cornered consumes no steps')
+        for(let y=39;y<=41;y++) map[y][41]='grass'
         map[40][43]='grass'
         player.invisibleTurns=5
         theftCheck(!tryWoundedEnemyFlee(e) && e.theftEscapeSteps===1,'invisibility pauses escape steps')
