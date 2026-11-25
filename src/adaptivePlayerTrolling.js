@@ -1253,7 +1253,7 @@ const AdaptivePlayerTrolling = (() => {
     if (!state.scrollKindsUsed.includes(kind)) state.scrollKindsUsed.push(kind)
     if (state.scrollUses < config.events.scroll_restock.minSuccessfulUses) return false
     for (const scrollKind of state.scrollKindsUsed) {
-      const existing = merchantStock.find(item => item.kind === scrollKind && !item.unlimitedStock)
+      const existing = merchantStock.find(item => item.kind === scrollKind && !item.unlimitedStock && !item.merchantSold)
       if (existing) {
         existing.count = Math.max(0, existing.count ?? 1) + 1
         existing.merchantNew = true

@@ -1310,7 +1310,11 @@
           },
           {
             "kind": "scrollOfInvisibility",
-            "weight": 4
+            "weight": 1
+          },
+          {
+            "kind": "idscroll",
+            "weight": 3
           },
           {
             "kind": "stoneSkinPotion",

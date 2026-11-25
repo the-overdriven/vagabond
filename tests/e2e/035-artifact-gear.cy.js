@@ -80,6 +80,28 @@ describe('Gear bases on procedural artifacts', () => {
         item.identified=false
         check(itemStatLine(item)==='???','unidentified artifact stays secret')
       }
+      const feather={kind:'artifact',artifactSlot:'trinket',noun:'Feather',
+        name:'Test Feather',identified:true,abilityId:'highlander'}
+      const flint={kind:'artifact',artifactSlot:'trinket',noun:'Flint',
+        name:'Test Flint',identified:true,abilityId:'earthmaw'}
+      for (const [item,domain] of [[feather,'wayfaring'],[flint,'geomancy']]) {
+        const el=document.createElement('span')
+        appendItemStatLine(el,item,'',itemStatLine(item))
+        check(el.querySelector('.domain-'+domain)?.textContent===artifactAbilityDefinition(item).name,
+          'identified ability uses its actual domain color')
+        item.identified=false
+        appendItemStatLine(el,item,'',itemStatLine(item))
+        check(el.textContent==='???' && !el.querySelector('.artifact-domain-power'),
+          'unidentified artifact does not reveal the power domain')
+      }
+      player.inventory=[feather,flint,{kind:'artifact',artifactSlot:'weapon',identified:false},createItem('amber')]
+      setInvTab('artifact')
+      check(filterVisibleInventory().length===3,'artifacts tab includes unidentified gear and trinkets')
+      setInvTab('weapon')
+      check(filterVisibleInventory().length===1,'artifact weapon also appears under weapons')
+      setInvTab('other')
+      check(filterVisibleInventory().length===1,'other excludes artifacts')
+      setInvTab('all')
     })()`))
   })
 

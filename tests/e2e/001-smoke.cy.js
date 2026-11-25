@@ -263,8 +263,8 @@ describe('Vagabond smoke test', () => {
         expect(npc.tile, npc.name + ' terrain').not.to.be.oneOf(['river', 'water'])
         expect(npc.distance, npc.name + ' walk distance').to.be.at.most(5)
       }
-      expect(state.stock.homecomingscroll).to.equal(9)
-      expect(state.stock.idscroll).to.equal(6)
+      expect(state.stock.homecomingscroll).to.equal(12)
+      expect(state.stock.idscroll).to.equal(12)
       expect(state.stock.scrollOfInvisibility).to.equal(3)
       expect(state.swordPrice).to.equal(600)
     })

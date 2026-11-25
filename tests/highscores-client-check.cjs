@@ -55,7 +55,8 @@ function character(id = 'character-a') {
 function snapshot(id = 'character-a', level = 2, mode = false) {
   return {character_id:id,character_name:'Tester',race:'elf',permadeath:mode,level,
     atk:2.25,def:1.5,spd:4,grace:2,equipment:{weapon:{name:'Sword',atk:2.25}},
-    artifacts:[],world_traits:[],strongest_enemy_killed:null}
+    artifacts:[],world_traits:[],strongest_enemy_killed:null,
+    combat_skills:{oneHanded:0,twoHanded:0,shielding:0,marksmanship:0,swimming:0,mining:0},life_potions:0}
 }
 
 test('startup reads both modes once with the configured shared Supabase SDK/client', async () => {

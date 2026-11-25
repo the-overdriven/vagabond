@@ -52,7 +52,7 @@ describe('Wyrdhag consumable healing and individual monster loot', () => {
     cy.window().then(win => win.eval(`(() => {
       const check=(ok,why)=>{if(!ok)throw Error(why)}
       const t=ENEMY_TEMPLATE_BY_NAME.Wyrdhag,origChance=chance,origRng=rng
-      const items=t.lootTable
+      const items=t.lootTable.filter(it=>it.group==='healing')
       check(items.length===3 && items.every(it=>it.group==='healing' &&
         it.chance===0.066) &&
         ['potion','herb','mushroom'].every(k=>items.some(it=>it.kind===k)) &&

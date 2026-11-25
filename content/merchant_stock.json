@@ -45,23 +45,33 @@
   "scrolls": {
     "idScroll": {
       "kind": "idscroll",
-      "minCount": 6,
-      "minPrice": 100
+      "count": 12,
+      "merchantPrice": 100
     },
     "homecomingScroll": {
       "kind": "homecomingscroll",
-      "count": 9,
+      "count": 12,
       "merchantPrice": 70
     },
     "fireballScroll": {
       "kind": "scrollOfFireball",
-      "count": 3,
+      "count": 5,
       "merchantPrice": 250
     },
     "invisibilityScroll": {
       "kind": "scrollOfInvisibility",
       "count": 3,
       "merchantPrice": 200
+    },
+    "fearScroll": {
+      "kind": "scrollOfFear",
+      "count": 4,
+      "merchantPrice": 80
+    },
+    "chaosScroll": {
+      "kind": "scrollOfChaos",
+      "count": 3,
+      "merchantPrice": 120
     }
   }
 }

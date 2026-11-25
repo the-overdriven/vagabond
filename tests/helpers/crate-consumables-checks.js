@@ -2,7 +2,7 @@
 function crateLootDistributionChecks() {
   const check = (ok, message) => {if (!ok) throw Error(message)}
   const config = WORLD_GEN_CONFIG.dungeons.dwarvenRuins.crates
-  const expected = new Map([[null,83.1], ['potion',6], ['scrollOfInvisibility',4],
+  const expected = new Map([[null,83.1], ['potion',6], ['scrollOfInvisibility',1], ['idscroll',3],
     ['stoneSkinPotion',1.8], ['berserkPotion',1.8], ['scrollOfFear',1.2],
     ['scrollOfChaos',0.9], ['scrollOfFireball',0.9], ['scrollOfDeathShield',0.3]])
   const total = config.loot.reduce((sum, entry) => sum + entry.weight, 0)

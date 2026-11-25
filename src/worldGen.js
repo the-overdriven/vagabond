@@ -630,7 +630,7 @@ function initializeDwarvenCrates() {
   const loot = config?.loot
   if (!Number.isInteger(config?.hp) || config.hp < 1 || !Array.isArray(loot) || !loot.length ||
       loot.some(entry => !entry || !Number.isFinite(entry.weight) || entry.weight <= 0 ||
-        (entry.kind !== null && !['potion', 'speedpotion', 'scrollOfInvisibility', ...TACTICAL_CONSUMABLE_KINDS].includes(entry.kind))))
+        (entry.kind !== null && !['potion', 'speedpotion', 'scrollOfInvisibility', 'idscroll', ...TACTICAL_CONSUMABLE_KINDS].includes(entry.kind))))
     throw new Error('Invalid Dwarven crate durability or loot table.')
   const total = loot.reduce((sum, entry) => sum + entry.weight, 0)
   for (const level of deepLevels) {
@@ -6151,7 +6151,7 @@ function populateDeepCaveRewards(deep) {
       groundItems.push({x:p.x,y:p.y,kind:'chest',tier,opened:false,level:-2,levelKind:'chain',caveIndex:p.caveIndex})
       e.chests++
     }else{
-      const supply=kind==='supply'?(rng()<.5?'potion':'scrollOfInvisibility'):kind
+      const supply=kind==='supply'?(rng()<.5?'potion':'idscroll'):kind
       groundItems.push({x:p.x,y:p.y,kind:supply,level:-2,levelKind:'chain',caveIndex:p.caveIndex})
       e.provisions++
     }
@@ -6455,7 +6455,7 @@ function spawnCaveScenarios() {
       for (let i = 0; i < cfg.deepProvisionCount; i++) {
         const spot = takeSpot('room', roomOrder[(i + 2) % roomOrder.length] || null)
         if (spot) groundItems.push({x: spot.x, y: spot.y,
-          kind: i % 2 === 0 ? 'potion' : 'scrollOfInvisibility', level, levelKind: 'chain', caveIndex})
+          kind: i % 2 === 0 ? 'potion' : 'idscroll', level, levelKind: 'chain', caveIndex})
       }
     }
 

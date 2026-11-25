@@ -21,7 +21,7 @@ async function main() {
     for(let y=42;y<68;y++)for(let x=42;x<75;x++){map[y][x]='grass';grasslandTrees.delete(keyXY(x,y))}
     enemies=[{id:'holy-test',name:'Goblin',baseName:'Goblin',tier:1,level:0,x:61,y:50,
       homeX:61,homeY:50,alive:true,hp:100,maxHp:100,atk:5,def:0,spd:2,
-      aggro:8,abilities:[],humanoid:false,aware:true,alarmed:false,sleeping:false,wander:false}];
+      aggro:8,abilities:[],groundingLostAbilities:[],humanoid:false,aware:true,alarmed:false,sleeping:false,wander:false}];
     occupied.add('61,50');player.equip.weapon={kind:'weapon',name:'Test Club',atk:1,grace:3}`)
   check('FLEE_DISTANCE===10 && playerInsideSanctuary()', 'inclusive 10-tile sanctuary')
   check('!enemyInsideSanctuary(enemies[0]) && !enemyCanPathThrough(enemies[0],60,50)', 'outer monster cannot enter')
@@ -116,7 +116,7 @@ async function main() {
         if(l.map[y]?.[x]==='dwarvencrate')tiles.push(keyXY(x,y));
       return tiles.length===l.crates.length && l.crates.every(c=>tiles.includes(keyXY(c.x,c.y)) &&
         c.hp===WORLD_GEN_CONFIG.dungeons.dwarvenRuins.crates.hp &&
-        [null,'potion','speedpotion','scrollOfInvisibility',...TACTICAL_CONSUMABLE_KINDS].includes(c.lootKind))
+        [null,'potion','speedpotion','scrollOfInvisibility','idscroll',...TACTICAL_CONSUMABLE_KINDS].includes(c.lootKind))
     })`, 'crate generation matches blocking tiles, configured HP and valid loot')
     run('rngState=WORLD_SEED;initializeDwarvenCrates()')
     assert.equal(JSON.stringify(run(`deepLevels.filter(l=>l.dungeonPackage==='dwarvenRuins')

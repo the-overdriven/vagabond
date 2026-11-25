@@ -305,14 +305,15 @@ more difficult:
         display: inline !important;
       }
     }
-    /* Merchant stock and player inventory remain side by side. Category filters
-       are independent for each column; touch trade and service views are unchanged. */
+    /* Independent category filters on both merchant columns, including mobile. */
     #tradePanel .trade-filters { display:none; }
     #tradePanel .trade-filters .inv-tab { display:inline-flex; align-items:center; justify-content:center; min-height:30px; min-width:31px; padding:4px 6px; }
     #tradePanel .trade-filter-icon { width:19px; height:19px; object-fit:contain; }
     #tradePanel .trade-filter-apple { font-size:19px; line-height:19px; }
-    @media (min-width: 721px) {
-      #tradePanel[data-trade-mode="merchant"] .trade-filters { display:flex; gap:4px; flex-wrap:wrap; margin:6px 0 8px; }
+    #tradePanel[data-trade-mode="merchant"] .trade-filters { display:flex; gap:4px; flex-wrap:wrap; margin:6px 0 8px; flex:0 0 auto; }
+    @media (max-width: 720px), (pointer: coarse) {
+      #tradePanel .trade-filters { gap:3px; }
+      #tradePanel .trade-filters .inv-tab { min-width:28px; padding:3px 4px; letter-spacing:0; }
     }
   </style>
 </head>
@@ -431,6 +432,7 @@ more difficult:
           <button class="inv-tab" data-tab="shield" type="button" aria-label="Shields"><span class="inv-tab-label">Shields</span><img class="inv-tab-mobile" src="img/icons/shield.svg" alt="" aria-hidden="true"></button>
           <button class="inv-tab" data-tab="armor" type="button" aria-label="Armors"><span class="inv-tab-label">Armors</span><img class="inv-tab-mobile" src="img/icons/armor.svg" alt="" aria-hidden="true"></button>
           <button class="inv-tab" data-tab="supplies" type="button" aria-label="Supplies"><span class="inv-tab-label">Supplies</span><span class="inv-tab-mobile inv-tab-apple" aria-hidden="true">🍎</span></button>
+          <button class="inv-tab" data-tab="artifact" type="button" aria-label="Artifacts"><span class="inv-tab-label">Artifacts</span><span class="inv-tab-mobile inv-tab-apple" aria-hidden="true">🔮</span></button>
           <button class="inv-tab" data-tab="other" type="button">Other</button>
         </div>
         <div class="invlist" id="invList"></div>
@@ -546,6 +548,7 @@ more difficult:
               <button class="inv-tab" type="button" data-trade-filter="shield" aria-pressed="false" aria-label="Shields" title="Shields"><img class="trade-filter-icon" src="img/icons/shield.svg" alt="" aria-hidden="true"></button>
               <button class="inv-tab" type="button" data-trade-filter="armor" aria-pressed="false" aria-label="Armors" title="Armors"><img class="trade-filter-icon" src="img/icons/armor.svg" alt="" aria-hidden="true"></button>
               <button class="inv-tab" type="button" data-trade-filter="supplies" aria-pressed="false" aria-label="Supplies" title="Supplies"><span class="trade-filter-apple" aria-hidden="true">🍎</span></button>
+              <button class="inv-tab" type="button" data-trade-filter="artifact" aria-pressed="false" aria-label="Artifacts" title="Artifacts"><span class="trade-filter-apple" aria-hidden="true">🔮</span></button>
               <button class="inv-tab" type="button" data-trade-filter="other" aria-pressed="false" title="Other items">Other</button>
             </div>
             <div class="invlist" id="tradeBuyList">
@@ -561,6 +564,7 @@ more difficult:
               <button class="inv-tab" type="button" data-trade-filter="shield" aria-pressed="false" aria-label="Shields" title="Shields"><img class="trade-filter-icon" src="img/icons/shield.svg" alt="" aria-hidden="true"></button>
               <button class="inv-tab" type="button" data-trade-filter="armor" aria-pressed="false" aria-label="Armors" title="Armors"><img class="trade-filter-icon" src="img/icons/armor.svg" alt="" aria-hidden="true"></button>
               <button class="inv-tab" type="button" data-trade-filter="supplies" aria-pressed="false" aria-label="Supplies" title="Supplies"><span class="trade-filter-apple" aria-hidden="true">🍎</span></button>
+              <button class="inv-tab" type="button" data-trade-filter="artifact" aria-pressed="false" aria-label="Artifacts" title="Artifacts"><span class="trade-filter-apple" aria-hidden="true">🔮</span></button>
               <button class="inv-tab" type="button" data-trade-filter="other" aria-pressed="false" title="Other items">Other</button>
             </div>
             <div class="invlist" id="tradeSellList"></div>
@@ -16931,6 +16935,30 @@ more difficult:
     return marker
   }
 
+  function artifactAbilityDomain(item) {
+    if (!item?.identified || !artifactAbilityDefinition(item)) return null
+    // Shared powers use the first applicable domain in the item's own pool.
+    return artifactDomains(item).find(domain => ARTIFACT_ABILITIES.domains[domain]?.includes(item.abilityId)) || null
+  }
+
+  function appendItemStatLine(element, item, prefix, line, suffix = '') {
+    const domain = artifactAbilityDomain(item)
+    const name = domain && artifactAbilityDefinition(item).name
+    if (!name || !line.includes(name)) {
+      element.textContent = prefix + line + suffix
+      return
+    }
+    const offset = line.lastIndexOf(name)
+    element.textContent = prefix + line.slice(0, offset)
+    const ability = document.createElement('span')
+    ability.className = `artifact-domain-power domain-${domain}`
+    ability.textContent = name
+    element.appendChild(ability)
+    const trailing = document.createElement('span')
+    trailing.textContent = line.slice(offset + name.length) + suffix
+    element.appendChild(trailing)
+  }
+
   function setSlotLabel(element, item, fallback = '-') {
     const tier = visibleItemTier(item)
     element.className = 'val' + (tier !== null ? ' ' + tierColorClass(tier) : '')
@@ -16940,7 +16968,7 @@ more difficult:
     const line = item && itemStatLine(item)
     if (line) {
       const details = document.createElement('span')
-      details.textContent = ' \u2022 ' + line
+      appendItemStatLine(details, item, ' \u2022 ', line)
       element.appendChild(details)
     }
   }
@@ -16980,13 +17008,7 @@ more difficult:
   function filterVisibleInventory() {
     const visible = []
     player.inventory.forEach((it, idx) => {
-      let matches = true
-      const category = it.kind === 'artifact' ? (it.artifactSlot || it.kind) : it.kind
-      if (invTab === 'weapon') matches = category === 'weapon'
-      else if (invTab === 'armor') matches = category === 'armor'
-      else if (invTab === 'shield') matches = category === 'shield'
-      else if (invTab === 'supplies') matches = isConsumableKind(it.kind)
-      else if (invTab === 'other') matches = !['weapon', 'armor', 'shield'].includes(category) && !isConsumableKind(it.kind)
+      const matches = tradeItemMatchesFilter(it, invTab)
       if (matches) visible.push({it, idx})
     })
     if (invTab === 'all') {
@@ -17218,8 +17240,8 @@ more difficult:
       nm.textContent = prefix + artifactDisplayName(it)
       if (it.venomCoated) nm.appendChild(venomMarker())
       const suffix = document.createElement('span')
-      suffix.textContent = countTag + (cookedFood ? '' : (line ? ' | ' + line : '')) +
-        (it.geomancyAegis ? ' | Aegis charged' : '') + visibleItemTierTag(it)
+      appendItemStatLine(suffix, it, countTag + (!cookedFood && line ? ' | ' : ''),
+        cookedFood ? '' : line, (it.geomancyAegis ? ' | Aegis charged' : '') + visibleItemTierTag(it))
       nm.appendChild(suffix)
       if (cookedFood) {
         const detail = document.createElement('span')
@@ -17519,29 +17541,10 @@ more difficult:
         merchantStock.push(art)
       }
     }
-    const idCfg = MERCHANT_STOCK_CONFIG.scrolls.idScroll
-    let idScrollStock = merchantStock.find(it => it.kind === idCfg.kind)
-    if (!idScrollStock) {
-      merchantStock.push(createItem(idCfg.kind, {count: idCfg.minCount, merchantPrice: idCfg.minPrice}))
-    } else {
-      idScrollStock.count = Math.max(idCfg.minCount, idScrollStock.count || 1)
-      idScrollStock.merchantPrice = Math.max(idCfg.minPrice, idScrollStock.merchantPrice || 0)
-    }
-    const homecomingCfg = MERCHANT_STOCK_CONFIG.scrolls.homecomingScroll
-    if (!merchantStock.some(it => it.kind === homecomingCfg.kind)) {
-      merchantStock.push(createItem(homecomingCfg.kind, {
-        count: homecomingCfg.count, merchantPrice: homecomingCfg.merchantPrice
-      }))
-    }
-    const invisibilityCfg = MERCHANT_STOCK_CONFIG.scrolls.invisibilityScroll
-    if (!merchantStock.some(it => it.kind === invisibilityCfg.kind)) {
-      merchantStock.push(createItem(invisibilityCfg.kind, {
-        count: invisibilityCfg.count, merchantPrice: invisibilityCfg.merchantPrice
-      }))
-    }
-    const fireballCfg = MERCHANT_STOCK_CONFIG.scrolls.fireballScroll
-    if (!merchantStock.some(it => it.kind === fireballCfg.kind)) {
-      merchantStock.push(createItem(fireballCfg.kind, {count: fireballCfg.count, merchantPrice: fireballCfg.merchantPrice}))
+    for (const cfg of Object.values(MERCHANT_STOCK_CONFIG.scrolls)) {
+      if (!merchantStock.some(it => it.kind === cfg.kind && !it.merchantSold)) {
+        merchantStock.push(createItem(cfg.kind, {count:cfg.count, merchantPrice:cfg.merchantPrice}))
+      }
     }
     for (const supply of MERCHANT_STOCK_CONFIG.camping) {
       if (!merchantStock.some(it => it.kind === supply.kind))
@@ -17597,18 +17600,35 @@ more difficult:
     return Math.min(pricing.maxBuyPrice, base + adjustment)
   }
 
+  function isScrollKind(kind) {
+    return kind === 'idscroll' || kind === 'homecomingscroll' ||
+      kind === 'wayfaringscroll' || kind.startsWith('scrollOf')
+  }
+
+  function groupMerchantScrolls(stock) {
+    const scrolls = stock.filter(it => isScrollKind(it.kind))
+    let inserted = false
+    return stock.flatMap(it => {
+      if (!isScrollKind(it.kind)) return [it]
+      if (inserted) return []
+      inserted = true
+      return scrolls
+    })
+  }
+
   // Presentation-only filters: no turns, RNG calls, save fields or replay actions.
   const tradeFilters = {buy:'all', sell:'all'}
   function tradeItemMatchesFilter(it, category) {
     if (category === 'all') return true
+    if (category === 'artifact') return it.kind === 'artifact'
     const kind = it.kind === 'artifact' ? (it.artifactSlot || 'other') : it.kind
     if (category === 'weapon' || category === 'shield' || category === 'armor') return kind === category
     const supplies = isConsumableKind(it.kind)
     if (category === 'supplies') return supplies
-    return category === 'other' && !['weapon', 'shield', 'armor'].includes(kind) && !supplies
+    return category === 'other' && it.kind !== 'artifact' && !['weapon', 'shield', 'armor'].includes(kind) && !supplies
   }
   function setTradeFilter(side, category, rerender = true) {
-    if (!['buy', 'sell'].includes(side) || !['all', 'weapon', 'shield', 'armor', 'supplies', 'other'].includes(category)) return
+    if (!['buy', 'sell'].includes(side) || !['all', 'weapon', 'shield', 'armor', 'supplies', 'artifact', 'other'].includes(category)) return
     tradeFilters[side] = category
     document.querySelectorAll(`#trade${side === 'buy' ? 'Buy' : 'Sell'}Filters [data-trade-filter]`).forEach(button => {
       const active = button.dataset.tradeFilter === category
@@ -17664,7 +17684,7 @@ more difficult:
     const buyList = document.getElementById('tradeBuyList')
     buyList.innerHTML = ''
     const availableStock = merchantStock.filter(it => it.count !== 0)
-    const visibleStock = availableStock.filter(it => tradeItemMatchesFilter(it, tradeFilters.buy))
+    const visibleStock = groupMerchantScrolls(availableStock.filter(it => tradeItemMatchesFilter(it, tradeFilters.buy)))
     if (visibleStock.length === 0) {
       const d = document.createElement('div')
       d.className = 'invitem'
@@ -17691,8 +17711,8 @@ more difficult:
         }
         const nm = document.createElement('span')
         nm.className = 'nm ' + cls
-        nm.textContent = (it.merchantSold ? '↩️ ' : '') + (it.merchantNew ? 'NEW · ' : '') + artifactDisplayName(it) + countTag +
-          (line ? ' | ' + line : '') + visibleItemTierTag(it)
+        appendItemStatLine(nm, it, (it.merchantSold ? '↩️ ' : '') + (it.merchantNew ? 'NEW · ' : '') +
+          artifactDisplayName(it) + countTag + (line ? ' | ' : ''), line, visibleItemTierTag(it))
         if (it.merchantSold) nm.title = 'Buy back an item you previously sold to this merchant'
         row.appendChild(nm)
         const btn = document.createElement('button')
@@ -17740,7 +17760,7 @@ more difficult:
       }
       const nm = document.createElement('span')
       nm.className = 'nm ' + cls
-      nm.textContent = artifactDisplayName(it) + countTag + (line ? ' | ' + line : '') + visibleItemTierTag(it)
+      appendItemStatLine(nm, it, artifactDisplayName(it) + countTag + (line ? ' | ' : ''), line, visibleItemTierTag(it))
       row.appendChild(nm)
       const btn = document.createElement('button')
       btn.textContent = 'Sell for ' + itemSellValue(it) + 'g'
@@ -17768,8 +17788,7 @@ more difficult:
       addInventoryItem(it.kind, {count:quantity})
       if (!it.unlimitedStock) it.count = (it.count || 1) - 1
       // Keep depleted finite scroll entries so save restoration cannot refill them.
-      if (!it.unlimitedStock && it.count <= 0 && ![MERCHANT_STOCK_CONFIG.scrolls.invisibilityScroll.kind,
-        MERCHANT_STOCK_CONFIG.scrolls.homecomingScroll.kind, MERCHANT_STOCK_CONFIG.scrolls.fireballScroll.kind].includes(it.kind)) {
+      if (!it.unlimitedStock && it.count <= 0 && !(isScrollKind(it.kind) && !it.merchantSold)) {
         const idx = merchantStock.indexOf(it)
         if (idx >= 0) merchantStock.splice(idx, 1)
       }

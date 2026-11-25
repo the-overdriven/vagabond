@@ -1199,6 +1199,15 @@ body.hint-collapsed #hint .panel-toggle {
   border-color: var(--ember-bright);
 }
 
+/* Ability text is independent of the item's rarity color. */
+.artifact-domain-power.domain-martial { color: #f18b82; }
+.artifact-domain-power.domain-archery { color: #a9dc86; }
+.artifact-domain-power.domain-bulwark { color: #8dc6ff; }
+.artifact-domain-power.domain-armors { color: #d6b8f3; }
+.artifact-domain-power.domain-shields { color: #f1d17c; }
+.artifact-domain-power.domain-wayfaring { color: #79ddd0; }
+.artifact-domain-power.domain-geomancy { color: #e0ae78; }
+
 .inv-tab-mobile { display: none; }
 @media (max-width: 720px), (pointer: coarse) {
   .inv-tab:has(.inv-tab-mobile) { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; min-height: 32px; padding: 4px; }

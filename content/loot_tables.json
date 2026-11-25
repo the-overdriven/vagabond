@@ -85,31 +85,31 @@
         "result": "potion"
       },
       {
-        "upTo": 80.5,
+        "upTo": 78.8,
         "result": "scrollOfInvisibility"
       },
       {
-        "upTo": 85,
+        "upTo": 83.3,
         "result": "speedpotion"
       },
       {
-        "upTo": 88,
+        "upTo": 86.3,
         "result": "stoneSkinPotion"
       },
       {
-        "upTo": 91,
+        "upTo": 89.3,
         "result": "berserkPotion"
       },
       {
-        "upTo": 93,
+        "upTo": 91.3,
         "result": "scrollOfFear"
       },
       {
-        "upTo": 94.5,
+        "upTo": 92.8,
         "result": "scrollOfChaos"
       },
       {
-        "upTo": 95,
+        "upTo": 93.3,
         "result": "scrollOfDeathShield"
       }
     ],
@@ -152,9 +152,9 @@
   },
   "looseScrollVariants": {
     "_note": "Each loose surface Invisibility scroll slot becomes an Identification, Fear, Chaos, or Fireball scroll with this chance. Total scroll count is unchanged.",
-    "chance": 0.75,
+    "chance": 0.85,
     "table": [
-      {"kind":"idscroll","weight":3},
+      {"kind":"idscroll","weight":5},
       {"kind":"scrollOfFear","weight":2},
       {"kind":"scrollOfChaos","weight":1},
       {"kind":"scrollOfFireball","weight":1}

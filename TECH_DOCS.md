@@ -2695,7 +2695,8 @@ provide a **16.9% total drop chance**, with one result per crate:
 |---|---:|
 | Nothing | 83.1% |
 | Life Potion | 6% |
-| Scroll of Invisibility | 4% |
+| Scroll of Invisibility | 1% |
+| Scroll of Identification | 3% |
 | Potion of Stone Skin | 1.8% |
 | Potion of Berserk | 1.8% |
 | Scroll of Fear | 1.2% |
@@ -2704,13 +2705,13 @@ provide a **16.9% total drop chance**, with one result per crate:
 | Scroll of Death Shield | 0.3% |
 
 The six tactical consumables together account for 6.9% of crates. Life Potion
-and Invisibility account for 6% and 4%; the empty share is 83.1%. Death Shield
-remains the rarest. Drops appear on the broken crate tile, are picked up
-normally, and cannot be rerolled through save/load or replay. The JSON loot
-entries use **relative weights**: `P(result) = weight / sum(all weights)`.
+and both ordinary scroll types account for 6% and 4%; the empty share is 83.1%.
+Death Shield remains the rarest. Drops appear on the broken crate tile, are
+picked up normally, and cannot be rerolled through save/load or replay. The
+JSON loot entries use **relative weights**: `P(result) = weight / sum(all weights)`.
 Supported kinds are `null` (nothing), `potion`, `speedpotion`,
-`scrollOfInvisibility`, and all five tactical consumable IDs; changing weights
-changes the odds without code edits. Contents still use exactly one seeded roll
+`scrollOfInvisibility`, `idscroll`, and all six tactical consumable IDs; changing
+weights changes the odds without code edits. Contents use exactly one seeded roll
 per crate during generation. Existing generated crates retain their saved
 contents; the expanded table is used for new worlds. Destroyed terrain and
 remaining ground loot persist as part of the existing dungeon map/ground item
@@ -6530,13 +6531,16 @@ slot list before iteration; this avoids a leading-array expression after
 insertion. The listed base gear icons are preloaded for offline use. This
 changes only presentation, not gear stats or loot odds.
 
-Inventory tabs include All, Weapons, Shields, Armors, Supplies, and Other. On
-mobile, category tabs use their corresponding equipment symbols and an apple for
-Supplies instead of text labels. Supplies lists consumable food, herbs,
-mushrooms, potions, scrolls, and arrows, including raw and cooked potatoes.
-Flint and brushwood appear in Other. Other excludes equipment and supplies; All
-keeps its existing consumables-first ordering. Tabs only filter displayed
-inventory. In windows at most 720px wide, inventory, map, treasure map, trade,
+Inventory tabs include All, Weapons, Shields, Armors, Supplies, Artifacts, and
+Other. On mobile, equipment categories use their corresponding icons, Supplies
+uses an apple, and Artifacts uses 🔮 instead of text labels. Supplies lists
+consumable food, herbs, mushrooms, potions, scrolls, and arrows, including raw
+and cooked potatoes.
+Flint and brushwood appear in Other. Other excludes equipment, artifacts and
+supplies. Artifacts includes all backpack artifacts, identified or not; gear
+artifacts also remain in their equipment category. All keeps its existing
+consumables-first ordering. Tabs only filter displayed inventory. In windows
+at most 720px wide, inventory, map, treasure map, trade,
 and character-creation dialogs are positioned against the browser viewport.
 Their width is independent of the canvas, which may be narrow while the sidebars
 are open. This applies even when the browser reports no pointer. Inventory
@@ -6552,15 +6556,17 @@ Hermit **Services** use a shorter panel ending above the message log, which
 remains visible while using their services; their Close control stays
 immediately above that log. These layouts do not alter the trade or service
 rules. Merchant trading keeps the **For Sale** and **Your Items** columns
-visible side by side at every screen size. On desktop (widths above 720px), each
-column has its own independent category filters: All, Weapons, Shields, Armors,
-Supplies and Other. Equipment categories include artifacts by their equipment
-slot; Supplies includes consumables, while Other contains non-equipment and
-non-consumables. The icon filters reuse inventory's weapon, shield and armor
-symbols and the Supplies apple. Changing one column's filter leaves the other
-unchanged; buying and selling redraw the visible lists without changing the
-selected categories. The filters reset to All when trading opens and do not
-spend a turn or affect RNG, saves or replays. On desktop, the trade dialog is
+visible side by side at every screen size. Each column has independent category
+filters on desktop and mobile, using the same categories as the backpack. The
+compact icon filters wrap within their own column on narrow screens. Supplies
+includes consumables; all artifact types appear under Artifacts. Gear artifacts
+also appear under their equipment slot. Other excludes artifacts and supplies.
+The merchant's For Sale list groups all scrolls together, including newly
+stocked scrolls and buybacks, without changing saved stock order or identity.
+Changing one column's filter leaves the other unchanged; buying and selling
+redraw the visible lists without changing the selected categories. The filters
+reset to All when trading opens and do not spend a turn or affect RNG, saves or
+replays. On desktop, the trade dialog is
 anchored immediately below the HUD rather than vertically centered. It fills the
 remaining desktop viewport height below the HUD, including on taller screens;
 each column's inventory list scrolls independently within that space while the
@@ -7293,7 +7299,11 @@ The domain catalog lives in `content/artifact_abilities.json`:
 Specific item bases can add more domains. The eligible pool is the **union of
 all enabled, unique ability IDs** in the item's domains: every power in that
 union has equal probability, regardless of its domain's size. A power listed in
-several domains is included only once. Only fully implemented powers are
+several domains is included only once. Identified power names in the backpack,
+equipment and trading lists use their domain color, independently of item tier.
+For a shared power, the first matching domain in the item's eligible domain
+list determines its color. Unidentified artifacts expose neither name nor color
+of their power. Only fully implemented powers are
 eligible to roll. Adding a future trinket or other equipment domain uses the
 same assignment and selection system. `bulwark` powers are shared between armor
 and shields; `armors` and `shields` contain their respective slot-exclusive
@@ -8027,7 +8037,9 @@ healing magic or ordinary humanoid gear. **Wyrdhag** has a **19.8%** total
 chance to drop a Life Potion, Healing Herb or Mushroom, each with an absolute
 **6.6%** chance and the same exclusive `healing` group. This loot chance does
 not increase with Magic Find. Using its own healing item in combat does not
-alter the separate death-drop roll.
+alter the separate death-drop roll. Identification scrolls have independent
+per-kill chances: Nymph 15%, Tulla and Kveld 20% each, and Wyrdhag 25%. They
+can drop alongside the existing healing loot.
 
 The following **32 non-humanoid species** always drop raw meat on death
 (except deaths that suppress ordinary loot), with fixed quantities:
@@ -8530,16 +8542,16 @@ artifact failure.
 | Chitin (1–5) | 41 | 0.5% |
 | Gear | 63.6 | 22.6% |
 | Life Potion | 77.3 | 13.7% |
-| Scroll of Invisibility | 80.5 | 3.2% |
-| Potion of Speed | 85 | 4.5% |
-| Potion of Stone Skin | 88 | 3% |
-| Potion of Berserk | 91 | 3% |
-| Scroll of Fear | 93 | 2% |
-| Scroll of Chaos | 94.5 | 1.5% |
-| Scroll of Death Shield | 95 | 0.5% |
-| Scroll of Identification (`elseResult`) | 100 | 5% |
+| Scroll of Invisibility | 78.8 | 1.5% |
+| Potion of Speed | 83.3 | 4.5% |
+| Potion of Stone Skin | 86.3 | 3% |
+| Potion of Berserk | 89.3 | 3% |
+| Scroll of Fear | 91.3 | 2% |
+| Scroll of Chaos | 92.8 | 1.5% |
+| Scroll of Death Shield | 93.3 | 0.5% |
+| Scroll of Identification (`elseResult`) | 100 | 6.7% |
 
-For example, a roll of 79 gives an Invisibility scroll, 86 gives Stone Skin, 31
+For example, a roll of 78 gives an Invisibility scroll, 85 gives Stone Skin, 31
 gives Fireball, and 96 reaches the Identification-scroll fallback. All new
 supplies use their catalog item IDs in chest outcomes, ground pickups, inventory
 actions and replay.
@@ -8653,7 +8665,7 @@ load; selling a scroll back to the merchant makes it available again.
 Returns the player to the Temple. Temple healing follows the same level 1
 exception, XP rule from level 2 onward, and 70-HP cap. Its canonical item kind
 and replay action are `homecomingscroll`, and its icon is
-`img/icons/homecomingscroll.svg`. Its merchant price is 70g, with nine in stock
+`img/icons/homecomingscroll.svg`. Its merchant price is 70g, with twelve in stock
 at world creation. This stock is finite and never automatically replenished
 after purchases, save/load, or replay restoration. Selling a scroll back adds
 exactly one scroll to the available stock. The stock config key is
@@ -8830,10 +8842,12 @@ death removes the modifiers. Highscores uses permanent stats, excluding both
 potions and their GRACE penalties.
 
 Ordinary chests use the percentages above; guaranteed-artifact chests keep their
-artifact rule. On the surface, **75%** of the nine loose Invisibility-scroll
+artifact rule. On the surface, **85%** of the nine loose Invisibility-scroll
 slots instead become Identification, Fear, Chaos or Fireball scrolls with
-respective relative weights **3:2:1:1**; 25% remain Invisibility. Expected
-Invisibility scrolls from these slots fall from **5.4 to 2.25 per world**. The
+respective relative weights **5:2:1:1**; 15% remain Invisibility. This gives
+about 4.25 Identification and 1.35 Invisibility scrolls per world on average.
+Generic deep-cave provision slots contain Life Potions or Identification
+scrolls instead of Invisibility scrolls; their total counts are unchanged. The
 separate loose Speed-Potion slots keep their **40%** chance to become a tactical
 consumable (Stone Skin 3, Berserk 3, Fear 2, Chaos 1.5, Death Shield 0.5,
 Fireball 1.5). Total loose-item counts and Life Potions are unchanged. Both
@@ -8910,18 +8924,20 @@ level, spell damage profile and expiry are saved
 and replayed independently of animation. Inventory, ground drops and stock
 use ordinary item serialization.
 
-The merchant stocks **three at 250g each**, selling value **125g**. Empty stock
+The merchant stocks **five at 250g each**, selling value **125g**. Empty stock
 persists through save/load; selling back replenishes it normally. Fireball
 matches Chaos's loot frequency: **1.5% per ordinary chest**, **0.9% per dwarven
 crate**, and equal relative weights in surface supply variants and Ruins Library
-rooms. The chest probability comes from gold (30.5%), keeping Identification at
-5%; crate probability comes from empty crates (83.1%). Adding it to weighted
+rooms. The ordinary chest Identification chance is 6.7%; the empty crate share
+is 83.1%. Adding Fireball to weighted
 surface pools shares those existing supply slots rather than increasing their
 count.
 
 ## Scroll of Identification
 
-Identifies an artifact. The Merchant starts with six at 100g each.
+Identifies an artifact. The Merchant starts with twelve at 100g each. Like
+other ordinary scroll stock, it is finite and a sold-out entry does not refill
+through save/load or stock initialization.
 
 ## Healing Herb
 
@@ -9806,12 +9822,11 @@ and ordinary pickup cannot exceed five carried; excess dropped bundles stay on
 the ground. Flint can also be found while completing boulders (2.5%), ordinary
 sand digging (0.5%) and opening chests (0.5%).
 
-Configured fixed stock includes a **Two-handed Sword for 600g**. Scroll stock at
-world creation is **9 Homecoming**, **6 Identification**, and **3
-Invisibility**. Homecoming scrolls are finite: an exhausted stack remains in
-saved stock with count zero and is hidden from trade. Restoration does not
-replenish it. Selling a scroll back adds exactly one; an empty stack cannot be
-purchased.
+Configured fixed stock includes a **Two-handed Sword for 600g**. Initial
+scroll quantities and prices are listed below. Scrolls are finite: an exhausted
+stack remains in saved stock with count zero and is hidden from trade.
+Restoration does not replenish it. Selling a scroll back adds exactly one; an
+empty stack cannot be purchased.
 
 During new-world NPC placement, Merchant candidate tiles are rejected if a
 surface ground item already occupies that coordinate. As a compatibility guard,
@@ -9825,6 +9840,21 @@ existing stack regardless of item name; opening the inventory merges duplicate
 stacks already present in older saves, keeping their total count.
 
 ## Item values and merchant prices
+
+Initial finite scroll stock is configured in `content/merchant_stock.json`:
+
+| Scroll | Quantity | Price |
+|---|---:|---:|
+| Identification | 12 | 100g |
+| Homecoming | 12 | 70g |
+| Fireball | 5 | 250g |
+| Invisibility | 3 | 200g |
+| Fear | 4 | 80g |
+| Chaos | 3 | 120g |
+
+Ordinary stock retains a zero-count entry after depletion. Buying back a sold
+scroll does not replace that entry. Scripted restock adds to ordinary stock,
+not player-sold stacks. Wayfaring cannot be traded.
 
 The game's base **sell value** is calculated by `itemSellValue()`.
 
@@ -12190,7 +12220,8 @@ player speed formula.
 `highscores_top_ten(p_permadeath)` RPC. The query selects each character's
 highest-level milestone before sorting and limiting to ten. Character IDs, not
 names, identify records. The separate `highscores_permadeath_top_ten()` RPC uses
-the same ranking, then adds an `is_dead` boolean through at most ten indexed
+the same ranking, explicitly projecting the normal RPC's public snapshot
+columns before adding an `is_dead` boolean through at most ten indexed
 `death_records` lookups. Only the permadeath board invokes it; normal-mode reads
 use the original RPC and never query Graveyard. The death marker updates when
 the board is refreshed, without polling or an additional client request. One
@@ -12215,7 +12246,13 @@ These appear in the expanded public highscore details, without affecting rank.
 Historical rows display a dash when these fields were not recorded. New
 uploads require the `supabase-highscores-skill-details.sql` database migration
 before updating the client; it preserves old milestones and the existing
-permadeath death-marker lookup and does not expose raw table reads.
+permadeath death-marker lookup and does not expose raw table reads. Apply
+`supabase-highscores-permadeath-repair.sql` if the death-aware RPC has an
+outdated return schema. It derives the normal RPC's actual public output
+columns from a temporary view, regardless of its return declaration, and
+rebuilds only the death-aware wrapper. Missing skill details do not prevent
+repair; they require their own migration. Verification runs in the same
+transaction, preserving ranking, permissions and death lookup.
 
 Only a live level-up triggers a submission. One XP award granting several
 levels captures one deep-cloned final-level snapshot after all gains resolve.

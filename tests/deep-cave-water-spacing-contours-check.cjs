@@ -29,7 +29,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
     const deep={map:deepMap,caveMaps:[deepMap],caves:[{entrances:[start]}],complexes:[complex]}
     populateDeepCaveRewards(deep)
     const rewards=groundItems.filter(g=>g.level===-2&&g.levelKind==='chain'&&
-      ['chest','potion','scrollOfInvisibility'].includes(g.kind));
+      ['chest','potion','scrollOfInvisibility','idscroll'].includes(g.kind));
     const c=WORLD_GEN_CONFIG.cavePopulation.rewards;
     const close=(a,b,r)=>Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y))<=r;
     const overcrowded=rewards.filter(p=>rewards.filter(q=>p!==q&&close(p,q,c.localRewardRadius)).length>=c.maxUnguardedLocalRewards);

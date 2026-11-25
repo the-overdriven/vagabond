@@ -30,7 +30,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
       const level=deepLevels[0],indices=new Map()
       for(const c of level.complexes)for(const i of c.members)indices.set(i,c.id)
       const rewards=groundItems.filter(g=>g.level===-2&&g.levelKind==='chain' && !g.towerMazeTreasure&&
-        ['chest','potion','scrollOfInvisibility'].includes(g.kind))
+        ['chest','potion','scrollOfInvisibility','idscroll'].includes(g.kind))
       const chests=rewards.filter(g=>g.kind==='chest'),loose=rewards.filter(g=>g.kind!=='chest')
       const onePerTile=new Set(rewards.map(g=>keyXY(g.x,g.y)))
       const invalidItems=rewards.filter(g=>level.caveMaps[g.caveIndex]?.[g.y]?.[g.x]!=='cavefloor2'||
@@ -63,7 +63,7 @@ const {run}=require('./helpers/node-game-runtime.cjs')
     assert.equal(save.version,summary.saveVersion,'save schema matches the current game')
     run('loadGameFromObject('+JSON.stringify(save)+',{isReplayInit:true})')
     const after=run(`JSON.stringify({rewards:groundItems.filter(g=>g.level===-2&&g.levelKind==='chain' && !g.towerMazeTreasure&&
-      ['chest','potion','scrollOfInvisibility'].includes(g.kind)),caveSpoor,
+      ['chest','potion','scrollOfInvisibility','idscroll'].includes(g.kind)),caveSpoor,
       complexes:deepLevels[0].complexes,decorations:caveDecorations,rng:rngState})`)
     assert.deepEqual(JSON.parse(after),before,'save/replay restores exact rewards, clues and RNG')
     const decorationRng=run('rngState')

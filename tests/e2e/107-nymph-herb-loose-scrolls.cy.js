@@ -21,6 +21,14 @@ describe('Nymph herbs and surface scroll variety',()=>{
             player.inventory=[];chance=()=>false
             lootFromEnemy({...n,baseName:'Nymph',equipment:null})
             check(!player.inventory.length,'failed roll leaves no herb')
+            for(const [species,probability] of [['Nymph',0.15],['Tulla',0.2],
+                ['Kveld',0.2],['Wyrdhag',0.25]]) {
+              const t=ENEMY_TEMPLATE_BY_NAME[species]
+              player.inventory=[];chance=p=>p===probability
+              lootFromEnemy({...t,baseName:species,equipment:null})
+              check(player.inventory.some(i=>i.kind==='idscroll' && i.count===1),
+                species+' can drop identification independently')
+            }
             const meatDrops = {
   'Giant Rat':1,'Giant Bat':1,Boar:2,Wolf:1,Hogwyrm:2,Jackal:1,Hyena:1,Vulture:1,'Giant Toad':1,
   'Giant Crab':2,Murkspawn:1,Owlbear:3,Serpent:2,Lion:2,Chupacabra:1,Harpy:1,'White Tiger':2,
@@ -164,11 +172,11 @@ describe('Nymph herbs and surface scroll variety',()=>{
             lootSkeletonOrForage()
             check(player.inventory.some(i=>i.kind==='chitin' && i.count===4),
               'the saved chitin stack can be collected in one action')
-            check(LOOSE_SCROLL_VARIANTS.chance===0.75 &&
+            check(LOOSE_SCROLL_VARIANTS.chance===0.85 &&
               LOOSE_CONSUMABLE_VARIANTS.chance===0.4,
               'surface scroll redistribution leaves speed-potion tuning unchanged')
-            chance=p=>p===0.75
-            check([0,0.51,0.75,0.9].map(v=>{
+            chance=p=>p===0.85
+            check([0,0.61,0.82,0.95].map(v=>{
               rng=()=>v;return rollLooseSupplyKind('scrollOfInvisibility')
             }).join(',')==='idscroll,scrollOfFear,scrollOfChaos,scrollOfFireball',
               'all four approved scroll alternatives can spawn')

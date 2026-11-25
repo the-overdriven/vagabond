@@ -12,7 +12,7 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
 
   const nymph=run('ENEMY_TEMPLATE_BY_NAME.Nymph')
   assert.equal(nymph.lootTable?.[0]?.chance,0.2)
-  assert.equal(nymph.lootTable.length,1)
+  assert.equal(nymph.lootTable.length,2)
   assert.equal(nymph.lootTable[0].kind,'herb')
 
   run(`chance=p=>p===0.2;
@@ -23,14 +23,14 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     lootFromEnemy({name:'Nymph',baseName:'Nymph',tier:2,equipment:null,humanoid:true});`)
   assert.equal(run('player.inventory.length'),0,'nymph may leave no herb')
 
-  assert.equal(run('LOOSE_SCROLL_VARIANTS.chance'),0.75)
+  assert.equal(run('LOOSE_SCROLL_VARIANTS.chance'),0.85)
   assert.equal(run('LOOSE_CONSUMABLE_VARIANTS.chance'),0.4,
     'speed-potion tactical conversion remains unchanged')
   const rolls=JSON.parse(JSON.stringify(run(`(()=>{
     const previousRng=rng,previousChance=chance
     try {
-      chance=p=>p===0.75
-      return [0,0.51,0.75,0.9].map(value=>{
+      chance=p=>p===0.85
+      return [0,0.61,0.82,0.95].map(value=>{
         rng=()=>value
         return rollLooseSupplyKind('scrollOfInvisibility')
       }).concat([rollLooseSupplyKind('speedpotion')])
@@ -201,7 +201,7 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
     'Fungus still guarantees mushrooms even with every loot-table chance failing')
   assert.deepEqual(templates.find(t=>t.name==='Nymph').lootTable[0],
     {kind:'herb',chance:0.2},'Nymph retains her 20% herb drop')
-  const wyrdhagDrops=templates.find(t=>t.name==='Wyrdhag').lootTable
+  const wyrdhagDrops=templates.find(t=>t.name==='Wyrdhag').lootTable.filter(drop=>drop.group==='healing')
   assert.deepEqual(wyrdhagDrops,['potion','herb','mushroom'].map(kind=>
     ({kind,chance:0.066,group:'healing'})),
     'Wyrdhag keeps three mutually exclusive 6.6% outcomes')
@@ -215,6 +215,11 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   run(`player.inventory=[];chance=()=>false;
     lootFromEnemy({name:'Wyrdhag',baseName:'Wyrdhag',tier:4,humanoid:false})`)
   assert.equal(run('player.inventory.length'),0,'failed Wyrdhag group roll drops nothing')
+  for(const [species,probability] of [['Nymph',0.15],['Tulla',0.2],['Kveld',0.2],['Wyrdhag',0.25]]) {
+    run(`player.inventory=[];chance=p=>p===${probability};
+      lootFromEnemy({...ENEMY_TEMPLATE_BY_NAME['${species}'],baseName:'${species}',equipment:null})`)
+    assert.equal(run('player.inventory.find(i=>i.kind==="idscroll")?.count'),1,`${species} drops one ID scroll`)
+  }
   const unequal=JSON.parse(JSON.stringify(run(`(()=>{
     const t=ENEMY_TEMPLATE_BY_NAME.Wyrdhag,original=t.lootTable
     const oldChance=chance,oldRng=rng

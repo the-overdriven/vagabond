@@ -189,7 +189,7 @@ describe('Non-gear item catalog', () => {
         try {
           player.inventory = []
           const chestKinds = []
-          for (const roll of [73, 79, 83, 96]) {
+          for (const roll of [73, 78, 82, 96]) {
             rng = () => { draws++; return roll / 100 }
             groundItems = [{kind: 'chest', x: player.x, y: player.y, level: currentZ, tier: 1}]
             checkGroundAt(player.x, player.y)
@@ -277,7 +277,7 @@ describe('Non-gear item catalog', () => {
         return result
       })()`)
       expect(result).to.deep.equal({herbs: 2, fishName: 'Fresh Fish', inscriptions: ['First', 'Second'],
-        homePrice: 70, homeSell: 50, gold: 30, homeCount: 8, potatoValue: 0, amberValue: 20, shellValue: 10})
+        homePrice: 70, homeSell: 50, gold: 30, homeCount: 11, potatoValue: 0, amberValue: 20, shellValue: 10})
     })
     cy.window().then(win => win.eval(`(async () => {
       const check = (ok, msg) => { if (!ok) throw Error(msg) }
@@ -427,8 +427,10 @@ describe('Non-gear item catalog', () => {
     cy.get('#tradePanel [data-trade-col="buy"]').should('be.visible')
     cy.get('#tradePanel [data-trade-col="sell"]').should('be.visible')
     cy.viewport(390, 900)
-    cy.get('#tradeBuyFilters').should('not.be.visible')
-    cy.get('#tradeSellFilters').should('not.be.visible')
+    cy.get('#tradeBuyFilters').should('be.visible')
+    cy.get('#tradeBuyFilters [data-trade-filter="artifact"]').click()
+    cy.get('#tradeBuyFilters [data-trade-filter="artifact"]').should('have.class', 'active')
+    cy.get('#tradeSellFilters').should('be.visible')
     cy.get('#tradePanel [data-trade-col="buy"]').should('be.visible')
     cy.get('#tradePanel [data-trade-col="sell"]').should('be.visible')
     // cy.viewport changes the size, not pointer type. Only assert mobile
