@@ -209,6 +209,7 @@ const copy = expression => JSON.parse(JSON.stringify(run(expression)))
   assert.equal(run('earthFoe.id===earthId'),true)
   assert.equal(run('earthFoe.geomancyBuriedUntil'),1504)
   assert.equal(run('earthMessages.filter(m=>m.includes("Earthmaw shakes")).length'),1)
+  assert.equal(run('earthMessages.some(m=>/lost to the depths|fell below/.test(m))'),false)
   assert.equal(run('ArtifactGeomancy.cooldownRemaining("earthmaw")'),499)
   assert.equal(run('occupied.has(keyXY(41,40))'),false,
     'the surface source square is released when transferred')

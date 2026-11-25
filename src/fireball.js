@@ -3,12 +3,55 @@
 // Targeting and animation are transient; only the committed cast enters replay.
 let fireballAim = null
 let fireballAnims = []
+let aftershockShakeAnims = []
+
+function queueAftershockShake() {
+  if (replayAnimationsDisabled || replaySimulationMode) return 0
+  const timing=queueEnemyAttackPresentation(650)
+  aftershockShakeAnims.push({start:timing.start,mapKey:currentMapViewKey()})
+  return timing.delay
+}
 const FIREBALL_FLIGHT_MS = 280
 const FIREBALL_BURST_MS = 780
+const FIREBALL_STONE_FADE_MS = 240
+
+function fireballDuration(cross) {
+  return FIREBALL_FLIGHT_MS + FIREBALL_BURST_MS + (cross ? FIREBALL_STONE_FADE_MS : 0)
+}
+
+function fireballCornerStones(x,y) {
+  return [-1,1].flatMap(dy=>[-1,1].map(dx=>({x:x+dx,y:y+dy})))
+    .filter(p=>!fireballOpaque(p.x,p.y))
+}
+
+function drawFireballCornerStones(a, elapsed) {
+  const fade = elapsed - FIREBALL_FLIGHT_MS - FIREBALL_BURST_MS
+  const progress = fade > 0 ? 1 - fade/FIREBALL_STONE_FADE_MS :
+    Math.min(1, elapsed/FIREBALL_FLIGHT_MS)
+  const alpha = Math.max(0, Math.min(1,progress))
+  if (!alpha) return
+  for (const p of a.cornerStones || []) {
+    if (!undergroundTileVisible(p.x,p.y)) continue
+    ctx.save()
+    ctx.translate((p.x-camX+.5)*TILE_PX,(p.y-camY+.5)*TILE_PX)
+    ctx.scale(.35+.65*alpha,.35+.65*alpha)
+    const drawn=USE_TILE_IMAGES && drawImageVisual(-TILE_PX/2,-TILE_PX/2,
+      RENDER_STYLE.terrainTiles.mountain,alpha)
+    if (!drawn) {
+      ctx.globalAlpha=alpha;ctx.fillStyle=TILE.mountain.color;ctx.font=`bold ${TILE_PX*.65}px monospace`
+      ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(TILE.mountain.ch || '▲',0,0)
+    }
+    ctx.restore()
+  }
+}
+
+function fireballImpactTime() {
+  return fireballAnims.reduce((end,a)=>Math.max(end,a.start+FIREBALL_FLIGHT_MS),0)
+}
 
 function fireballPresentationEnd() {
   if (replayAnimationsDisabled || replaySimulationMode) return 0
-  return fireballAnims.reduce((end, a) => Math.max(end, a.start + FIREBALL_FLIGHT_MS + FIREBALL_BURST_MS), 0)
+  return fireballAnims.reduce((end, a) => Math.max(end, a.start + fireballDuration(a.cross)), 0)
 }
 
 function fireballOpaque(x, y) {
@@ -173,11 +216,11 @@ function resolveFireballEffect({x,y,source='read',origin={x:player.x,y:player.y}
     const groundingHits = []
     let impactDelay = 0
     if (!replayAnimationsDisabled && !replaySimulationMode) {
-      const presentation = queueEnemyAttackPresentation(FIREBALL_FLIGHT_MS + FIREBALL_BURST_MS)
+      const presentation = queueEnemyAttackPresentation(fireballDuration(cross))
       fireballAnims.push({fromX:origin.x, fromY:origin.y, x, y, tiles,
         visualTiles:providedTiles || fireballVisualTiles(x,y,cross),
         // Keep the cast/inscription shape, even if the trinket changes later.
-        cross:!!cross, start:presentation.start, mapKey:currentMapViewKey()})
+        cross:!!cross, cornerStones:cross ? fireballCornerStones(x,y) : [], start:presentation.start, mapKey:currentMapViewKey()})
       impactDelay = presentation.delay + FIREBALL_FLIGHT_MS
     }
     log(read?'You cast a fireball!':'Runic fire erupts!', 'info')
@@ -378,6 +421,9 @@ function drawFireballBurst(a, age) {
 }
 
 function drawFireballPresentation(now) {
+  const ready=aftershockShakeAnims.filter(a=>a.start<=now && a.mapKey===currentMapViewKey())
+  aftershockShakeAnims=aftershockShakeAnims.filter(a=>a.start>now && a.mapKey===currentMapViewKey())
+  if (ready.length) shakeRuptureScreen()
   ctx.save()
   if (fireballAim) {
     for(let y=player.y-6;y<=player.y+6;y++) for(let x=player.x-6;x<=player.x+6;x++) {
@@ -411,7 +457,7 @@ function drawFireballPresentation(now) {
   }
   for(let i=fireballAnims.length-1;i>=0;i--) {
     const a=fireballAnims[i],elapsed=now-a.start
-    if(elapsed>=FIREBALL_FLIGHT_MS+FIREBALL_BURST_MS||a.mapKey!==currentMapViewKey()) {
+    if(elapsed>=fireballDuration(a.cross)||a.mapKey!==currentMapViewKey()) {
       fireballAnims.splice(i,1);continue
     }
     if(elapsed<0)continue
@@ -423,7 +469,9 @@ function drawFireballPresentation(now) {
         const y=(a.fromY+(a.y-a.fromY)*q-camY+0.5)*TILE_PX
         fireballPuff(x,y,TILE_PX*(0.42-tail*0.022),1.25,angle-Math.PI/2,0.95-tail*0.055)
       }
-    } else drawFireballBurst(a,elapsed-FIREBALL_FLIGHT_MS)
+    } else if (elapsed<FIREBALL_FLIGHT_MS+FIREBALL_BURST_MS)
+      drawFireballBurst(a,elapsed-FIREBALL_FLIGHT_MS)
+    if (a.cross) drawFireballCornerStones(a,elapsed)
   }
   ctx.restore()
 }

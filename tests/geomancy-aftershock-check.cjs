@@ -28,7 +28,8 @@ const read=expression=>JSON.parse(JSON.stringify(run(expression)))
   // looked round. Check actual painted cells at early, midway and full burst.
   run(`globalThis.crossPaintedCells=(shape,age)=>{
     const drawn=[]
-    const original=ctx.fillRect
+    const original=ctx.fillRect, originalPuff=fireballPuff
+    fireballPuff=(x,y)=>ctx.fillRect(x,y,1,1)
     ctx.fillRect=(px,py,w,h)=>{
       if(w>0&&h>0)drawn.push([Math.floor((px+w/2)/TILE_PX)+camX,
         Math.floor((py+h/2)/TILE_PX)+camY])
@@ -36,7 +37,7 @@ const read=expression=>JSON.parse(JSON.stringify(run(expression)))
     const visible=undergroundTileVisible
     undergroundTileVisible=()=>true
     try {drawFireballBurst({x:46,y:40,cross:true,visualTiles:shape},age)}
-    finally {ctx.fillRect=original;undergroundTileVisible=visible}
+    finally {ctx.fillRect=original;fireballPuff=originalPuff;undergroundTileVisible=visible}
     return [...new Set(drawn.map(p=>keyXY(p[0],p[1])))]
   };`)
   const shape=read('fireballBlastTiles(46,40)')
@@ -56,6 +57,42 @@ const read=expression=>JSON.parse(JSON.stringify(run(expression)))
   run("surfaceMap[40][48]='cavewall'")
   assert.equal(run('fireballBlastTiles(46,40).length'),14,'opaque wall stops only one arm')
   run("surfaceMap[40][48]='grass'")
+  assert.deepEqual(read('fireballCornerStones(46,40)'),
+    [{x:45,y:39},{x:47,y:39},{x:45,y:41},{x:47,y:41}])
+  run("surfaceMap[39][45]='mountain'")
+  assert.equal(run('fireballCornerStones(46,40).length'),3,'solid corners need no visual stone')
+  run("surfaceMap[39][45]='grass'")
+  assert.deepEqual(read(`(()=>{
+    const oldDraw=drawImageVisual,oldVisible=undergroundTileVisible,oldTiles=USE_TILE_IMAGES
+    const oldMap=map,oldZ=currentZ,oldText=ctx.fillText
+    const images=[],glyphs=[]
+    try {
+      undergroundTileVisible=()=>true
+      drawImageVisual=(x,y,visual,alpha)=>{images.push([visual.image,alpha]);return true}
+      const a={cornerStones:[{x:45,y:39}]}
+      USE_TILE_IMAGES=true
+      for(const [terrain,z] of [[surfaceMap,0],[undergroundMap,-1]]) {
+        map=terrain;currentZ=z
+        drawFireballCornerStones(a,FIREBALL_FLIGHT_MS)
+      }
+      drawFireballCornerStones(a,FIREBALL_FLIGHT_MS+FIREBALL_BURST_MS+FIREBALL_STONE_FADE_MS/2)
+      drawFireballCornerStones(a,fireballDuration(true))
+      USE_TILE_IMAGES=false;ctx.fillText=ch=>glyphs.push(ch)
+      drawFireballCornerStones(a,FIREBALL_FLIGHT_MS)
+      return {images,glyphs}
+    } finally {
+      drawImageVisual=oldDraw;undergroundTileVisible=oldVisible;USE_TILE_IMAGES=oldTiles
+      map=oldMap;currentZ=oldZ;ctx.fillText=oldText
+    }
+  })()`),{images:[['img/tiles/mountain-middle.png',1],['img/tiles/mountain-middle.png',1],
+    ['img/tiles/mountain-middle.png',0.5]],glyphs:['▲']},
+    'the same standalone mountain appears on all levels, fades, and uses its ASCII glyph')
+  assert.equal(run('fireballDuration(true)-fireballDuration(false)'),240)
+  run(`replayAnimationsDisabled=false;clearEnemyAnims();
+    globalThis.blastTiming=queueEnemyAttackPresentation(fireballDuration(true));
+    queueAftershockShake()`)
+  assert.ok(run('aftershockShakeAnims[0].start>=blastTiming.start+fireballDuration(true)'))
+  run('clearEnemyAnims();replayAnimationsDisabled=true')
   const before=read('ArtifactGeomancy.serialize()')
   assert.equal(before.aftershocks.length,0)
   const rngBefore=run('rngState'),turnBefore=run('turnCount')

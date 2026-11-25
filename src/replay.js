@@ -99,7 +99,7 @@ let replayRngCallers = []
        path (movement/combat/loot/etc.) reproduces the exact same run. */
 // v2 records non-turn NPC service interactions (e.g. opening the Herbalist)
 // because they mutate talkFreezeTurns and therefore affect future RNG consumption.
-const REPLAY_VERSION = 22
+const REPLAY_VERSION = 26
 const REPLAY_ACTION_DELAY_MS = 99
 // const REPLAY_ACTION_DELAY_MS = 169
 

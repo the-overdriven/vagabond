@@ -122,6 +122,21 @@ describe('Tactical consumables', () => {
           const cross=fireballBlastTiles(44,40)
           if(cross.length!==17 || cross.some(p=>p.x===45&&p.y===41))
             throw Error('Burst Bending must shape the same aim into a cross')
+          const terrain=JSON.stringify(map[39].slice(43,46))
+          const stones=fireballCornerStones(44,40)
+          if(stones.length!==4 || stones.some(p=>Math.abs(p.x-44)!==1||Math.abs(p.y-40)!==1))
+            throw Error('Burst Bending mountains must occupy the four visual diagonals')
+          if(JSON.stringify(map[39].slice(43,46))!==terrain)
+            throw Error('Visual mountains cannot change terrain')
+          const oldDraw=drawImageVisual,oldVisible=undergroundTileVisible,oldTiles=USE_TILE_IMAGES
+          try {
+            const images=[]
+            USE_TILE_IMAGES=true;undergroundTileVisible=()=>true
+            drawImageVisual=(x,y,visual)=>{images.push(visual.image);return true}
+            drawFireballCornerStones({cornerStones:stones},FIREBALL_FLIGHT_MS)
+            if(images.length!==4 || images.some(path=>path!=='img/tiles/mountain-middle.png'))
+              throw Error('Burst Bending must use the standalone mountain tile')
+          } finally {drawImageVisual=oldDraw;undergroundTileVisible=oldVisible;USE_TILE_IMAGES=oldTiles}
           const buffer=document.createElement('canvas')
           buffer.width=buffer.height=9*TILE_PX
           const originalCtx=ctx,visible=undergroundTileVisible

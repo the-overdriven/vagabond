@@ -2565,7 +2565,7 @@ more difficult:
   function fillArtifactText(str, noun, name, possessor) {
     return str.replace(/\{noun\}/g, noun.toLowerCase())
       .replace(/\{name\}/g, name || '')
-      .replace(/\{possessor\}/g, possessor || '')
+      .replace(/\{possessor\}/g, possessor || 'A former owner')
   }
 
   // Vocation data is intentionally accepted in a few simple JSON shapes:
@@ -2801,7 +2801,7 @@ more difficult:
     if (ambusher > 0) artifactAbilityMessage('ambusher',
       `Ambusher exploits the ${e.name}'s hesitation!`, `You exploit the ${e.name}'s hesitation!`)
     if (melee && (invisible || phantom) && playerHasArtifactAbility('shadow_strike'))
-      artifactAbilityMessage('shadow_strike', `Shadow Strike catches the ${e.name} unawares!`,
+      artifactAbilityMessage('shadow_strike', `Shadow Strike takes the ${e.name} by surprise!`,
         `Your hidden strike hits the ${e.name} harder!`)
     if (melee && flurry && playerHasArtifactAbility('flurry'))
       artifactAbilityMessage('flurry', `Flurry drives another powerful strike!`,
@@ -2917,6 +2917,22 @@ more difficult:
         tone === 'bad' ? '#e48b86' : '#e3c589', popupDelay, 1050)
   }
 
+  function artifactOwnerDescription(item) {
+    let text = item.description || ''
+    if (!item.name || !item.noun) return text
+    // Old generated sentences may still be carried by saved items. Correct
+    // their subject on display, without regenerating lore or consuming RNG.
+    for (const fragments of [ARTIFACT_DESC?.haunting, ARTIFACT_DESC?.lore]) {
+      for (const fragment of fragments || []) {
+        if (!fragment.includes('{possessor}')) continue
+        const wrong = fillArtifactText(fragment, item.noun, item.name, item.name)
+        const right = fillArtifactText(fragment, item.noun, item.name, item.possessor)
+        text = text.replace(wrong, right)
+      }
+    }
+    return text
+  }
+
   function artifactInspectionText(item) {
     const ability = artifactAbilityDefinition(item)
     const roll = item.abilityId === 'drifter' ? ` (Rolled: MF +${item.drifterMf})` : item.abilityId === 'berserkers_oath' && item.berserkerOathRoll
@@ -2927,7 +2943,7 @@ more difficult:
         p.kind==='homecomingscroll'?'Homecoming':p.kind==='wayfaringscroll'?'Wayfaring':
         (itemDefinition(p.kind)?.name || p.kind).replace(/^Scroll of /,'')).join(' → ') || 'none'}.`
       : ''
-    return [item.description, rescue, ability && `${ability.name}: ${ability.description}${roll}`, cairnContents, item.identified && (ArtifactWayfaring.activeItem(item) || (item.artifactSlot === 'trinket' && ARTIFACT_ABILITIES.abilities[item.abilityId]?.enabled && ARTIFACT_ABILITIES.abilities[item.abilityId]?.active && ARTIFACT_ABILITIES.domains.geomancy.includes(item.abilityId))) ? `Cooldown remaining: ${ArtifactWayfaring.cooldownRemaining(item.abilityId)} turns.` : ''].filter(Boolean).join('\n')
+    return [artifactOwnerDescription(item), rescue, ability && `${ability.name}: ${ability.description}${roll}`, cairnContents, item.identified && (ArtifactWayfaring.activeItem(item) || (item.artifactSlot === 'trinket' && ARTIFACT_ABILITIES.abilities[item.abilityId]?.enabled && ARTIFACT_ABILITIES.abilities[item.abilityId]?.active && ARTIFACT_ABILITIES.domains.geomancy.includes(item.abilityId))) ? `Cooldown remaining: ${ArtifactWayfaring.cooldownRemaining(item.abilityId)} turns.` : ''].filter(Boolean).join('\n')
   }
 
   // Relocation is gameplay state, never tied to camera animation. It covers
@@ -3478,7 +3494,7 @@ more difficult:
 
   // Melee and projectile attacks share mitigation. Periodic/environmental HP
   // loss bypasses these shields, but still feeds the common HP-loss hook.
-  function artifactIncomingHit(rawDamage) {
+  function artifactIncomingHit(rawDamage, attacker = null) {
     if (rawDamage <= 0) return {damage:rawDamage,evaded:false,absorbed:false}
     if (player.artifactEvasionPrepared && playerHasArtifactAbility('bulwark_evasion')) {
       player.artifactEvasionPrepared = false
@@ -3492,8 +3508,9 @@ more difficult:
     if (playerHasArtifactAbility('sacred_aegis') &&
         turnCount >= (player.artifactSacredReadyTurn || 0)) {
       player.artifactSacredReadyTurn = turnCount + artifactRule('sacred_aegis','cooldown')
-      artifactAbilityMessage('sacred_aegis', 'Sacred Aegis absorbs the blow!',
-        'A protective ward absorbs the blow!')
+      const blow = attacker ? `the ${attacker.name}'s attack` : 'the blow'
+      artifactAbilityMessage('sacred_aegis', `Sacred Aegis absorbs ${blow}!`,
+        `A protective ward absorbs ${blow}!`)
       spawnDamageNumber(player.x,player.y,
         playerKnowsArtifactAbility('sacred_aegis') ? 'Aegis!' : 'Ward!', '#c9dfff')
       return {damage:0,evaded:false,absorbed:true}
@@ -4693,7 +4710,7 @@ more difficult:
     if (ability === 'ethereal' && enemy?.adaptiveEventId === 'forest_spirit') return false
     // Binding suppresses these behaviors temporarily; it never edits the
     // monster's actual ability catalog, so the powers return after movement.
-    if (enemy?.artifactBound && (ability === 'flee' || ability === 'thief')) return false
+    if (enemy?.artifactBound && ['flee', 'thief', 'evades'].includes(ability)) return false
     if (enemy?.groundingLostAbilities?.includes(ability)) return false
     return !(ability === 'fly' && enemy?.sleeping) && !!enemy?.abilities?.includes(ability)
   }
@@ -4739,7 +4756,8 @@ more difficult:
 
   function artifactSoulEaterOnKill(victim) {
     if (!playerHasArtifactAbility('soul_eater') || !victim.humanoid ||
-        victim.artifactSoulGhost || (victim.baseName || victim.name) === 'Ghost' ||
+        victim.artifactSoulGhost || (victim.family || enemyTemplateForSavedEnemy(victim)?.family) === 'undead' ||
+        (victim.baseName || victim.name) === 'Ghost' ||
         !onCurrentLevel(victim) ||
         enemies.some(e => e.alive && e.artifactSoulGhost)) return false
     if (!chance(artifactRule('soul_eater','chance'))) return false
@@ -4913,6 +4931,8 @@ more difficult:
     enemy.gearBonuses = enemy.gearBonuses || null
     enemy.meleeHitXpGranted = Number.isInteger(enemy.meleeHitXpGranted)
       ? Math.max(0, enemy.meleeHitXpGranted) : 0
+    enemy.meleeHitXpPending = Math.min(enemy.meleeHitXpGranted,
+      Number.isInteger(enemy.meleeHitXpPending) ? Math.max(0, enemy.meleeHitXpPending) : 0)
     enemy.combatSkillXp = enemy.combatSkillXp ? {...enemy.combatSkillXp} : null
     enemy.shieldGuardHits = Number.isInteger(enemy.shieldGuardHits) ? Math.max(0,enemy.shieldGuardHits) : 0
     enemy.shieldGuardBroken = enemy.shieldGuardBroken === true
@@ -6111,18 +6131,18 @@ more difficult:
     return reward
   }
 
-  function awardMeleeHitXp(e, damage) {
+  function reserveMeleeHitXp(e, damage) {
     if (damage <= 0) return
     const cfg = MONSTER_XP_WEIGHTS.meleeHitBonus
     // A capped per-enemy budget rewards close combat without allowing XP to
     // be farmed indefinitely from regeneration or intentionally weak strikes.
     const maxBonus = Math.floor(xpForEnemy(e) * cfg.maxEnemyRewardFraction)
-    const granted = e.meleeHitXpGranted
+    const granted = e.meleeHitXpGranted || 0
     const award = Math.min(cfg.xpPerDamagingHit, Math.max(0, maxBonus - granted))
     if (award <= 0) return
-    e.meleeHitXpGranted += award
-    // Melee hits can happen repeatedly in one fight: avoid one XP log per hit.
-    gainXp(award, false)
+    e.meleeHitXpGranted = granted + award
+    // Reserve the bonus on this enemy; only a credited kill pays it out.
+    e.meleeHitXpPending = (e.meleeHitXpPending || 0) + award
   }
 
   function damageRoll(atk, def, enemy = null) {
@@ -6493,7 +6513,7 @@ more difficult:
     artifactGrowingMaliceHit(e)
     if (effectiveDamage > 0) artifactOnDirectPlayerHit()
     if (consumeBulwarkBravery) player.artifactBraveryCharge = false
-    awardMeleeHitXp(e, dmg)
+    reserveMeleeHitXp(e, dmg)
     const trainedMeleeSkill = meleeCombatSkill(player.equip.weapon)
     if (trainedMeleeSkill) trainCombatSkill(trainedMeleeSkill, e, dmg)
     if (targetWasInvisible) revealEnemyInvisibility(e)
@@ -6626,7 +6646,7 @@ more difficult:
     const critical = !glancing && !blocked && criticalRoll && !playerHasArtifactAbility('gods_chosen')
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing || blocked) dmg = Math.floor(dmg / 3)
-    const incoming = artifactIncomingHit(dmg)
+    const incoming = artifactIncomingHit(dmg, e)
     if (incoming.evaded) return false
     dmg = incoming.damage
     if (player.equip.shield) trainCombatSkill('shielding', e)
@@ -6939,7 +6959,7 @@ more difficult:
     if (critical) dmg = Math.round(dmg * 2)
     if (glancing) dmg = Math.floor(dmg / 3)
     else dmg = Math.max(1, dmg)
-    const incoming = artifactIncomingHit(dmg)
+    const incoming = artifactIncomingHit(dmg, e)
     if (incoming.evaded) return false
     dmg = incoming.damage
     artifactLosePlayerHp(dmg,{directHit:true})
@@ -7062,7 +7082,7 @@ more difficult:
     spawnDeathAnim(e, deathFxDelay)
     if (onCurrentLevel(e)) occupied.delete(keyXY(e.x, e.y))
     enemies = enemies.filter(x => x !== e)
-    if (playerCredit) gainXp(xpForEnemy(e))
+    if (playerCredit) gainXp(xpForEnemy(e) + (e.meleeHitXpPending || 0))
     if (playerCredit) artifactSoulEaterOnKill(e)
     if (e.carriedDungeonKey) {
       groundItems.push({x:e.x,y:e.y,level:e.level ?? currentZ,levelKind:e.levelKind || currentLevelKind(),
@@ -7379,7 +7399,7 @@ more difficult:
     requestAnimationFrame(step)
   }
 
-  function die(killer = null, cause = 'environment') {
+  function die(killer = null, cause = 'environment', impactDelay = 0) {
     if (deathTransition) return
     cancelAllPreparedEnemyAbilities()
     toggleInv(false)
@@ -7475,7 +7495,7 @@ more difficult:
       'bad'
     )
     stopCameraAnimation()
-    clearEnemyAnims()
+    clearEnemyAnims(cause === 'aftershock')
     stopAttackAnimation()
     if (replayAnimationsDisabled) {
       // Death transitions are visual only. Apply the actual gameplay result now so
@@ -7505,8 +7525,8 @@ more difficult:
       phase: 'pending',
       start: deathNow,
       duration: 900,
-      deathStart: fireballEnd ? Math.max(deathNow, fireballEnd - FIREBALL_BURST_MS) : deathNow,
-      fadeNotBefore: fireballEnd,
+      deathStart: fireballEnd ? Math.max(deathNow, fireballImpactTime()) : deathNow + impactDelay,
+      fadeNotBefore: Math.max(fireballEnd, impactDelay ? deathNow + impactDelay + 650 : 0),
       rotation: 0,
       permadeath: player.permadeath
     }
@@ -11197,9 +11217,9 @@ more difficult:
     const templates = ENEMY_TEMPLATES.filter(t => t.aggro !== 0 && t.name !== 'Ghost' && (ancient ? t.tier >= 3 : (t.tier === 1 || t.tier === 2)) && enemyBiomes(t).includes('forest') && naturalSpawnEligible(t))
     if (!templates.length) return
     const tmpl = pickWeighted(templates, t => t.rarity ?? 1)
-    // A peaceful beast's ambush is cancelled, not replaced by a humanoid.
+    // A beast's ambush is cancelled, not replaced by a humanoid.
     // This preserves every other species' original ambush probability.
-    if (ArtifactWayfaring.truce({...tmpl,x,y,alive:true})) return
+    if (ArtifactWayfaring.preventsBeastAmbush(tmpl)) return
     const spot = pick(candidates)
     const variance = WORLD_GEN_CONFIG.surfaceEnemies.statVarianceMin + rng() * WORLD_GEN_CONFIG.surfaceEnemies.statVarianceSpan
     const e = {
@@ -13666,8 +13686,9 @@ more difficult:
     return presentation
   }
 
-  function clearEnemyAnims() {
+  function clearEnemyAnims(keepAftershock = false) {
     enemyAttackVisualEnd = 0
+    if (!keepAftershock) aftershockShakeAnims = []
     shooterVolleyTurn = -1
     playerProjectileDodges = []
     rareStampedeAnims = []
@@ -13698,7 +13719,7 @@ more difficult:
   }
 
   function animationsPending() {
-    return !!moveAnim || enemyAttackPresentationPending() || playerProjectileDodges.length > 0 || rareStampedeAnims.length > 0 || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0 || fireballAnims.length > 0 || ArtifactGeomancy.earthmawAnimating()
+    return !!moveAnim || enemyAttackPresentationPending() || playerProjectileDodges.length > 0 || rareStampedeAnims.length > 0 || enemyAnimsPending() || npcAnimsPending() || fxAnims.length > 0 || soundAnims.length > 0 || damageAnims.length > 0 || projectileAnims.length > 0 || fireballAnims.length > 0 || aftershockShakeAnims.length > 0 || ArtifactGeomancy.earthmawAnimating()
   }
 
   // A single shared rAF loop drives every in-progress animation. Having one loop
@@ -18048,7 +18069,7 @@ more difficult:
       equipmentLog(`${equipLead} the ${artifactDisplayName(it)}.${statDeltaText(before)}`, [old, it])
     }
     artifactAlchemistClamp()
-    consumeItemTurn()
+    finishEquipmentChange(slot)
     bowAimTarget = null
     clearHoveredAutoPath()
     updateTooltip()
@@ -18130,13 +18151,23 @@ more difficult:
     carryItem(item)
     equipmentLog(`You unequip the ${artifactDisplayName(item)}.${statDeltaText(before)}`, [item])
     artifactAlchemistClamp()
-    consumeItemTurn()
+    finishEquipmentChange(slot)
     bowAimTarget = null
     clearHoveredAutoPath()
     updateTooltip()
   }
 
-  // Inventory actions are player actions: they advance the world once even
+  function finishEquipmentChange(slot) {
+    if (slot === 'weapon' && artifactEquippedInSlot('armor', 'weaponmaster')) {
+      updateHud()
+      render()
+      renderInventory()
+      return
+    }
+    consumeItemTurn()
+  }
+
+  // Inventory actions normally advance the world once even
   // though the inventory overlay remains open.
   function consumeItemTurn(playerMovement = null) {
     enemyTurn(null,playerMovement)
@@ -18329,6 +18360,7 @@ more difficult:
     item.count=(item.count||1)-1
     if(item.count<=0)player.inventory.splice(idx,1)
     AdaptivePlayerTrolling.onPotionDrunk()
+    if (cureStrangePotionDebuff()) { consumeItemTurn(); return }
     const effect=AdaptivePlayerTrolling.strangePotionEffect()
     if(effect==='confusion') {
       player.confusionTurns=AdaptivePlayerTrolling.strangePotionConfusionTurns()
@@ -19158,7 +19190,6 @@ more difficult:
     player.baseMf = 25
     player.godMode = true
     if (!replayPlaying && !replaySimulationMode) setHintPanelCollapsed(true)
-    player.trackingLearned = true
     if (!player.inventory.some(item => item.kind === 'pickaxe')) addInventoryItem('pickaxe')
     resetSwimming()
     player.godInvisible = true

@@ -21,9 +21,13 @@ describe('Nymph herbs and surface scroll variety',()=>{
             player.inventory=[];chance=()=>false
             lootFromEnemy({...n,baseName:'Nymph',equipment:null})
             check(!player.inventory.length,'failed roll leaves no herb')
-            for(const [species,probability] of [['Nymph',0.15],['Tulla',0.2],
-                ['Kveld',0.2],['Wyrdhag',0.25]]) {
+            for(const [species,probability] of [['Nymph',0.15],['Tulla',0.15],
+                ['Kveld',0.15],['Wyrdhag',0.25],['Goblin',0.01],['Orc',0.01],
+                ['Imp',0.05],['Skerva',0.1],['Gorgon',0.2],['Vampire',0.25],
+                ['Serpent Queen',0.25],['Lich',0.3]]) {
               const t=ENEMY_TEMPLATE_BY_NAME[species]
+              check(t.lootTable.find(d=>d.kind==='idscroll')?.chance===probability,
+                species+' has the configured identification chance')
               player.inventory=[];chance=p=>p===probability
               lootFromEnemy({...t,baseName:species,equipment:null})
               check(player.inventory.some(i=>i.kind==='idscroll' && i.count===1),

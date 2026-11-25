@@ -129,6 +129,7 @@ const ArtifactGeomancy = (() => {
     const targets=enemies.filter(e=>e.alive && e.hp>0 &&
       (e.level||0)===p.z && (e.levelKind|| (p.z===0?'surface':p.z>0?'tower':'chain'))===p.levelKind &&
       cells.has(keyXY(e.x,e.y)))
+    const impactDelay=onLevel ? queueAftershockShake() : 0
     const affected=targets.map(e=>({enemy:e,damage:randInt(p.minDamage,p.maxDamage)}))
     const hitsPlayer=onLevel && cells.has(keyXY(player.x,player.y))
     const playerDamage=hitsPlayer?randInt(p.minDamage,p.maxDamage):0
@@ -142,7 +143,7 @@ const ArtifactGeomancy = (() => {
       if (onLevel) {
         revealEnemyInvisibility(e);breakEnemyFear(e);wakeSleepingEnemy(e)
         alarmEnemy(e);alarmEnemiesNearHit(e)
-        spawnDamageNumber(e.x,e.y,amount,RENDER_STYLE.damage.enemyHit)
+        spawnDamageNumber(e.x,e.y,amount,RENDER_STYLE.damage.enemyHit,impactDelay)
       }
       absorbEnemyFatalHit(e)
     }
@@ -150,20 +151,20 @@ const ArtifactGeomancy = (() => {
       const amount=Math.floor(playerDamage*rule('aftershock','damageFraction'))
       if(amount>0){
         artifactLosePlayerHp(amount)
-        spawnDamageNumber(player.x,player.y,amount,RENDER_STYLE.damage.playerHit||'#ff6655')
+        spawnDamageNumber(player.x,player.y,amount,RENDER_STYLE.damage.playerHit||'#ff6655',impactDelay)
         absorbPlayerFatalDamage()
       }
     }
     const fatal=player.hp<=0
     for(const {enemy:e} of affected) if(e.alive && e.hp<=0)
-      killEnemy(e,true,'aftershock')
-    if(fatal) {player.hp=0;die(null,'aftershock')}
+      killEnemy(e,true,'aftershock',impactDelay)
+    if(fatal) {player.hp=0;die(null,'aftershock',impactDelay)}
     if(onLevel){
       log(hurt || hitsPlayer ? 'The fractured earth erupts in a second shock!':
         'The fractured earth settles.', 'info')
       if (!replayAnimationsDisabled && !replaySimulationMode && (hurt||hitsPlayer))
         spawnDamageNumber(player.x,player.y,
-          playerKnowsArtifactAbility('aftershock')?'Aftershock!':'Tremor!', '#c18a62')
+          playerKnowsArtifactAbility('aftershock')?'Aftershock!':'Tremor!', '#c18a62',impactDelay)
     }
   }
   function tick() {
@@ -343,7 +344,7 @@ const ArtifactGeomancy = (() => {
       const descends=!!landing && chance(rule('earthmaw','depthTransferChance'))
       if (seen) {
         earthmawCast.holes.push({x:e.x,y:e.y,enemy:{...e},shimmers:enemyInvisibleShimmer(e)})
-        spawnDamageNumber(e.x,e.y,e.name+(descends?' fell below':' swallowed'),'#ffd58e',quakeLeadMs,1100)
+        spawnDamageNumber(e.x,e.y,e.name+' swallowed','#ffd58e',quakeLeadMs,1100)
       }
       cancelPreparedEnemyAbility(e)
       e.farPath=null;e.chargeAnim=undefined;e.hasteAnim=undefined
@@ -773,7 +774,7 @@ const ArtifactGeomancy = (() => {
         const result=swallowEarthmaw()
         count=result.swallowed+result.resisted+result.killed
         if (count) artifactAbilityMessage(id,
-          `Earthmaw shakes the ground! ${result.swallowed} creature${result.swallowed===1?'':'s'} swallowed${result.descended ? `; ${result.descended} lost to the depths` : ''}${result.killed ? `, ${result.killed} crushed` : ''}.`,
+          `Earthmaw shakes the ground! ${result.swallowed} creature${result.swallowed===1?'':'s'} swallowed${result.killed ? `, ${result.killed} crushed` : ''}.`,
           'The earth heaves!')
       } else if (id==='stonemaker') {
         const spot=pick(candidates())

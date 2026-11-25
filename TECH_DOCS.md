@@ -489,17 +489,15 @@ reward once. Prefixes have no extra XP multiplier beyond their effect on
 permanent stats and abilities. Player XP multipliers (including Human +20%)
 apply when XP is awarded.
 
-Each damaging player melee hit awards **3 additional XP** before player XP
-multipliers. This applies to ordinary and extra weapon strikes, including
-killing blows, but not misses, zero-damage strikes, or ranged attacks.
-To prevent repeated low-damage attacks or enemy regeneration from generating
-unlimited XP, each monster grants at most **floor(25% of its kill XP)** in
-melee-hit bonuses across the entire fight. The remaining allowance carries
-across saves and replay. Partial final awards respect the cap; the bonus does
-not reduce the monster's regular kill XP. Configuration lives alongside the
-monster XP weights in `content/monster_xp_weights.json`. Melee-heavy characters
-can thus reach level milestones sooner, but characters at the same level still
-have identical base max HP progression regardless of fighting style.
+Each damaging player melee hit reserves **3 additional XP** before player XP
+multipliers. Ordinary and extra weapon strikes, including killing blows, count;
+misses, zero-damage strikes and ranged attacks do not. Each monster has a
+maximum bonus of **floor(25% of its kill XP)** across the entire fight, even
+if it regenerates. The reserved XP and remaining allowance survive saves and
+replay. Only a player-credited kill pays the reserved bonus, together with the
+regular kill reward and the XP multiplier at death. Non-player kills pay
+nothing. Configuration lives in `content/monster_xp_weights.json`. The bonus
+never levels the player up while the target is still alive.
 
 XP is affected by the player's XP multiplier.
 
@@ -5206,12 +5204,13 @@ array; the shared chance and projectile tuning live in
 | Eligible species | Projectile | Projectile ATK |
 |---|---|---:|
 | Monkey, Goblin | Small stone | 3 |
-| Cyclops | Large stone (boulder) | 3 |
+| Cyclops | Large stone (boulder) | 9 |
 | Kobold, Lizard Man, Nymph, Centaur, Skeleton | Arrow | 5 |
 
 Small and large stone throwers use the same combat rules, XP bonus and
-generation threat weight. Only the projectile sprite and its log name differ;
-Cragbowl uses the large stone sprite as well.
+generation threat weight. Large stones have three times the projectile ATK
+of small stones and use a different sprite and log name. Cragbowl uses the
+large stone sprite as well, but retains its own damage rules.
 
 Each eligible spawn has a **50%** seeded-RNG chance to become a shooter and
 starts with **10 shots**. Shooter role and exact remaining ammunition persist
@@ -5721,7 +5720,9 @@ or retreat from sacred ground. Ultra-rare and adaptive encounters, and beasts
 agitated by the Forest Spirit, are exempt. Attacking any living beast while
 either party is in forest breaks the truce for 1,000 world turns, even on a miss
 or an immune hit. Melee, ranged, Fireball and secondary artifact damage share
-the same aggression hook. Re-equipping does not reset the character cooldown.
+the same aggression hook. Re-equipping does not reset the character cooldown. The carried power also
+prevents random forest ambushes by living non-humanoids, even while the
+truce is broken; humanoid ambushes are unaffected.
 
 ### Alarmed
 
@@ -7228,7 +7229,8 @@ This includes curse details and dwarven-owner names, even when the artifact
 is currently equipped. The artifact's effect tier is also concealed: no tier
 number or tier-based text color appears in inventory, equipment, merchant lists
 or item logs until the artifact is identified. Identified artifacts display
-their ordinary tier and color.
+their ordinary tier and color. Owner-related lore refers to the dwarf rather
+than the artifact itself; unnamed artifacts use a generic former owner.
 
 ---
 
@@ -7368,7 +7370,7 @@ identification-dependent prices apply to gear and trinkets.
 | Phantom Trail | Create a stationary translucent double on the player’s current tile for eight world turns, including the activation turn. It is hidden and cannot be targeted while the player occupies that tile. When an enemy attempts a direct attack against the player, it has a 50% chance to target the double instead if it is a legal target within its attack range. Pursuing enemies can also spend their pursuit action attacking the double when they cannot directly attack the player. True Sight and blind creatures ignore it. The double survives attacks. Each fooled enemy grants one surprise opening: +10 critical chance percentage points for the next direct strike against it, also +25% melee damage with Shadow Strike. These half-strength bonuses do not stack with the corresponding full invisible-strike bonuses. 500-turn cooldown. | 450g |
 | Forestwalker | +10 concealment percentage points, retain successful cover across one open tile, multiply forest ambush chance by 0.25; woodland-adapted races can prepare a guaranteed dodge (30-turn cooldown). | 350g |
 | Unseen | Hide beside cover after a stationary noncombat turn; retain each observer's result along cover and across two open tiles. | 450g |
-| One with the Wild | Ordinary beasts respect a forest truce; attacking beasts in the forest disables it for 1,000 turns. | 400g |
+| One with the Wild | Ordinary beasts respect a forest truce; attacking beasts in the forest disables it for 1,000 turns. Cancels random beast forest ambushes even while the truce is broken. | 400g |
 | Farsight | Reveal a wholly undiscovered square on the current map, side `min(6, 4 + floor(max(0, MF)/5))`. Underground it must overlap the connected cavern and cannot include floor belonging to another complex. See scouting below. 1,000-turn cooldown. | 400g |
 | Spelunker | At natural cave entrances, sense the size of the connected cave on the destination level, whether it has a deeper passage and another exit. | 200g |
 
@@ -7440,7 +7442,9 @@ curses: they use the cursed naming and resale rules and cannot additionally roll
 a periodic curse. Their restrictions apply even unidentified. Other powers,
 including Permafrost, can roll a normal curse. Positional and low-health bonuses
 are excluded from permanent ATK/DEF/SPD statistics; Drifter's stored MF is
-included in ordinary MF.
+included in ordinary MF. Troglodyte displays its current signed ATK, DEF
+and maximum HP modifiers in the player status panel when nonzero. An
+unidentified source does not reveal its ability name.
 
 Discovery rewards use genuine first-time map discovery, not camera movement,
 quest map hints or magical map reveals. The surface uses a fixed circular radius
@@ -7601,7 +7605,8 @@ Rupture and shows no enemy name, statistics or per-turn notifications. At expira
 the same X/Y, whether or not the player is on that floor. Mounds do not
 move aside for stair arrivals. A successful depth transfer changes only Z,
 floor identity and the corresponding cave reference. HP, ID, gear, lost powers
-and quest identity survive, and the transfer grants no XP or loot. The
+and quest identity survive, and the transfer grants no XP or loot. Swallow
+feedback does not identify or count transferred creatures separately. The
 legacy Crypt map is excluded from transfers. Each eligible target consumes
 one resistance roll; the descent chance is rolled only for a legal lower
 landing. All successes share one cast message and cooldown. An activation
@@ -7694,7 +7699,7 @@ do not affect gameplay determinism.
 | Duelist | armors | While equipped with a **one-handed melee weapon and no shield**, direct melee damage gains **0.25% for each One-Handed proficiency point** (**+25%** at skill 100). Bows and unarmed strikes excluded. Changing weapon or equipping a shield removes the bonus immediately. |
 | Veteran — Experience | armors, martial | **Melee weapon:** +5% direct melee damage per 10 percentage points of effective XP bonus, scaling continuously. **Armor:** +1 DEF per **15 complete XP-bonus percentage points**. Uses all existing racial/equipment XP multipliers. Bows and shields excluded. |
 | Veteran — Level | armors, martial | **Melee weapon:** +1% direct melee damage per character level. **Armor:** +2 DEF per **5 complete character levels**. Bows and shields excluded. |
-| Weaponmaster | armors | With a one-handed or two-handed melee weapon equipped, add **floor(min(One-Handed, Two-Handed) / 20) GRACE**, up to **+5** at both skills 100. The normal weapon affinity, gear penalties and GRACE follow-up rules still apply; bows and unarmed combat are excluded. |
+| Weaponmaster | armors | With a one-handed or two-handed melee weapon equipped, add **floor(min(One-Handed, Two-Handed) / 20) GRACE**, up to **+5** at both skills 100. The normal weapon affinity, gear penalties and GRACE follow-up rules still apply; bows and unarmed combat are excluded from the GRACE bonus. Equipping, swapping or removing any weapon costs no turn while this armor power is active. |
 | Blood Reservoir | bulwark | Stores **25% of every HP-loss event**, capped at **25% of maximum HP**. Its next damaging melee strike adds the **whole-number portion** of the reserve; a miss keeps it. |
 | Boneplate | bulwark | Every enemy death within **2 tiles at the same Z level** grants **+1 DEF** for **5 player turns**; up to **5 independent charges**, which expire separately, even if an enemy dies from poison or a trap. |
 | Brace | bulwark | After the player has remained stationary since the preceding player action, grants **+20% DEF**, minimum **+2**. Any actual relocation, including forced movement, teleportation or a Z change, cancels the standing condition. |
@@ -7717,7 +7722,7 @@ do not affect gameplay determinism.
 | Taunt | bulwark | Increases enemy detection radius by **3 tiles** and suppresses strength-based bow avoidance and ranged spacing, but never fear or invisibility. |
 | Tideguard | bulwark | While standing on unfrozen **water or river** terrain, armor grants **+20% DEF** (rounded down from the ordinary pre-conditional DEF basis) and shields grant **+15 percentage points** to normal melee block chance. Both slot effects may operate together, but duplicate copies of either effect do not stack. Frozen rivers and lake ice do not qualify. |
 | Vigorplate | bulwark | At **75% maximum HP or more**, grants **+30% DEF**, minimum **+3**. Re-evaluated for each incoming attack. |
-| Binding | martial | A landed melee hit prevents the struck enemy's Flee and Thief behavior, without deleting its underlying abilities. **Any actual relocation** of the player releases all bound enemies; blocked movement attempts do not. |
+| Binding | martial | A landed melee hit prevents the struck enemy's Flee, Thief and Evasion behavior, without deleting its underlying abilities. **Any actual relocation** of the player releases all bound enemies; blocked movement attempts do not. |
 | Blindness | martial | Each damaging hit has a **10%** chance to lower enemy **ATK by 1** or lower **AGGRO by 1 once** (50/50 until AGGRO falls). Afterwards only ATK is reduced; maximum **−5 ATK**, minimum **1 ATK** and **1 AGGRO**. |
 | Blood Pact | martial | Each landed melee strike, including GRACE strikes, uses **max(player maximum HP, target maximum HP)** as its reference. It costs **ceil(1% of the reference HP)** in direct HP loss and separately adds **ceil(1% of the same reference HP)** damage after defenses. The two rates are independently configurable. The cost ignores damage reduction, can kill the player, and still allows the blow to resolve and cause mutual death. |
 | Bravery (martial) | martial | Melee damage is **25% higher** against an enemy with greater current strength, **or** while at least **3 same-level enemies** are adjacent. Both conditions still grant only one bonus. |
@@ -7741,7 +7746,7 @@ do not affect gameplay determinism.
 | Shadow Strike | martial | A melee hit begun while invisible deals **50% more damage**. Invisibility is checked independently at the start of each strike, including additional strikes. |
 | Silence | martial | Each damaging melee hit has a **30%** chance to prevent only enemy spellcasting for **3 player turns**; regular attacks and movement still work. |
 | Slow | martial | Each damaging melee hit has a **30%** chance to apply **Slow for 3 player turns**. |
-| Soul Eater | martial | Every player-credited kill of a **humanoid other than a Ghost** has a **50%** chance to create a hostile `ghost of <victim>` on a free safe neighboring floor tile on the same global Z level. Only **one** Soul Eater ghost can be alive anywhere in the world at once. The ghost has **half the slain creature’s maximum HP, ATK, DEF, SPD and GRACE** (rounded to nearest integer, minimum 1 for HP/ATK/SPD), but retains Ghost species behavior, including ethereal and invisibility. It does not inherit the victim’s gear, abilities, prefix or loot. It grants normal stat-based **XP**, but drops **nothing**. Killing that ghost with player credit awards **Soul Fed: +1 ATK for 300 player turns**, with **independent uncapped stack expiries**. |
+| Soul Eater | martial | Every player-credited kill of a **non-undead humanoid** has a **50%** chance to create a hostile `ghost of <victim>` on a free safe neighboring floor tile on the same global Z level. Only **one** Soul Eater ghost can be alive anywhere in the world at once. The ghost has **half the slain creature’s maximum HP, ATK, DEF, SPD and GRACE** (rounded to nearest integer, minimum 1 for HP/ATK/SPD), but retains Ghost species behavior, including ethereal and invisibility. It does not inherit the victim’s gear, abilities, prefix or loot. It grants normal stat-based **XP**, but drops **nothing**. Killing that ghost with player credit awards **Soul Fed: +1 ATK for 300 player turns**, with **independent uncapped stack expiries**. |
 | Soulburst | martial | Killing a foe with a direct melee strike bursts over a **7×7** area centered on the victim. Other enemies in sight on the same Z level take damage with **30% of the killing strike's damage** before their own DEF reduction. Bursts cannot trigger further bursts or weapon powers; the player is unharmed. |
 | Sunder | martial | Each damaging melee hit permanently reduces the enemy's effective DEF by **1**, up to **10**; minimum DEF is **0**. |
 | Counterguard | shields | **+15 percentage points** to block against enemies carrying a weapon. |
@@ -7874,6 +7879,7 @@ never the Blood Pact cost. HP-loss charges only count **actual HP removed**;
 armor wards which prevent damage don't generate charges. For compounded
 damage reductions, round down after each reduction. Temporary charges and
 shields are shown in the status panel only when their artifact is identified.
+A Sacred Aegis activation names the attacker whose hit was absorbed.
 
 Slow uses the same **10% SPD reduction** rule as the player's Slow. This affects
 enemy hit/miss and chase calculations; it starts with the immediate enemy
@@ -8038,8 +8044,20 @@ chance to drop a Life Potion, Healing Herb or Mushroom, each with an absolute
 **6.6%** chance and the same exclusive `healing` group. This loot chance does
 not increase with Magic Find. Using its own healing item in combat does not
 alter the separate death-drop roll. Identification scrolls have independent
-per-kill chances: Nymph 15%, Tulla and Kveld 20% each, and Wyrdhag 25%. They
-can drop alongside the existing healing loot.
+per-kill chances and can drop alongside existing healing or equipment loot.
+They are species-specific rather than a universal humanoid reward: magical or
+intelligent species are more likely to carry them. Tulla and Kveld retain their
+scroll drops despite not being humanoids.
+
+| Species | Identification chance per kill |
+| --- | ---: |
+| Goblin, Orc | 1% each |
+| Imp | 5% |
+| Skerva | 10% |
+| Nymph, Tulla, Kveld | 15% each |
+| Gorgon | 20% |
+| Wyrdhag, Vampire, Serpent Queen | 25% each |
+| Lich | 30% |
 
 The following **32 non-humanoid species** always drop raw meat on death
 (except deaths that suppress ordinary loot), with fixed quantities:
@@ -8883,11 +8901,17 @@ without a free opening ambush attack.
 With Burst Bending carried, the blast instead takes a **17-tile cross**
 on open ground: the epicenter and four separate four-tile arms. The same
 footprint controls the preview, damage, hidden Mimic revelation and visuals.
-Four streams of fire spread from a bright central flare. Each stream has a
-flickering edge and tapers at the last tile it reaches.
+Four diagonal mountain sprites rise around the epicenter before impact,
+remain during the four spreading cardinal streams of flame, then fade away.
+The same standalone mountain tile (or mountain glyph in ASCII mode) is used
+on all levels, regardless of neighboring terrain. Opaque cells are skipped.
+These mountains are purely visual, with no collision, persistence or gameplay
+RNG. Each flame stream tapers at its last affected tile.
 Walls stop individual arms; runes retain the shape set when inscribed.
 Aftershock may later re-strike the same recorded cells as a separate
-world-turn effect, not a second immediate fireball.
+world-turn effect, not a second immediate fireball. Its screen shake and
+damage popups are queued behind the original blast presentation, without
+delaying damage resolution or advancing world turns.
 
 Each living monster in the footprint and the player independently roll an
 integer from **10 through 50**, uniformly (mean **30**), without armor/DEF
@@ -9609,7 +9633,11 @@ and ground-object tooltips take priority. Inspecting the tile uses the usual
 inspect key; special terrain and ground-object interactions retain priority.
 Without Tracking it logs exactly: “You notice something that looks like foot
 tracks, but cannot make sense of them.” With Tracking, it reports bearing and
-freshness:
+freshness. God Mode permits interpretation only while enabled and never teaches the
+skill permanently. Without Tracking, the map marker is non-directional for both
+surface tracks and permanent cave spoor.
+
+Surface-track ages:
 
 | Age in turns | Example for a recognized species |
 |---|---|
@@ -10054,7 +10082,7 @@ candidate selection excludes enemy templates with `aggro: 0`; passive creatures
 do not initiate ambushes. Each step onto a forest or ancient-forest tile rolls
 the base `surfaceEnemies.forestAmbushChance` of **4%**. Forestwalker multiplies
 the trait-adjusted chance by 0.25 (4% becomes 1%); racial immunity still takes
-precedence. One with the Wild cancels a rolled ambush by a protected beast
+precedence. One with the Wild cancels a rolled ambush by a living non-humanoid beast
 without substituting a different monster. A spawn still requires an open
 adjacent tile of the same forest type and an eligible enemy template; the roll
 alone does not guarantee an encounter. Ancient-forest ambushes use tier 3+
@@ -11138,12 +11166,13 @@ are not filled or cleared on either toggle. Real movement still discovers
 terrain with the ordinary rules, so exploration-dependent powers remain
 testable. Disabling God Mode hides the overlay and restores ordinary fog without
 forgetting any genuinely explored terrain. Toggling the overlay consumes no turn
-or RNG and its state is saved and replayed. Enabling God Mode also permanently
-teaches the character **Tracking** using the same learned-skill flag as the Old
-Hunter. If the character does not already carry a Pickaxe, enabling God Mode
-grants one; toggling God Mode off does not remove it, and enabling it again
-never duplicates it. These effects persist in saves/replay. The first accepted
-activation per character adds identified test artifacts to Merchant stock: one
+or RNG and its state is saved and replayed. God Mode temporarily permits
+reading tracks without teaching the Old Hunter's **Tracking** skill. Turning
+it off preserves only genuinely learned Tracking. If the character does not
+already carry a Pickaxe, enabling God Mode grants one; toggling God Mode
+off does not remove it, and enabling it again never duplicates it. These
+effects persist in saves/replay. The first accepted activation per character
+adds identified test artifacts to Merchant stock: one
 representative for each eligible power in each category (melee weapon, bow,
 shield, armor, trinket), using the ordinary domain and weapon-type restrictions.
 The first eligible base in catalog order is used. These are ability-only
@@ -12558,7 +12587,7 @@ traversal, placement rules and seeded random draws.
 | 8 | **Trogloraptor Ambush** (`trogloraptor_ambush`) | Completely extract **12 mineral deposits**, then extract another. | A hidden Trogloraptor ambushes from an intact wall on a suitable mine floor. |
 | 9 | **Mushroom Prophet** (`mushroom_prophet`) | Collect **30 ordinary Mushrooms**. | A Mushroom Prophet appears near underground fungi and pauses to deliver a warning. |
 | 10 | **The Previous Owner** (`previous_owner`) | Carry **a non-purchased artifact named after a dwarf**, whether equipped or in inventory. | The actual named dwarf appears as a Ghost and pursues while the player possesses the artifact. |
-| 11 | **Debt Collector** (`debt_collector`) | Recover loot from **10 distinct dwarven remains or skeletal remains in the Dwarven Fort/Ruins**. | A dwarven Ghost demands recovered loot or a gold payment of at least 100g; refuse to fight. |
+| 11 | **Debt Collector** (`debt_collector`) | Recover loot from **10 distinct dwarven remains or skeletal remains in the Dwarven Fort/Ruins**. | A double-Champion dwarven Ghost pursues the player and demands recovered loot or at least 100g; refuse to fight. |
 | 12 | **Uninvited Guest** (`uninvited_guest`) | Light abandoned campfires **8 times**, then light one again. | A visitor appears, friendly (offers cooked food) or hostile (draws a blade), at 50% each. |
 | 13 | **Ignored Mushroom Cleaning** (`ignored_mushroom_cleaning`) | Leave Herbalist Services with untreated Mushrooms, **without purifying**, on **3 distinct visits**. | Six mushrooms (five ordinary, one edible) appear together underground. |
 | 14 | **Hungry Monster** (`hungry_monster`) | Carry **25 raw Meat or 25 Roasted Meat**. | An aggressive Hungry Ogre/Cyclops/Cave Troll tracks the player; dropped raw meat can divert it. |
@@ -12568,7 +12597,7 @@ traversal, placement rules and seeded random draws.
 | 18 | **Unused Healing** (`unused_healing`) | Die **twice**, each time still holding **at least 2 Life Potions**. | Searchable underground remains offer two Life Potions. |
 | 19 | **Humanoid Hunter** (`humanoid_hunter`) | Kill **30+ humanoids**, making up **at least 70%** of all credited kills. | Ordinary living beasts initiate combat only 75% as often while the condition holds. |
 | 20 | **Beast Hunter** (`beast_hunter`) | Kill **40+ beasts**, making up **at least 60%** of credited kills. | A marked native tier-four beast begins a persistent surface hunt. |
-| 21 | **Strange Green Potion** (`strange_green_potion`) | Drink **20 ordinary potions**. | An unidentified green potion appears; drinking causes Confusion or Poison at equal odds. |
+| 21 | **Strange Green Potion** (`strange_green_potion`) | Drink **20 ordinary potions**. | An unidentified green potion appears; it cures one temporary debuff, prioritizing Poison, or causes Confusion or Poison if none is present. |
 | 22 | **Trap Lure** (`trap_lure`) | Activate **5 distinct Dwarven Ruins traps**. | A Life Potion appears beyond a spike-trap shortcut that also has a safe detour. |
 | 23 | **Drowning Lure** (`drowning_lure`) | Finish **2 separate damaging deep-water crossings**. | A Scroll of Homecoming appears across water, also reachable via a longer dry route. |
 | 24 | **Low HP Carrion** (`low_hp_carrion`) | Remain below **25% HP for 30 turns** and stay wounded until a qualifying check. | A powerful Carrion beast gets long-range pursuit and bonus damage at very low HP. |
@@ -13158,10 +13187,14 @@ ground at least ten tiles from the player, outside underground sight and
 away from stairs. It is not placed in a chest, consumes no monster-threat slot
 and does not spawn immediately on the twentieth drink. The player must pick
 it up manually. The potion has no identification action and its description
-does not reveal its effect. Drinking consumes one normal turn and rolls once:
-**50% chance for the existing five-turn Confused status, or 50% chance for the
-existing Poisoned status** using its ordinary HP-based duration. Existing
-status expiry, curing and save/replay rules apply. If placement is impossible,
+does not reveal its effect. Drinking consumes one normal turn. If poisoned,
+the player is cured of poison. Otherwise one active temporary debuff is
+selected uniformly: rooting, petrification, mummy curse, confusion, weakness,
+slowness or an individual temporary artifact stat penalty. Terrain hazards
+and intrinsic artifact curses are not removed. With no eligible debuff,
+the potion has a **50% chance of five-turn Confusion** and a **50% chance
+of Poison** with its ordinary HP-based duration. Existing status expiry,
+curing and save/replay rules apply. If placement is impossible,
 the event is postponed to a later scheduled check. The consumed-potion counter
 and completed reward are serialized with adaptive state; the final effect is
 resolved from seeded RNG when the potion is drunk, never during animation.
@@ -13559,10 +13592,16 @@ skeleton loot is unchanged and is not marked as dwarven loot for the Ghost's
 payment demand. The encounter uses the same depth-weighted, equal-candidate
 lottery and occupies one of the two optional threat slots. It appears on
 reachable, trap-safe ground, at least 10 tiles away and outside sight. It reuses
-the Ghost walking sprite and combat profile (36 HP, 9 ATK, 1 DEF, 5 SPD), with
-its own dwarven-ghost portrait and name. It waits until the player sees it
-before making a demand. The player may avoid it entirely, surrender the randomly
-selected eligible loot or gold, or refuse and fight/flee.
+the Ghost walking sprite, its own dwarven-ghost portrait and name, and applies
+the Champion prefix twice (93 HP, 21 ATK, 4 DEF, 9 SPD before other modifiers).
+It follows the debtor on the current floor via normal monster pathfinding,
+including while the player is invisible. As soon as it reaches an adjacent
+cell, it interrupts auto-travel and opens the mandatory payment dialog. An
+attempt to attack it directly instead opens the same dialog before damage,
+ammunition use or a combat turn. Until the choice is made, the collector cannot
+attack or inspire allies and is protected from incidental damage. The player
+may surrender the selected loot or gold, or refuse and fight/flee. It cannot
+teleport between floors; leaving its floor before contact postpones the demand.
 
 The Ghost selects **one random recovered object** among currently carried
 remains items (including equipped gear, gems and ammunition stacks) **and
@@ -13576,14 +13615,15 @@ greater of the original purse amount and **100g**, payable using any current
 gold; there is no artificial distinction between physical coins after pickup. An
 eligible item stack is surrendered in full. If no recovered items or affordable
 remains purses qualify, the demand is **100 gold** instead. The selection
-resolves once on discovery, never on UI refresh, and stays locked until the
-player responds. Paying removes the actual item or gold and peacefully dismisses
-the Ghost, without loot or XP. Refusal makes it hostile using normal Ghost
-combat. Attacking first also makes it hostile, without a payment demand. A
-single dialog choice is recorded for replay and consumes no extra turn; the next
-player action resumes ordinary monster turns. The pending demand, selected loot
-or gold-purse identity, loot provenance, recovered-gold records,
-searched-remains total and hostility state all survive save/restore and replay.
+resolves once when the demand begins, never on UI refresh, and stays locked
+until the player responds. Paying removes the actual item or gold and peacefully
+dismisses the Ghost, without loot or XP. Refusal makes it hostile using normal
+Ghost combat, removes its negotiation protection, and enables its single
+Champion aura. A single dialog choice is recorded for replay and consumes no
+extra turn; the next player action resumes ordinary monster turns. The pending
+demand, selected loot or gold-purse identity, loot provenance, recovered-gold
+records, searched-remains total and hostility state all survive save/restore
+and replay.
 When payment is unaffordable, refusal remains available; the dialog cannot be
 dismissed without choosing. Ordinary worlds have no such tracking or encounter.
 

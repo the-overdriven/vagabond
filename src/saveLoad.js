@@ -309,6 +309,7 @@ function buildSaveObject() {
       artifactFearAuraCheckedTurn: e.artifactFearAuraCheckedTurn ?? -1,
       artifactSoulGhost: e.artifactSoulGhost === true,
       meleeHitXpGranted: e.meleeHitXpGranted,
+      meleeHitXpPending: e.meleeHitXpPending,
       combatSkillXp: e.combatSkillXp ? {...e.combatSkillXp} : null,
       victoryLevel: e.victoryLevel || 0,
       atk: e.atk,
@@ -1204,6 +1205,8 @@ function loadGameFromObject(data, opts = {}) {
       artifactFearAuraCheckedTurn: e.artifactFearAuraCheckedTurn ?? -1,
       artifactSoulGhost: e.artifactSoulGhost === true,
       meleeHitXpGranted: Number.isInteger(e.meleeHitXpGranted) ? Math.max(0, e.meleeHitXpGranted) : 0,
+      meleeHitXpPending: Number.isInteger(e.meleeHitXpPending) && Number.isInteger(e.meleeHitXpGranted)
+        ? Math.max(0, Math.min(e.meleeHitXpPending, e.meleeHitXpGranted)) : 0,
       combatSkillXp: e.combatSkillXp ? {...e.combatSkillXp} : null,
       victoryLevel: e.victoryLevel || 0, atk: e.atk, def: e.def, spd: e.spd,
       aggro: typeof e.aggro === 'number' ? e.aggro : AGGRO_RANGE,

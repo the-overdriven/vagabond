@@ -69,7 +69,7 @@ describe('Nonblocking level-up feedback', () => {
         await playerAttackEnemy(e,true)
         const expected=Math.min(cap,cfg.xpPerDamagingHit)
         check(e.meleeHitXpGranted===expected,'first hit grants configured base XP')
-        check(player.xp===Math.round(expected*xpMultiplier()),'racial XP multiplier applies to melee hit')
+        check(e.meleeHitXpPending===expected && player.xp===0,'first hit reserves XP without paying it')
         const earned=player.xp
         chance=()=>true
         await playerAttackEnemy(e,true)
@@ -82,7 +82,8 @@ describe('Nonblocking level-up feedback', () => {
         check(saved.enemies.find(m=>m.id===e.id).meleeHitXpGranted===expected,'save retains awarded XP')
         loadGameFromObject(saved,{isReplayInit:true})
         const restored=enemies.find(m=>m.id===e.id)
-        check(restored.meleeHitXpGranted===expected,'replay-style load restores earned XP')
+        check(restored.meleeHitXpGranted===expected && restored.meleeHitXpPending===expected,
+          'replay-style load restores reserved XP')
         check(player.xp===earned,'XP persists across replay-style load')
         for(let i=0;i<30;i++)await playerAttackEnemy(restored,true)
         check(restored.meleeHitXpGranted===cap,'melee XP respects per-monster cap')
@@ -94,7 +95,11 @@ describe('Nonblocking level-up feedback', () => {
         const capped=enemies.find(m=>m.id===e.id)
         check(capped.meleeHitXpGranted===cap,'spent cap persists in replay snapshot')
         await playerAttackEnemy(capped,true)
-        check(player.xp===afterCap,'reloaded capped enemy cannot grant extra hit XP')
+        check(player.xp===afterCap && capped.meleeHitXpPending===cap,'reloaded cap remains pending')
+        const totalBefore=player.totalXpEarned
+        const expectedKill=Math.round((xpForEnemy(capped)+cap)*xpMultiplier())
+        killEnemy(capped,true,'melee')
+        check(player.totalXpEarned===totalBefore+expectedKill,'kill pays all reserved XP once')
       }finally{chance=oldChance;damageRoll=oldDamage}
     })()`))
   })

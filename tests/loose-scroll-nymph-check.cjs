@@ -215,7 +215,10 @@ const {run,context}=require('./helpers/node-game-runtime.cjs')
   run(`player.inventory=[];chance=()=>false;
     lootFromEnemy({name:'Wyrdhag',baseName:'Wyrdhag',tier:4,humanoid:false})`)
   assert.equal(run('player.inventory.length'),0,'failed Wyrdhag group roll drops nothing')
-  for(const [species,probability] of [['Nymph',0.15],['Tulla',0.2],['Kveld',0.2],['Wyrdhag',0.25]]) {
+  for(const [species,probability] of [['Nymph',0.15],['Tulla',0.15],['Kveld',0.15],['Wyrdhag',0.25],
+      ['Goblin',0.01],['Orc',0.01],['Imp',0.05],['Skerva',0.1],['Gorgon',0.2],
+      ['Vampire',0.25],['Serpent Queen',0.25],['Lich',0.3]]) {
+    assert.equal(run(`ENEMY_TEMPLATE_BY_NAME['${species}'].lootTable.find(d=>d.kind==='idscroll').chance`),probability)
     run(`player.inventory=[];chance=p=>p===${probability};
       lootFromEnemy({...ENEMY_TEMPLATE_BY_NAME['${species}'],baseName:'${species}',equipment:null})`)
     assert.equal(run('player.inventory.find(i=>i.kind==="idscroll")?.count'),1,`${species} drops one ID scroll`)
