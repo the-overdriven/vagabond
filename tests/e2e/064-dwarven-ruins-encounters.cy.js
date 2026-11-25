@@ -158,6 +158,35 @@ describe('Dwarven Ruins encounter progression', () => {
         check(saved.adaptivePlayerTrolling.poisonedEnemyIds.length===10 &&
           saved.adaptivePlayerTrolling.completed.includes('venom_eater'),
           'trigger counters and completion are present in saves and replay snapshots')
+        const mines=deepLevels.filter(f=>f.dungeonPackage==='dwarvenMines')
+        check(mines.length>=4,'mine floors exist')
+        enter(mines[1])
+        player.steps=(AdaptivePlayerTrolling.serialize().activationChecks+1)*500
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(enemies.filter(e=>e.adaptiveEventId==='venom_eater').length===1,
+          'completion in ruins prevents another Venom Eater in mines')
+        // Isolate the same reaction in a fresh adaptive state.
+        loadGameFromObject(before,{isReplayInit:true})
+        activeWorldTraits=[{name:'test curse',effects:[]}]
+        AdaptivePlayerTrolling.reset()
+        player.inventory=[];player.steps=0
+        for(let i=0;i<10;i++) AdaptivePlayerTrolling.onVenomAttempt({
+          id:'mine-venom-prey-'+i,alive:true,hp:30,family:'living'})
+        const mineFloors=deepLevels.filter(f=>f.dungeonPackage==='dwarvenMines')
+        const checkpoint=()=>{
+          player.steps=(AdaptivePlayerTrolling.serialize().activationChecks+1)*500
+          AdaptivePlayerTrolling.onPlayerMoved()
+        }
+        enter(mineFloors[0]);checkpoint()
+        check(!AdaptivePlayerTrolling.completed('venom_eater'),'respite excludes Venom Eater')
+        enter(mineFloors[1]);undergroundDiscovered.forEach(row=>row.fill(true));checkpoint()
+        check(!AdaptivePlayerTrolling.completed('venom_eater'),'explored mine excludes Venom Eater')
+        enter(mineFloors[2]);checkpoint()
+        eater=enemies.find(e=>e.adaptiveEventId==='venom_eater')
+        check(eater && eater.level===currentZ && !undergroundDiscovered[eater.y][eater.x] &&
+          AdaptivePlayerTrolling.completed('venom_eater'),'qualified encounter spawns in an unexplored mine')
+        check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1']<=2,
+          'mine spawn respects the shared threat limit')
       } finally {chance=originalChance;loadGameFromObject(before)}
     })()`))
   })

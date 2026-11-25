@@ -12504,7 +12504,7 @@ traversal, placement rules and seeded random draws.
 | 2 | **Nemesis** (`nemesis`) | Die to the **same non-ultra-rare enemy species twice**. | A Champion of that species appears on the last Dwarven Ruins floor if a safe undiscovered tile is available. |
 | 3 | **Fan Club** (`fan_club`) | Equip prefixed weapon, shield and armor with the **same modifier**. | Three matching-prefixed Kobold, Goblin and Skink copy the style, use real enchanted equipment and can drop it. |
 | 4 | **Fireball Self-Harm** (`self_fireball`) | Damage yourself with **two separately cast Fireballs**. | A Scroll of Fireball appears in an accessible narrow underground corridor. |
-| 5 | **Venom Eater** (`venom_eater`) | Poison **10 distinct enemies**, or spend **5 venom coatings** on undead targets. | Venom Eater appears in deep ruins; poisoned weapon hits heal it instead of poisoning. |
+| 5 | **Venom Eater** (`venom_eater`) | Poison **10 distinct enemies**, or spend **5 venom coatings** on undead targets. | Venom Eater appears in deep ruins or mines from floor 2 onward; poisoned weapon hits heal it instead of poisoning. |
 | 6 | **Champion Oculus** (`oculus`) | Hit **3 distinct enemies** while invisible from a scroll, in **3 separate engagements**. | A True Sight Champion Oculus can hunt the invisible player in deep ruins. |
 | 7 | **Ancient Scarab** (`ancient_scarab`) | Dig **35 distinct sand tiles**, then dig another new sand tile. | A doubled-stat Champion Scarab emerges from sand. |
 | 8 | **Trogloraptor Ambush** (`trogloraptor_ambush`) | Completely extract **12 mineral deposits**, then extract another. | A hidden Trogloraptor ambushes from an intact wall on a suitable mine floor. |
@@ -12707,20 +12707,22 @@ Merely inspecting the UI or re-entering a floor does not consume randomness.
 
 **Venom Eater:** Only in Cursed World, successfully poisoning **10 different
 monsters**, or spending **5 venom coatings attempting to poison undead**, makes
-one Venom Eater eligible in either of the last two Dwarven Ruins floors. A
-poison refresh against the same creature does not count as another unique
-monster. A missed attack or unused coating does not count, and attempting to
-poison a construct does not count toward the undead threshold. The encounter
-uses the same depth-weighted probability and equal-weight candidate selection as
-other optional ruins events. It spawns once, out of sight and on connected,
-undiscovered, trap-free terrain with stair clearance; unsuccessful placement
-leaves it eligible for a later scheduled check. The Venom Eater is a
-**tier-4, 150 HP, 18 ATK, 6 DEF, 5 SPD** monster (3 GRACE), using the Venom
-Absorption ability described in the monster properties section. Its walking
-tile is the Bog Spitter's, with its own Venom Eater portrait. The species is
-otherwise excluded from natural spawning. The player can respond with uncoated
-attacks, avoidance, or by avoiding venom: every qualifying venom hit can
-restore another 20% of its maximum HP.
+one Venom Eater eligible in either of the last two Dwarven Ruins floors or in
+Dwarven Mines from **floor 2 (z:-10) onward**. The first mine floor retains its
+respite role. A poison refresh against the same creature does not count as
+another unique monster. A missed attack or unused coating does not count, and
+attempting to poison a construct does not count toward the undead threshold.
+The encounter competes with other eligible optional events at scheduled checks.
+Ruins use their depth-weighted probability; Mines use the standard non-Ruins
+selection without that probability gate. Both use the same lifetime floor
+budget and once-per-character completion flag. The creature spawns out of
+sight on connected, undiscovered, trap-free terrain with clearance from stairs
+and mine cage landings. Unsuccessful placement leaves it eligible for a later
+scheduled check. The Venom Eater is a **tier-4, 150 HP, 18 ATK, 6 DEF, 5 SPD**
+monster (3 GRACE), using Venom Absorption. Its walking tile is the Bog
+Spitter's, with its own Venom Eater portrait. The species is otherwise excluded
+from natural spawning. The player can respond with uncoated attacks or
+avoidance: every qualifying venom hit can restore another 20% of its maximum HP.
 
 **Venom Absorption (Venom Eater)** is a special defensive response, distinct
 from the undead/construct family immunity rule. The creature is permanently

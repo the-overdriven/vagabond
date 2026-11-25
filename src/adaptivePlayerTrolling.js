@@ -456,7 +456,8 @@ const AdaptivePlayerTrolling = (() => {
       throw new Error('Invalid adaptive self-fireball settings.')
     const eater = value.events.venom_eater
     if (!eater || eater.type !== 'poison_absorbing_hunter' ||
-        eater.location !== 'last_two_dwarven_ruins_floors' ||
+        eater.location !== 'deep_ruins_and_mines' ||
+        !Number.isInteger(eater.minMineFloor) || eater.minMineFloor < 2 ||
         !Number.isInteger(eater.minDistinctPoisonedEnemies) || eater.minDistinctPoisonedEnemies < 1 ||
         !Number.isInteger(eater.minUndeadPoisonAttempts) || eater.minUndeadPoisonAttempts < 1 ||
         !Number.isFinite(eater.venomHealMaxHpRatio) ||
@@ -2899,6 +2900,20 @@ const AdaptivePlayerTrolling = (() => {
     return true
   }
 
+  // Keep the quiet first mine floor intact. Both dungeon packages share the
+  // same one-time encounter, fog grid, connected spawn search and floor budget.
+  function venomEaterSites(floor) {
+    if (!floor || !venomEaterEligible()) return []
+    const cfg = config.events.venom_eater
+    const mine = floor.dungeonPackage === 'dwarvenMines'
+    if (mine ? floor.dungeonFloor < cfg.minMineFloor :
+        floor.dungeonPackage !== 'dwarvenRuins' || floor.dungeonFloor < floor.floorCount-1)
+      return []
+    const cage = mine ? floor.mineCagePad : null
+    return adaptiveMonsterSpawnSites(floor,cfg,ENEMY_TEMPLATE_BY_NAME['Venom Eater'],
+      (x,y) => !cage || Math.max(Math.abs(x-cage.x),Math.abs(y-cage.y)) > cfg.minEntranceDistance)
+  }
+
   function spawnVenomEater(sites) {
     if (!sites.length) return false
     const spot = pick(sites), base = ENEMY_TEMPLATE_BY_NAME['Venom Eater']
@@ -2919,7 +2934,8 @@ const AdaptivePlayerTrolling = (() => {
       occupied.delete(keyXY(spot.x,spot.y))
       return false
     }
-    log('Something in the ruins has learned to hunger for venom.', 'bad')
+    log(currentMineLevel() ? 'Something in the mines has learned to hunger for venom.' :
+      'Something in the ruins has learned to hunger for venom.', 'bad')
     return true
   }
 
@@ -4678,13 +4694,15 @@ const AdaptivePlayerTrolling = (() => {
     const waterReward = tryDrowningLure()
     const floor=fortLevel()
     if (!floor) {
-      // Other habitats activate on level arrival, independently of the ruins
-      // probability curve, but share their local two-threat lifetime budget.
+      // Other habitats use the same scheduled checks, independently of the
+      // ruins probability curve, and share their local lifetime threat budget.
+      const mine=currentMineLevel()
       let spawned=false
       const tried=new Set()
       while (availableThreatSlots(currentLevelKind(),currentZ,currentCave)>0) {
         spawnSearch.threats = null // A returning actor may have moved without changing array length.
         const sites=!tried.has('mushroom_prophet') ? mushroomProphetSites() : []
+        const eaterSites=!tried.has('venom_eater') ? venomEaterSites(mine) : []
         const hungry=!tried.has('hungry_monster') ? hungryMonsterOptions() : []
         const goldSites=!tried.has('gold_imp') ? goldImpSpawnSites() : []
         const carrionOptions = !tried.has('low_hp_carrion') ? adaptiveHunterOptions('low_hp_carrion') : []
@@ -4700,6 +4718,7 @@ const AdaptivePlayerTrolling = (() => {
           ? forestSpiritSites(true) : []
         const candidates=[]
         if (sites.length) candidates.push('mushroom_prophet')
+        if (eaterSites.length) candidates.push('venom_eater')
         if (hungry.length) candidates.push('hungry_monster')
         if (goldSites.length) candidates.push('gold_imp')
         if (carrionOptions.length) candidates.push('low_hp_carrion')
@@ -4718,6 +4737,7 @@ const AdaptivePlayerTrolling = (() => {
         const chosen=pick(candidates)
         tried.add(chosen)
         spawned=(chosen==='mushroom_prophet' ? spawnMushroomProphet(sites) :
+          chosen==='venom_eater' ? spawnVenomEater(eaterSites) :
           chosen==='gold_imp' ? spawnGoldImp(goldSites) :
           chosen==='low_hp_carrion' ? spawnAdaptiveHunter(chosen,carrionOptions) :
           chosen==='reckless_fighter' ? spawnAdaptiveHunter(chosen,gracefulOptions) :
@@ -4741,8 +4761,7 @@ const AdaptivePlayerTrolling = (() => {
       spawnSearch.threats = null
       const prefix=!completed('fan_club') ? matchingEquippedPrefix() : null
       const clubs=prefix ? fanClubSpawnSites() : []
-      const eaterSites=venomEaterEligible() && floor.dungeonFloor >= floor.floorCount-1
-        ? adaptiveMonsterSpawnSites(floor,config.events.venom_eater,ENEMY_TEMPLATE_BY_NAME['Venom Eater']) : []
+      const eaterSites=venomEaterSites(floor)
       const oculusSites=oculusEligible() && floor.dungeonFloor >= floor.floorCount-1
         ? adaptiveMonsterSpawnSites(floor,config.events.oculus,ENEMY_TEMPLATE_BY_NAME.Oculus) : []
       const ownerOptions=previousOwnerSpawnOptions(floor)
