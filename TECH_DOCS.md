@@ -1050,7 +1050,9 @@ cave rubble, while `dwarvenrubble` alternates between cave rubble and
 `img/tiles/dwarven-rubble.png` with an even-weight, coordinate-based visual
 selection (no gameplay RNG). Crypt rubble in tile mode overlays the original
 `crypt2floor` tile without a painted square, just as dwarven rubble overlays its
-recorded floor underlay; ASCII backgrounds stay unchanged. Both rubble types
+recorded floor underlay. In the Mines, rubble preserves the underlying brown
+floor artwork and its coordinate-based mirroring, just like boulders. ASCII
+backgrounds stay unchanged. Both rubble types
 block movement, enemy and player sight, and projectiles. A carried Pickaxe
 clears one adjacent rubble tile with one movement attempt, without moving into
 that tile. Clearing consumes one turn and produces the same nearby/distant noise
@@ -12499,10 +12501,10 @@ traversal, placement rules and seeded random draws.
 | # | Reaction | Player trigger | World response |
 |---:|---|---|---|
 | 1 | **Merchant Expansion** (`merchant_expansion`) | Sell goods for **1,500g** total, buy goods for **1,500g** total, **or** kill all required surface monsters within 100 tiles of the Temple (excluding `farWandering`). | Merchant adds one weapon, one armor/shield and one utility item. Permanent stock addition; another character can unlock another expansion after permadeath. |
-| 2 | **Nemesis** (`nemesis`) | Die to the **same non-ultra-rare enemy species twice**. | A Champion of that species is guaranteed on the last Dwarven Ruins floor. |
+| 2 | **Nemesis** (`nemesis`) | Die to the **same non-ultra-rare enemy species twice**. | A Champion of that species appears on the last Dwarven Ruins floor if a safe undiscovered tile is available. |
 | 3 | **Fan Club** (`fan_club`) | Equip prefixed weapon, shield and armor with the **same modifier**. | Three matching-prefixed Kobold, Goblin and Skink copy the style, use real enchanted equipment and can drop it. |
 | 4 | **Fireball Self-Harm** (`self_fireball`) | Damage yourself with **two separately cast Fireballs**. | A Scroll of Fireball appears in an accessible narrow underground corridor. |
-| 5 | **Venom Eater** (`venom_eater`) | Poison **15 distinct enemies**, or spend **5 venom coatings** on undead targets. | Venom Eater appears in deep ruins; poisoned weapon hits heal it instead of poisoning. |
+| 5 | **Venom Eater** (`venom_eater`) | Poison **10 distinct enemies**, or spend **5 venom coatings** on undead targets. | Venom Eater appears in deep ruins; poisoned weapon hits heal it instead of poisoning. |
 | 6 | **Champion Oculus** (`oculus`) | Hit **3 distinct enemies** while invisible from a scroll, in **3 separate engagements**. | A True Sight Champion Oculus can hunt the invisible player in deep ruins. |
 | 7 | **Ancient Scarab** (`ancient_scarab`) | Dig **35 distinct sand tiles**, then dig another new sand tile. | A doubled-stat Champion Scarab emerges from sand. |
 | 8 | **Trogloraptor Ambush** (`trogloraptor_ambush`) | Completely extract **12 mineral deposits**, then extract another. | A hidden Trogloraptor ambushes from an intact wall on a suitable mine floor. |
@@ -12551,8 +12553,9 @@ starts on the same world following permadeath. The core bookkeeping reserves at
 most **two optional special threats per underground floor** for the entire
 character run, without recycling slots after enemies die. A multi-enemy ambush
 consumes one slot, not one per member. On the surface, two threats are allowed
-per map-size-scaled region. Nemesis is an independent guaranteed encounter that
-can appear **in addition to both slots** on the last ruin floor.
+per map-size-scaled region. Nemesis is an independent encounter that can
+appear **in addition to both slots** on the last ruin floor, without a
+probability roll when a legal undiscovered spawn site exists.
 
 **Scheduled encounter checks:** The first optional check happens on the
 **500th actual walking step** or upon first reaching **Dwarven Ruins floor 2**,
@@ -12579,7 +12582,7 @@ local limits. Successful special encounters must be separated from existing
 adaptive enemies by at least six Chebyshev tiles and meet terrain and
 stair-safety rules. Failed/used check numbers and affected floor results are
 saved, so walking, loading and stair-hopping cannot duplicate a check.
-Action-specific events (mineral extraction, digging, campfires) and guaranteed
+Action-specific events (mineral extraction, digging, campfires) and independent
 or non-threat effects (Nemesis, merchant expansion, first-visit rewards,
 ordinary-thief region checks) still use their own triggers and are not delayed
 until one of these optional checks. This keeps the causal link between the
@@ -12650,11 +12653,13 @@ the second Dwarven Ruins floor** (not in the z:-3 entrance fort or on the first
 ruins floor at z:-4). This depth exists in all 3–5-floor ruins. It is placed on
 an unoccupied, trap-safe tile reachable from the arrival tile by a walkable path
 of **8–200 cardinal steps**. Placement avoids blocked or locked paths, stair
-transitions and other ground objects. If no legal site is available at first
-arrival, later visits to z:-5 can retry. It does not consume an optional
-enemy-threat slot or an RNG roll. A placed ledger is never duplicated by floor
-revisits: it remains a normal, saved ground pickup, then a non-droppable,
-non-sellable inventory item after collection.
+transitions and other ground objects. If no legal undiscovered site is
+available at first arrival, later visits to z:-5 can retry. A fully explored
+quest floor cannot receive a new ledger; the commission remains active. It
+does not consume an optional enemy-threat slot or an RNG roll. A placed
+ledger is never duplicated by floor revisits: it remains a normal, saved
+ground pickup, then a non-droppable, non-sellable inventory item after
+collection.
 
 With the ledger in inventory, a white exclamation mark appears above the
 Merchant in both display modes, and he offers **Return the Dwarven Trade
@@ -12666,15 +12671,41 @@ The gold payment and item removal happen in the same recorded NPC-topic action.
 
 ### Monster encounters, environmental lures and rewards
 
+New monsters from Nemesis, Fan Club, Venom Eater, Champion Oculus, Mushroom
+Prophet, Previous Owner, Debt Collector, Hungry Monster, Gold Imp, Beast
+Hunter, Low HP Carrion, Reckless Fighter, Last Survivor, Strong Enemy Hunter,
+Hidden Leader, Undead Warden and the first Forest Spirit manifestation require
+undiscovered tiles on the active level. Each member of a group must qualify.
+Discovery uses the existing saved per-level fog grid, not merely current FOV;
+a remembered tile is ineligible even after the player leaves its vicinity.
+The legacy Crypt map uses its own discovery grid. Other terrain, sight, habitat,
+reachability and safety restrictions still apply. Without a legal site the
+reaction remains uncompleted, with no fallback to explored terrain. Optional
+checks retain their existing schedule and are not refunded. Ancient Scarab,
+Trogloraptor Ambush, Uninvited Guest, Unused Scroll Ambush, Depth Guardian,
+Unfinished Business and the returning Forest Spirit keep their existing
+placement rules, since they respond to a local action or a returning threat.
+
+The same discovery restriction applies to Fireball Self-Harm, Ignored Mushroom
+Cleaning, Unread Scrolls, Early Descent, Unused Healing, Strange Green Potion,
+Trap Lure, Opposite Weapon, Neglected Shield and the Fort Quest ledger. Every
+corpse, loose item and mushroom in a multi-object reward must occupy an
+undiscovered tile. Existing reachability, distance and safety rules still
+apply. If placement fails, no partial reward or completion is recorded; the
+original trigger schedule and retry rules are retained. Drowning Lure and the
+Uninvited Guest's meal retain their existing placement rules. Already placed
+rewards are not moved when their tiles become discovered.
+
 **Nemesis:** If at least two deaths were inflicted on the same non-ultra-rare
-monster species, a Champion of that species is guaranteed on entry to the final
+monster species, a Champion of that species can appear on entry to the final
 Dwarven Ruins floor (including a later return). If several species qualify, the
-most frequent killer wins; the latest death breaks ties. It spawns off-screen on
-connected, safe terrain and never reappears after the event has been committed.
+most frequent killer wins; the latest death breaks ties. It spawns without a
+probability roll on connected, safe, undiscovered terrain outside current sight.
+If no site exists, it remains pending; it never reappears after completion.
 The Champion uses the ordinary Champion bonuses and normal monster combat rules.
 Merely inspecting the UI or re-entering a floor does not consume randomness.
 
-**Venom Eater:** Only in Cursed World, successfully poisoning **15 different
+**Venom Eater:** Only in Cursed World, successfully poisoning **10 different
 monsters**, or spending **5 venom coatings attempting to poison undead**, makes
 one Venom Eater eligible in either of the last two Dwarven Ruins floors. A
 poison refresh against the same creature does not count as another unique
@@ -12682,14 +12713,14 @@ monster. A missed attack or unused coating does not count, and attempting to
 poison a construct does not count toward the undead threshold. The encounter
 uses the same depth-weighted probability and equal-weight candidate selection as
 other optional ruins events. It spawns once, out of sight and on connected,
-trap-free terrain with stair clearance; unsuccessful placement leaves it
-eligible for a later transition. The Venom Eater is a **tier-4, 150 HP, 18 ATK,
-6 DEF, 5 SPD** monster (3 GRACE), using the Venom Absorption ability described
-in the monster properties section. Its walking tile is the Bog Spitter's, with
-its own Venom Eater portrait. The species is otherwise excluded from natural
-spawning. The player can respond with uncoated attacks, avoidance, or by
-avoiding venom: every qualifying venom hit can restore another 20% of its
-maximum HP.
+undiscovered, trap-free terrain with stair clearance; unsuccessful placement
+leaves it eligible for a later scheduled check. The Venom Eater is a
+**tier-4, 150 HP, 18 ATK, 6 DEF, 5 SPD** monster (3 GRACE), using the Venom
+Absorption ability described in the monster properties section. Its walking
+tile is the Bog Spitter's, with its own Venom Eater portrait. The species is
+otherwise excluded from natural spawning. The player can respond with uncoated
+attacks, avoidance, or by avoiding venom: every qualifying venom hit can
+restore another 20% of its maximum HP.
 
 **Venom Absorption (Venom Eater)** is a special defensive response, distinct
 from the undead/construct family immunity rule. The creature is permanently
@@ -13129,12 +13160,14 @@ to the same floor or stepping across a boundary cannot farm extra attempts. The
 modifier uses only ordinary thief-capable species eligible for the current
 habitat/depth and a player-connected location outside sight, at least **10 tiles
 away**, not on entrances, traps, items, NPCs, occupied terrain, or in the Temple
-sanctuary. A successful roll adds one ordinary monster that uses its native
-movement, gear, theft and escape rules and leaves normal loot on death. This is
-an **ordinary population addition** and neither consumes the two-special-threat
-budget nor completes a once-per-character special encounter. The monster and the
-checked-area ledger survive saves and replays. Ordinary worlds do not roll or
-record these checks.
+sanctuary. The actual spawn tile must also be on **previously unexplored fog of
+war** for that exact floor or region; if every legal candidate has already been
+discovered, the area's one check simply yields no thief. A successful roll adds
+one ordinary monster that uses its native movement, gear, theft and escape
+rules and leaves normal loot on death. This is an **ordinary population
+addition** and neither consumes the two-special-threat budget nor completes a
+once-per-character special encounter. The monster and the checked-area ledger
+survive saves and replays. Ordinary worlds do not roll or record these checks.
 
 **Hungry Monster:** Carrying **at least 25 raw Meat or 25 Roasted Meat**
 qualifies one special Hungry Ogre or Hungry Cyclops on matching surface terrain,
@@ -13564,13 +13597,18 @@ independently has an **85% chance** to reinforce. The upgrade promotes **one
 existing ranged guard** to Champion and adds exactly **two real archers** (one
 in each barred bay), making a usual gallery of **10 guards become 12**, not 13.
 Champion bonuses and the *Inspired* aura use the ordinary prefix rules; the two
-extra archers keep normal ammunition, humanoid equipment and ranged AI. Their
-locations must have clear projectile lines into the aisle and cannot overlap
-terrain hazards, other units or items. Cleared galleries remain cleared. A
-gallery's outcome is persistent, never rerolled on a return visit, including
-failed 15% rolls. Temporarily blocked placement defers the roll. Reinforcement
-does **not** consume either of the floor's two optional special-threat slots,
-alter dungeon generation, or force the player through this optional branch.
+extra archers keep normal ammunition, humanoid equipment and ranged AI. The
+promoted captain and both added archers must all remain on **previously
+unexplored tiles** on that floor. If the gallery has already been discovered and
+no eligible unseen guard/bay positions remain, its reinforcement outcome is
+locked as spent and will not trigger on a revisit. Added archers still require
+clear projectile lines into the aisle and cannot overlap terrain hazards, other
+units or items. Cleared galleries remain cleared. A gallery's outcome is
+persistent, never rerolled on a return visit, including failed 15% rolls.
+Temporarily blocked placement on an otherwise unseen gallery defers the roll.
+Reinforcement does **not** consume either of the floor's two optional
+special-threat slots, alter dungeon generation, or force the player through
+this optional branch.
 Reinforcement is not announced in ordinary logs when it occurs out of sight;
 debug logging retains its check. Combat alternatives remain fighting through
 bars, reaching the side cell, or ignoring the gallery.

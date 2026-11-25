@@ -91,7 +91,7 @@
     },
     "venom_eater": {
       "type": "poison_absorbing_hunter",
-      "minDistinctPoisonedEnemies": 15,
+      "minDistinctPoisonedEnemies": 10,
       "minUndeadPoisonAttempts": 5,
       "location": "last_two_dwarven_ruins_floors",
       "minSpawnDistance": 10,

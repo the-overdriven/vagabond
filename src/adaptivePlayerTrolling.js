@@ -673,6 +673,13 @@ const AdaptivePlayerTrolling = (() => {
     return !TowerMaze.inRegion(z,x,y) && DungeonTraps.safeSpawn(x,y,z,kind)
   }
 
+  // Discovery is simulation-owned and persisted per level. Do not consult a
+  // different floor (or use the current FOV as a substitute for remembered fog).
+  function unexploredSpawnTile(x,y) {
+    const known = currentZ === 0 ? discovered : undergroundDiscovered
+    return !!map[y]?.[x] && known?.[y]?.[x] === false
+  }
+
   function active() {
     // Cursed World is represented by the resolved world-trait set in both
     // live games and save/replay snapshots. The checkbox alone is UI state.
@@ -1426,7 +1433,7 @@ const AdaptivePlayerTrolling = (() => {
               Math.max(Math.abs(x-player.x),Math.abs(y-player.y))<cfg.minPlayerDistance ||
               directSteps <= direct.get(keyXY(t.x,t.y)) ||
               safeSteps-directSteps<cfg.minDetour || safeSteps-directSteps>cfg.maxDetour ||
-              !lureRewardSpotClear(x,y)) continue
+              !unexploredSpawnTile(x,y) || !lureRewardSpotClear(x,y)) continue
           // A loose ground item would absorb an incoming wall arrow.
           // Keep this lure off the projectile's firing lane.
           if (level.traps.some(h=>h.type==='projectile' && h.emitter && h.direction &&
@@ -1890,7 +1897,9 @@ const AdaptivePlayerTrolling = (() => {
     const visited=new Set([keyXY(player.x,player.y)]), safe=[]
     const traversable=(x,y)=>!!TILE[map[y]?.[x]]?.walk &&
       !Mining.blocksPathAt(x,y) && !CAVE_TRANSITION_TILES.has(map[y]?.[x])
-    const clear=(x,y)=>traversable(x,y) && !occupied.has(keyXY(x,y)) &&
+    invalidateUndergroundFov()
+    const clear=(x,y)=>traversable(x,y) && unexploredSpawnTile(x,y) &&
+      !undergroundTileVisible(x,y) && !occupied.has(keyXY(x,y)) &&
       trollingSafeSpawn(x,y,currentZ,currentLevelKind()) &&
       !groundItemAt(x, y) &&
       !enemies.some(e=>e.alive && onCurrentLevel(e) && e.x===x && e.y===y) &&
@@ -1963,7 +1972,8 @@ const AdaptivePlayerTrolling = (() => {
     for (let i=0; i<queue.length; i++) {
       const {x,y}=queue[i]
       if (Math.max(Math.abs(x-player.x),Math.abs(y-player.y)) >= cfg.minPlayerDistance &&
-          !undergroundTileVisible(x,y) && !occupied.has(keyXY(x,y)) &&
+          unexploredSpawnTile(x,y) && !undergroundTileVisible(x,y) &&
+          !occupied.has(keyXY(x,y)) &&
           trollingSafeSpawn(x,y,currentZ,currentLevelKind()) &&
           !groundItemAt(x, y) &&
           !queue[i].stair &&
@@ -2007,7 +2017,7 @@ const AdaptivePlayerTrolling = (() => {
     for(let i=0;i<queue.length;i++) {
       const {x,y}=queue[i]
       if (Math.max(Math.abs(x-player.x),Math.abs(y-player.y))>=cfg.minPlayerDistance &&
-          (currentZ>=0 || !undergroundTileVisible(x,y)) &&
+          unexploredSpawnTile(x,y) && (currentZ>=0 || !undergroundTileVisible(x,y)) &&
           !groundItemAt(x, y) &&
           !enemies.some(e=>e.alive&&onCurrentLevel(e)&&e.x===x&&e.y===y) &&
           !occupied.has(keyXY(x,y)) &&
@@ -2050,7 +2060,8 @@ const AdaptivePlayerTrolling = (() => {
     for (let i = 0; i < queue.length; i++) {
       const {x,y} = queue[i]
       if (Math.max(Math.abs(x-player.x),Math.abs(y-player.y)) >= cfg.minPlayerDistance &&
-          !undergroundTileVisible(x,y) && !occupied.has(keyXY(x,y)) &&
+          unexploredSpawnTile(x,y) && !undergroundTileVisible(x,y) &&
+          !occupied.has(keyXY(x,y)) &&
           trollingSafeSpawn(x,y,currentZ,levelKind) &&
           !groundItemAt(x, y) &&
           !enemies.some(e => e.alive && onCurrentLevel(e) && e.x === x && e.y === y) &&
@@ -2096,7 +2107,7 @@ const AdaptivePlayerTrolling = (() => {
     invalidateUndergroundFov()
     const traversable = (x,y) => !!TILE[map[y]?.[x]]?.walk &&
       !Mining.blocksPathAt(x,y) && !CAVE_TRANSITION_TILES.has(map[y]?.[x])
-    const safe = (x,y) => traversable(x,y) &&
+    const safe = (x,y) => traversable(x,y) && unexploredSpawnTile(x,y) &&
       !occupied.has(keyXY(x,y)) && !undergroundTileVisible(x,y) &&
       Math.max(Math.abs(x-player.x),Math.abs(y-player.y)) >= settings.minPlayerDistance &&
       trollingSafeSpawn(x,y,currentZ,currentLevelKind()) &&
@@ -2169,7 +2180,8 @@ const AdaptivePlayerTrolling = (() => {
     for (let i=0; i<queue.length; i++) {
       const {x,y} = queue[i]
       if (Math.max(Math.abs(x-player.x),Math.abs(y-player.y)) >= event.minPlayerDistance &&
-          !undergroundTileVisible(x,y) && !occupied.has(keyXY(x,y)) &&
+          unexploredSpawnTile(x,y) && !undergroundTileVisible(x,y) &&
+          !occupied.has(keyXY(x,y)) &&
           trollingSafeSpawn(x,y,currentZ,currentLevelKind()) &&
           !groundItemAt(x, y) &&
           traversable(x,y)) {
@@ -2396,7 +2408,7 @@ const AdaptivePlayerTrolling = (() => {
     const endpoints=[level.mineUpstairs,level.mineDownstairs,level.mineCagePad].filter(Boolean)
     return adaptiveMonsterSpawnSites(level,cfg,template,(x,y)=>
       endpoints.every(p=>Math.max(Math.abs(p.x-x),Math.abs(p.y-y))>cfg.minEntranceDistance) &&
-      !npcs.some(n=>n.x===x && n.y===y && onCurrentLevel(n)))
+      !npcs.some(n=>n.x===x && n.y===y && onCurrentLevel(n)), false)
   }
 
   function resolveDepthGuardianWarning() {
@@ -2499,7 +2511,7 @@ const AdaptivePlayerTrolling = (() => {
   // A single path-connected monster must have a valid place to stand and a
   // route to the player. Do not consume spawn RNG until the encounter wins the
   // shared floor lottery. Keep both stairs and already placed loot clear.
-  function adaptiveMonsterSpawnSites(floor, settings, monster, accepts = () => true) {
+  function adaptiveMonsterSpawnSites(floor, settings, monster, accepts = () => true, requireUnexplored = true) {
     if (!monster) return []
     const entrances = (floor.caves || []).flatMap(c => c.entrances || [])
     const directions = [[0,-1],[1,0],[0,1],[-1,0]]
@@ -2509,6 +2521,7 @@ const AdaptivePlayerTrolling = (() => {
     for (let i=0; i<queue.length; i++) {
       const {x,y}=queue[i]
       if (Math.max(Math.abs(x-player.x),Math.abs(y-player.y)) >= settings.minSpawnDistance &&
+          (!requireUnexplored || unexploredSpawnTile(x,y)) &&
           !undergroundTileVisible(x,y) && !occupied.has(keyXY(x,y)) &&
           separateFromAdaptiveThreats(x,y) &&
           !CAVE_TRANSITION_TILES.has(map[y]?.[x]) &&
@@ -2987,7 +3000,7 @@ const AdaptivePlayerTrolling = (() => {
     for (let i = 0; i < queue.length; i++) {
       const tile = queue[i]
       const far = Math.max(Math.abs(tile.x - player.x), Math.abs(tile.y - player.y)) > UndergroundFov.RADIUS
-      if (far && !undergroundTileVisible(tile.x, tile.y) &&
+      if (far && unexploredSpawnTile(tile.x,tile.y) && !undergroundTileVisible(tile.x, tile.y) &&
           trollingSafeSpawn(tile.x, tile.y, currentZ, currentLevelKind()) &&
           !occupied.has(keyXY(tile.x, tile.y)) &&
           separateFromAdaptiveThreats(tile.x, tile.y) &&
@@ -3087,7 +3100,7 @@ const AdaptivePlayerTrolling = (() => {
     invalidateUndergroundFov()
     function canPlace(x,y) {
       if (Math.max(Math.abs(x-player.x),Math.abs(y-player.y)) <= Math.max(club.minSpawnDistance, UndergroundFov.RADIUS)) return false
-      if (undergroundTileVisible(x,y) || occupied.has(keyXY(x,y)) ||
+      if (!unexploredSpawnTile(x,y) || undergroundTileVisible(x,y) || occupied.has(keyXY(x,y)) ||
           !separateFromAdaptiveThreats(x,y) || !TILE[map[y]?.[x]]?.walk ||
           CAVE_TRANSITION_TILES.has(map[y]?.[x]) || Mining.blocksPathAt(x,y) ||
           !trollingSafeSpawn(x,y,currentZ,currentLevelKind()) ||
@@ -3204,6 +3217,7 @@ const AdaptivePlayerTrolling = (() => {
         if (distance>=cfg.minSpawnDistance && distance<=cfg.maxSpawnDistance &&
             (currentZ!==0 || (biomes.has(map[y]?.[x]) &&
               surfaceRegion(x,y).key===surfaceRegion(player.x,player.y).key)) &&
+            unexploredSpawnTile(x,y) &&
             (currentZ===0 ? !(x>=camX && x<camX+VIEW_W && y>=camY && y<camY+VIEW_H) :
               !undergroundTileVisible(x,y)) &&
             !occupied.has(keyXY(x,y)) &&
@@ -3358,6 +3372,7 @@ const AdaptivePlayerTrolling = (() => {
       if(distance>=cfg.minSpawnDistance && distance<=cfg.maxSpawnDistance &&
           (currentZ!==0 || (['hill','forest'].includes(map[y]?.[x]) &&
             surfaceRegion(x,y).key===region && sanctuaryDistance(x,y)>FLEE_DISTANCE)) &&
+          unexploredSpawnTile(x,y) &&
           (currentZ===0 ? !(x>=camX && x<camX+VIEW_W && y>=camY && y<camY+VIEW_H) :
             !undergroundTileVisible(x,y)) &&
           !occupied.has(keyXY(x,y)) && !npcs.some(n=>currentZ===0 && n.x===x && n.y===y) &&
@@ -3475,6 +3490,7 @@ const AdaptivePlayerTrolling = (() => {
               WORLD_GEN_CONFIG.surfaceEnemies.highTierMinTempleDistance)) &&
           (kind==='surface' ? !(x>=camX && x<camX+VIEW_W && y>=camY && y<camY+VIEW_H) :
             !undergroundTileVisible(x,y)) &&
+          unexploredSpawnTile(x,y) &&
           !occupied.has(keyXY(x,y)) &&
           !npcs.some(n=>kind==='surface' && n.x===x && n.y===y) &&
           !groundItemAt(x, y) &&
@@ -3572,6 +3588,7 @@ const AdaptivePlayerTrolling = (() => {
       const {x,y}=queue[i],distance=Math.max(Math.abs(x-player.x),Math.abs(y-player.y))
       if(distance>=cfg.minSpawnDistance && distance<=cfg.maxSpawnDistance &&
           (!region || (surfaceRegion(x,y).key===region && sanctuaryDistance(x,y)>FLEE_DISTANCE)) &&
+          unexploredSpawnTile(x,y) &&
           (currentZ===0 ? !(x>=camX && x<camX+VIEW_W && y>=camY && y<camY+VIEW_H) :
             !undergroundTileVisible(x,y)) &&
           !occupied.has(keyXY(x,y)) &&
@@ -3747,6 +3764,7 @@ const AdaptivePlayerTrolling = (() => {
         if (d >= cfg.minSpawnDistance && d <= cfg.maxSpawnDistance &&
             (!region || (surfaceRegion(x,y).key === region &&
               sanctuaryDistance(x,y) > FLEE_DISTANCE && enemyBiomes(tmpl).includes(map[y]?.[x]))) &&
+            unexploredSpawnTile(x,y) &&
             (currentZ === 0 ? !(x>=camX && x<camX+VIEW_W && y>=camY && y<camY+VIEW_H) :
               !undergroundTileVisible(x,y)) &&
             !occupied.has(keyXY(x,y)) &&
@@ -3822,7 +3840,7 @@ const AdaptivePlayerTrolling = (() => {
         }
       }
       const legal=(site)=>!!site && site.d>=cfg.minSpawnDistance &&
-        site.d<=cfg.maxSpawnDistance &&
+        site.d<=cfg.maxSpawnDistance && unexploredSpawnTile(site.x,site.y) &&
         (currentZ!==0 || (surfaceRegion(site.x,site.y).key===region &&
           sanctuaryDistance(site.x,site.y)>FLEE_DISTANCE &&
           enemyBiomes(tmpl).includes(map[site.y]?.[site.x]))) &&
@@ -3952,6 +3970,7 @@ const AdaptivePlayerTrolling = (() => {
         if(d>=cfg.minSpawnDistance && d<=cfg.maxSpawnDistance &&
            (!region || (surfaceRegion(x,y).key===region &&
              sanctuaryDistance(x,y)>FLEE_DISTANCE && enemyBiomes(tmpl).includes(map[y]?.[x]))) &&
+           unexploredSpawnTile(x,y) &&
            (currentZ===0 ? !(x>=camX && x<camX+VIEW_W && y>=camY && y<camY+VIEW_H) :
              !undergroundTileVisible(x,y)) &&
            !occupied.has(keyXY(x,y)) &&
@@ -4103,7 +4122,7 @@ const AdaptivePlayerTrolling = (() => {
     for (let i=0;i<queue.length;i++) {
       const {x,y,d}=queue[i], tile=map[y]?.[x]
       if(d>=cfg.minSpawnDistance && d<=cfg.maxSpawnDistance &&
-          (!forestOnly || tile===cfg.initialBiome) &&
+          (!forestOnly || (tile===cfg.initialBiome && unexploredSpawnTile(x,y))) &&
           sanctuaryDistance(x,y)>FLEE_DISTANCE &&
           !(x>=camX && x<camX+VIEW_W && y>=camY && y<camY+VIEW_H) &&
           !occupied.has(keyXY(x,y)) &&
@@ -4345,7 +4364,7 @@ const AdaptivePlayerTrolling = (() => {
     for(let i=0;i<queue.length;i++) {
       const {x,y}=queue[i]
       if(Math.max(Math.abs(x-player.x),Math.abs(y-player.y))>=settings.minPlayerDistance &&
-          !undergroundTileVisible(x,y) && passable(x,y) &&
+          unexploredSpawnTile(x,y) && !undergroundTileVisible(x,y) && passable(x,y) &&
           !occupied.has(keyXY(x,y)) &&
           !groundItemAt(x, y) &&
           !npcs.some(n=>n.x===x&&n.y===y&&(n.level===currentZ||(currentZ===0&&n.level==null))) &&
@@ -4460,8 +4479,14 @@ const AdaptivePlayerTrolling = (() => {
         ['gallery0','gallery1'].includes(enemy.dungeonRole) && enemyIsShooter(enemy))
       // A previously cleared gallery never mysteriously resurrects its crew.
       if(!guards.length) {state.explorerGalleryRolls[key]=false;continue}
+      const hiddenGuards=guards.filter(enemy=>unexploredSpawnTile(enemy.x,enemy.y))
+      // Reinforcements and the promoted captain must both remain an unseen
+      // surprise. Once the gallery itself has been discovered, the modifier is
+      // considered spent and will not trigger on a revisit.
+      if(!hiddenGuards.length) {state.explorerGalleryRolls[key]=false;continue}
       const candidates=[0,1].map(side=>(room.gallery.bays?.[side] || []).filter(p=>
-        map[p.y]?.[p.x]==='marble' && !occupied.has(keyXY(p.x,p.y)) &&
+        map[p.y]?.[p.x]==='marble' && unexploredSpawnTile(p.x,p.y) &&
+        !occupied.has(keyXY(p.x,p.y)) &&
         !groundItemAt(p.x, p.y) &&
         !npcs.some(n=>n.x===p.x&&n.y===p.y) &&
         trollingSafeSpawn(p.x,p.y,currentZ,currentLevelKind()) &&
@@ -4475,8 +4500,8 @@ const AdaptivePlayerTrolling = (() => {
       }
       // Preserve the baseline 10 ranged defenders. Upgrading an existing
       // shooter rather than spawning an extra captain keeps total size at 12.
-      const captain=guards.find(e=>e.prefix==='Champion') ||
-        guards.find(e=>!e.prefix) || guards[0]
+      const captain=hiddenGuards.find(e=>e.prefix==='Champion') ||
+        hiddenGuards.find(e=>!e.prefix) || hiddenGuards[0]
       const template=ENEMY_TEMPLATE_BY_NAME[captain.baseName]
       const ability=shooterAbilityForTemplate(template)
       if(!template || !ability)continue
@@ -4567,12 +4592,14 @@ const AdaptivePlayerTrolling = (() => {
     if (currentZ!==cfg.targetZ || floor?.dungeonFloor!==2) return false
     if (player.inventory.some(item=>item.kind===cfg.itemKind) ||
         groundItems.some(item=>item.kind==='droppeditem' && item.item?.kind===cfg.itemKind)) return false
+    invalidateUndergroundFov()
     const distances=lureDistances(player,cfg.maxPathSteps)
     const sites=[]
     for (const [key,steps] of distances) {
       if (steps < cfg.minPathSteps) continue
       const [x,y]=key.split(',').map(Number),tile=map[y]?.[x]
-      if (!TILE[tile]?.walk || CAVE_TRANSITION_TILES.has(tile) ||
+      if (!unexploredSpawnTile(x,y) || undergroundTileVisible(x,y) ||
+          !TILE[tile]?.walk || CAVE_TRANSITION_TILES.has(tile) ||
           occupied.has(key) || Mining.blocksPathAt(x,y) ||
           !trollingSafeSpawn(x,y,currentZ,currentLevelKind()) ||
           groundItemAt(x, y)) continue

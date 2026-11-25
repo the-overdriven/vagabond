@@ -33,7 +33,7 @@ describe('Adaptive Player Trolling', () => {
         check(spirit && spirit.baseName==='Forest Spirit' && !spirit.abilities.includes('ethereal') &&
           !enemyHasAbility(spirit,'ethereal') &&
           RENDER_STYLE.enemies.tiles['Forest Spirit'].image==='img/enemies-tiles/dreadling.png' &&
-          spirit.hp===90 && !enemyIsVisibleOnMainView(spirit) && map[spirit.y][spirit.x]==='forest',
+          spirit.hp===90 && !discovered[spirit.y][spirit.x] && !enemyIsVisibleOnMainView(spirit) && map[spirit.y][spirit.x]==='forest',
           'distinct Forest Spirit initially manifests in reachable unseen forest')
         const wolfTemplate=ENEMY_TEMPLATE_BY_NAME.Wolf
         const wolf={name:'Wolf',baseName:'Wolf',alive:true,aware:false,alarmed:false,
@@ -78,6 +78,8 @@ describe('Adaptive Player Trolling', () => {
         spirit=enemies.find(e=>e.adaptiveEventId==='forest_spirit')
         check(spirit && spirit.id===spiritId && spirit.forestSpiritDormant && spirit.hp===hp,
           'enemy identity, damage and dormancy survive a replay restore')
+        // The returning Spirit is exempt even if every surface tile is known.
+        discovered.forEach(row=>row.fill(true))
         for(let i=0;i<99;i++){turnCount++;AdaptivePlayerTrolling.onWorldTurn()}
         check(spirit.forestSpiritDormant && AdaptivePlayerTrolling.serialize().forestSpiritRestTurns===99,
           'no resurfacing before 100 surface turns')
@@ -583,7 +585,7 @@ describe('Adaptive Player Trolling', () => {
           leader.spd>=6 && leader.grace>=3 && leader.tier>=3 &&
           group.filter(e=>e.prefix===null).length===2,
           'one named Champion leader and two ordinary allies')
-        check(group.every(e=>!(e.x>=camX && e.x<camX+VIEW_W &&
+        check(group.every(e=>!discovered[e.y][e.x] && !(e.x>=camX && e.x<camX+VIEW_W &&
           e.y>=camY && e.y<camY+VIEW_H)) &&
           group.every(e=>Math.max(Math.abs(e.x-leader.x),Math.abs(e.y-leader.y))<=2),
           'the off-screen band is kept together')
@@ -1143,9 +1145,11 @@ describe('Adaptive Player Trolling', () => {
         groundItems=groundItems.filter(g=>(g.level??0)!==-1)
         caveDecorations=caveDecorations.filter(d=>d.level!==-1)
         rebuildActiveLevelOccupancy()
+        undergroundDiscovered.forEach(row=>row.fill(true))
+        for(let y=30;y<=39;y++)for(let x=40;x<=55;x++)undergroundDiscovered[y][x]=false
         check(AdaptivePlayerTrolling.onFloorChanged(),'first suitable untouched floor spawns cluster')
         const mushrooms=groundItems.filter(g=>g.adaptiveEventId==='ignored_mushroom_cleaning')
-        check(mushrooms.length===6 && mushrooms.every(g=>g.kind==='droppeditem'),
+        check(mushrooms.length===6 && mushrooms.every(g=>g.kind==='droppeditem' && !undergroundDiscovered[g.y][g.x]),
           'six real ground pickups, not a chest')
         check(mushrooms.filter(g=>g.item.kind==='mushroom').length===5 &&
           mushrooms.filter(g=>g.item.kind==='ediblemushroom').length===1,
@@ -1619,7 +1623,7 @@ describe('Adaptive Player Trolling', () => {
         AdaptivePlayerTrolling.reset()
         chance=()=>false
         const setUnderground=()=>{
-          currentZ=-1;currentCave=-1;map=undergroundMap
+          currentZ=-1;currentCave=-1;map=undergroundMap;undergroundDiscovered=undergroundDiscoveredL1
           player.x=40;player.y=40
           for(let y=24;y<=68;y++)for(let x=24;x<=68;x++)map[y][x]='cavefloor'
           enemies=[];groundItems=[];occupied=new Set()
@@ -1646,7 +1650,11 @@ describe('Adaptive Player Trolling', () => {
         AdaptivePlayerTrolling.onPlayerMoved()
         check(!groundItems.some(g=>g.adaptiveEventId==='unused_healing'),
           'a surface checkpoint never creates healing remains')
-        setUnderground();player.steps=1500
+        setUnderground();undergroundDiscovered.forEach(row=>row.fill(true));player.steps=1500
+        AdaptivePlayerTrolling.onPlayerMoved()
+        check(!AdaptivePlayerTrolling.completed('unused_healing'),'remembered floor cannot receive remains')
+        for(let y=52;y<=68;y++)for(let x=52;x<=68;x++)undergroundDiscovered[y][x]=false
+        player.steps=2000
         check(AdaptivePlayerTrolling.onPlayerMoved(),
           'next underground checkpoint places the reward')
         const bodies=groundItems.filter(g=>g.adaptiveEventId==='unused_healing')
@@ -1654,7 +1662,7 @@ describe('Adaptive Player Trolling', () => {
           bodies[0].gear?.kind==='potion' && bodies[0].gear?.count===2 && bodies[0].level===-1,
           'one searchable corpse carries two Life Potions underground')
         check(Math.max(Math.abs(bodies[0].x-player.x),Math.abs(bodies[0].y-player.y))>=10 &&
-          !undergroundTileVisible(bodies[0].x,bodies[0].y),
+          !undergroundDiscovered[bodies[0].y][bodies[0].x] && !undergroundTileVisible(bodies[0].x,bodies[0].y),
           'the remains are out of sight and away from player')
         const snapshot=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(snapshot,{isReplayInit:true})
@@ -1731,7 +1739,7 @@ describe('Adaptive Player Trolling', () => {
         activeWorldTraits=[{name:'test curse',effects:[]}]
         AdaptivePlayerTrolling.reset()
         player.inventory=[];player.killsBySpecies={}
-        currentZ=-1;currentCave=-1;map=undergroundMap
+        currentZ=-1;currentCave=-1;map=undergroundMap;undergroundDiscovered=undergroundDiscoveredL1
         player.x=40;player.y=40
         for(let y=24;y<=68;y++)for(let x=24;x<=68;x++)map[y][x]='cavefloor'
         enemies=[];groundItems=[];occupied=new Set()
@@ -1740,12 +1748,17 @@ describe('Adaptive Player Trolling', () => {
         check(AdaptivePlayerTrolling.serialize().potionsDrunk===19,'count real drinks')
         check(!AdaptivePlayerTrolling.completed('strange_green_potion'),'19 insufficient')
         AdaptivePlayerTrolling.onPotionDrunk()
-        player.steps=500
+        undergroundDiscovered.forEach(row=>row.fill(true))
+        player.steps=500;AdaptivePlayerTrolling.onPlayerMoved()
+        check(!AdaptivePlayerTrolling.completed('strange_green_potion'),'remembered floor cannot receive potion')
+        for(let y=52;y<=68;y++)for(let x=52;x<=68;x++)undergroundDiscovered[y][x]=false
+        player.steps=1000
         check(AdaptivePlayerTrolling.onPlayerMoved(),'scheduled check places potion')
         const drops=groundItems.filter(g=>g.adaptiveEventId==='strange_green_potion')
         check(drops.length===1 && drops[0].kind==='droppeditem' &&
           drops[0].item?.kind==='strangeGreenPotion','potion lies on the ground, not inside a chest')
-        check(!undergroundTileVisible(drops[0].x,drops[0].y),'spawn outside view')
+        check(!undergroundDiscovered[drops[0].y][drops[0].x] &&
+          !undergroundTileVisible(drops[0].x,drops[0].y),'spawn on undiscovered tile outside view')
         check(itemDefinition('strangeGreenPotion').icon==='img/tiles/strange-green-potion.png',
           'uses its own green potion sprite, not a borrowed item image')
         check(groundGlyph(drops[0]).ch==='!' && groundGlyph(drops[0]).color==='#61d478',
@@ -1778,7 +1791,7 @@ describe('Adaptive Player Trolling', () => {
           'drinking consumes the potion')
         check(AdaptivePlayerTrolling.serialize().potionsDrunk===21,
           'special potion counts as a drink but does not repeat the event')
-        player.steps=1000;AdaptivePlayerTrolling.onPlayerMoved()
+        player.steps=1500;AdaptivePlayerTrolling.onPlayerMoved()
         check(groundItems.filter(g=>g.adaptiveEventId==='strange_green_potion').length===0,
           'potion is never duplicated')
       } finally {
@@ -1827,11 +1840,12 @@ describe('Adaptive Player Trolling', () => {
         }
         check(AdaptivePlayerTrolling.serialize().drowningCrossings===2,
           'separate damaging crossings meet the threshold')
+        discovered.forEach(row=>row.fill(true)) // Drowning Lure is an explicit exception.
         player.steps=500
         AdaptivePlayerTrolling.onPlayerMoved()
         const drops=groundItems.filter(g=>g.adaptiveEventId==='drowning_lure')
         check(drops.length===1 && drops[0].kind==='droppeditem' &&
-          drops[0].item?.kind==='homecomingscroll' && drops[0].x===65,
+          drops[0].item?.kind==='homecomingscroll' && drops[0].x===65 && discovered[drops[0].y][drops[0].x],
           'Homecoming scroll spawns on far dry shore')
         const save=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(save,{isReplayInit:true})
@@ -1929,7 +1943,7 @@ describe('Adaptive Player Trolling', () => {
         currentZ=-5;currentCave=-1
         deepLevels[3].dungeonPackage='dwarvenRuins'
         deepLevels[3].dungeonFloor=3;deepLevels[3].floorCount=3
-        map=deepLevels[3].map
+        map=deepLevels[3].map;undergroundDiscovered=deepLevels[3].discovered
         for(let y=24;y<=70;y++)for(let x=24;x<=70;x++)map[y][x]='cavefloor'
         player.x=45;player.y=45;player.combatSkills.oneHanded=60
         player.combatSkills.twoHanded=9;player.combatSkills.shielding=0
@@ -1938,6 +1952,9 @@ describe('Adaptive Player Trolling', () => {
         AdaptivePlayerTrolling.syncTriggerFlags()
         check(AdaptivePlayerTrolling.serialize().triggerFlags.opposite_weapon,
           'specialization threshold remembered')
+        undergroundDiscovered.forEach(row=>row.fill(true))
+        check(!AdaptivePlayerTrolling.tryNeglectedCombatGear(),'remembered ruins cannot receive artifact')
+        for(let y=56;y<=70;y++)for(let x=56;x<=70;x++)undergroundDiscovered[y][x]=false
         check(AdaptivePlayerTrolling.tryNeglectedCombatGear(),
           'unfamiliar two-handed artifact placed on valid ruin floor')
         const rewards=groundItems.filter(g=>g.adaptiveEventId==='opposite_weapon')
@@ -1972,7 +1989,7 @@ describe('Adaptive Player Trolling', () => {
         currentZ=-5;currentCave=-1
         deepLevels[3].dungeonPackage='dwarvenRuins'
         deepLevels[3].dungeonFloor=3;deepLevels[3].floorCount=3
-        map=deepLevels[3].map
+        map=deepLevels[3].map;undergroundDiscovered=deepLevels[3].discovered
         for(let y=24;y<=70;y++)for(let x=24;x<=70;x++)map[y][x]='cavefloor'
         player.x=45;player.y=45;player.combatSkills.oneHanded=0
         player.combatSkills.twoHanded=0;player.combatSkills.shielding=0
@@ -2005,6 +2022,9 @@ describe('Adaptive Player Trolling', () => {
         AdaptivePlayerTrolling.syncTriggerFlags()
         check(AdaptivePlayerTrolling.serialize().triggerFlags.neglected_shield,
           'qualifying behavior marked in debugger')
+        undergroundDiscovered.forEach(row=>row.fill(true))
+        check(!AdaptivePlayerTrolling.tryNeglectedCombatGear(),'remembered ruins cannot receive artifact')
+        for(let y=56;y<=70;y++)for(let x=56;x<=70;x++)undergroundDiscovered[y][x]=false
         check(AdaptivePlayerTrolling.tryNeglectedCombatGear(),
           'reward placed when entering final two ruin floors')
         const item=groundItems.find(g=>g.adaptiveEventId==='neglected_shield')?.item
@@ -2277,7 +2297,7 @@ describe('Adaptive Player Trolling', () => {
         currentZ=-4
         check(!AdaptivePlayerTrolling.tryPlaceFortQuestLedger(),
           'ledger cannot appear on the first ruins floor')
-        currentZ=-5
+        currentZ=-5;undergroundDiscovered=floor.discovered
         const x=Math.floor(map[0].length/2),y=Math.floor(map.length/2)
         for(let yy=Math.max(1,y-20);yy<Math.min(map.length-1,y+21);yy++)
           for(let xx=Math.max(1,x-20);xx<Math.min(map[0].length-1,x+21);xx++)
@@ -2285,11 +2305,15 @@ describe('Adaptive Player Trolling', () => {
         player.x=x;player.y=y
         enemies=[];groundItems=[];occupied=new Set()
         rebuildActiveLevelOccupancy();invalidateUndergroundFov()
+        undergroundDiscovered.forEach(row=>row.fill(true))
+        check(!AdaptivePlayerTrolling.tryPlaceFortQuestLedger() && AdaptivePlayerTrolling.fortQuestOption()==='active',
+          'fully remembered floor cannot receive ledger; commission stays active')
+        for(let yy=y+10;yy<=y+15;yy++)for(let xx=x+10;xx<=x+15;xx++)undergroundDiscovered[yy][xx]=false
         check(AdaptivePlayerTrolling.tryPlaceFortQuestLedger(),
           'quest ledger is placed on a traversable ruins tile')
         let ledgers=groundItems.filter(g=>g.kind==='droppeditem' &&
           g.item?.kind==='dwarvenTradeLedger')
-        check(ledgers.length===1 && ledgers[0].level===-5 &&
+        check(ledgers.length===1 && ledgers[0].level===-5 && !undergroundDiscovered[ledgers[0].y][ledgers[0].x] &&
           Math.abs(ledgers[0].x-x)+Math.abs(ledgers[0].y-y)>=8,
           'item is a physical pickup away from the stairs')
         check(!AdaptivePlayerTrolling.tryPlaceFortQuestLedger() &&

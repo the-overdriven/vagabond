@@ -228,6 +228,8 @@ describe('Mine creatures: hidden Burrow and Wall Ambush',()=>{
           check(!enemies.some(e=>e.adaptiveEventId==='depth_guardian'),
             'no guardian before the fifth complete world turn')
         }
+        // The Guardian can awaken even on an entirely explored mine floor.
+        undergroundDiscovered.forEach(row=>row.fill(true))
         turnCount=255
         AdaptivePlayerTrolling.setDebugTrolling(false)
         const originalLog=log,spawnMessages=[]

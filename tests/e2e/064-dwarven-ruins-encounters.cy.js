@@ -102,7 +102,7 @@ describe('Dwarven Ruins encounter progression', () => {
         AdaptivePlayerTrolling.reset()
         const ruins=deepLevels.filter(f=>f.dungeonPackage==='dwarvenRuins')
         check(ruins.length>=3,'ruins generated for trial')
-        for(let i=0;i<15;i++) AdaptivePlayerTrolling.onVenomAttempt({
+        for(let i=0;i<10;i++) AdaptivePlayerTrolling.onVenomAttempt({
           id:'venom-prey-'+i,alive:true,hp:30,family:'living'})
         const enter=(floor)=>{
           currentZ=chainZForDepth(deepLevels.indexOf(floor)+2);currentCave=-1
@@ -117,12 +117,20 @@ describe('Dwarven Ruins encounter progression', () => {
         AdaptivePlayerTrolling.onFloorChanged()
         check(!enemies.some(e=>e.adaptiveEventId==='venom_eater'),'the early ruins cannot spawn Venom Eater')
         enter(ruins[ruins.length-2])
-        check(AdaptivePlayerTrolling.onFloorChanged(),'the penultimate ruin floor accepts Venom Eater')
+        // Previously explored tiles remain ineligible even outside current FOV.
+        undergroundDiscovered.forEach(row=>row.fill(true))
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!enemies.some(e=>e.adaptiveEventId==='venom_eater') &&
+          !AdaptivePlayerTrolling.completed('venom_eater'),
+          'a completely discovered floor leaves the qualified event pending')
+        enter(ruins[ruins.length-1])
+        player.steps=(AdaptivePlayerTrolling.serialize().activationChecks+1)*500
+        check(AdaptivePlayerTrolling.onFloorChanged(),'a later checkpoint on the final ruin floor accepts Venom Eater')
         let eater=enemies.find(e=>e.adaptiveEventId==='venom_eater')
         check(!!eater && eater.baseName==='Venom Eater' && eater.maxHp===150 &&
           eater.hp===150 && eater.atk===18 && eater.def===6 && eater.spd===5 &&
           eater.tier===4, 'Venom Eater uses approved tier-4 stats')
-        check(!undergroundTileVisible(eater.x,eater.y) &&
+        check(!undergroundDiscovered[eater.y][eater.x] && !undergroundTileVisible(eater.x,eater.y) &&
           !CAVE_TRANSITION_TILES.has(map[eater.y][eater.x]),
           'spawn is unseen and does not occupy a stair')
         check(AdaptivePlayerTrolling.serialize().floorThreats['chain:'+currentZ+':-1']===1,
@@ -147,7 +155,7 @@ describe('Dwarven Ruins encounter progression', () => {
         check(!AdaptivePlayerTrolling.onFloorChanged() &&
           enemies.filter(e=>e.adaptiveEventId==='venom_eater').length===1,
           'reentry never duplicates Venom Eater')
-        check(saved.adaptivePlayerTrolling.poisonedEnemyIds.length===15 &&
+        check(saved.adaptivePlayerTrolling.poisonedEnemyIds.length===10 &&
           saved.adaptivePlayerTrolling.completed.includes('venom_eater'),
           'trigger counters and completion are present in saves and replay snapshots')
       } finally {chance=originalChance;loadGameFromObject(before)}
@@ -500,7 +508,8 @@ describe('Dwarven Ruins encounter progression', () => {
           check(e.name==='Mighty '+e.baseName && e.prefix===null,'monster prefix only appears in display name')
           check(e.equipment.name.startsWith('Mighty ') && e.equipment.mod==='atk','real prefixed item equipped')
           check(e.gearBonuses.atk>0 && !e.prefixBase,'ATK came from gear, not enemy prefix')
-          check(!undergroundTileVisible(e.x,e.y),'every member starts outside field of view')
+          check(!undergroundDiscovered[e.y][e.x] && !undergroundTileVisible(e.x,e.y),
+            'every member starts on an undiscovered tile outside field of view')
           check(CAVE_TRANSITION_TILES.has(map[e.y][e.x])===false,'no member blocks a stair')
         }
         check(AdaptivePlayerTrolling.completed('fan_club'),'encounter committed once')
@@ -587,11 +596,16 @@ describe('Dwarven Ruins encounter progression', () => {
         check(!AdaptivePlayerTrolling.onFloorChanged(),'wall-only floor defers placement')
         check(!AdaptivePlayerTrolling.completed('self_fireball'),'deferred event stays available')
         for(let x=1;x<33;x++)map[20][x]='marble'
-        check(AdaptivePlayerTrolling.onFloorChanged(),'one-tile passage can receive the reward')
+        undergroundDiscovered.forEach(row=>row.fill(true))
+        check(!AdaptivePlayerTrolling.onFloorChanged() &&
+          !AdaptivePlayerTrolling.completed('self_fireball'),
+          'a remembered corridor outside FOV cannot receive the reward')
+        undergroundDiscovered[20][24]=false
+        check(AdaptivePlayerTrolling.onFloorChanged(),'one undiscovered passage tile can receive the reward')
         const drops=groundItems.filter(g=>g.adaptiveEventId==='self_fireball')
         check(drops.length===1 && drops[0].kind==='droppeditem' &&
           drops[0].item.kind==='scrollOfFireball','scroll is ordinary ground loot')
-        check(drops[0].y===20 && drops[0].x>=12,'off-screen and away from stairs')
+        check(drops[0].y===20 && drops[0].x===24,'off-screen and away from stairs')
         check(AdaptivePlayerTrolling.serialize().floorThreats['chain:-4:-1']===undefined,
           'loot does not occupy a threat slot')
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
@@ -613,7 +627,7 @@ describe('Dwarven Ruins encounter progression', () => {
       try {
         activeWorldTraits=[{name:'test curse',effects:[]}]
         AdaptivePlayerTrolling.reset()
-        for(let i=0;i<15;i++) AdaptivePlayerTrolling.onVenomAttempt({
+        for(let i=0;i<10;i++) AdaptivePlayerTrolling.onVenomAttempt({
           id:'dual-event-prey-'+i,alive:true,hp:50,maxHp:50,family:'living'})
         for(let i=0;i<3;i++) {
           const turn=100+6*i
@@ -667,7 +681,7 @@ describe('Dwarven Ruins encounter progression', () => {
       try {
         activeWorldTraits=[{name:'test curse',effects:[]}]
         AdaptivePlayerTrolling.reset()
-        for(let i=0;i<15;i++)AdaptivePlayerTrolling.onVenomAttempt({
+        for(let i=0;i<10;i++)AdaptivePlayerTrolling.onVenomAttempt({
           id:'single-event-prey-'+i,alive:true,hp:30,family:'living'})
         for(let i=0;i<3;i++) {
           const turn=100+6*i
@@ -726,11 +740,18 @@ describe('Dwarven Ruins encounter progression', () => {
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Goblin'})
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Goblin'})
         AdaptivePlayerTrolling.onPlayerKilledBy({baseName:'Giant Rat'})
-        check(AdaptivePlayerTrolling.onFloorChanged(),'Nemesis is guaranteed when eligible')
+        const fog=undergroundDiscovered.map(row=>row.slice())
+        undergroundDiscovered.forEach(row=>row.fill(true))
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!AdaptivePlayerTrolling.completed('nemesis') && enemies.length===beforeCount,
+          'Nemesis has no explored-terrain fallback')
+        fog.forEach((row,y)=>row.forEach((value,x)=>{undergroundDiscovered[y][x]=value}))
+        check(AdaptivePlayerTrolling.onFloorChanged(),'Nemesis needs no probability roll when a legal site exists')
         check(enemies.length===beforeCount+1,'exactly one Nemesis spawned')
         const nemesis=enemies.find(e=>e.name==='Champion Giant Rat' && e.level===currentZ)
         check(nemesis?.prefix==='Champion' && nemesis.baseName==='Giant Rat','latest repeated death breaks equal-count tie')
-        check(!undergroundTileVisible(nemesis.x,nemesis.y),'Nemesis starts outside player FOV')
+        check(!undergroundDiscovered[nemesis.y][nemesis.x] && !undergroundTileVisible(nemesis.x,nemesis.y),
+          'Nemesis starts on an undiscovered tile outside player FOV')
         check(!AdaptivePlayerTrolling.onFloorChanged(),'reentry never duplicates committed Nemesis')
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
         check(saved.adaptivePlayerTrolling.completed.includes('nemesis'),'Nemesis completion saved')
@@ -983,10 +1004,14 @@ describe('Dwarven Ruins encounter progression', () => {
         loadGameFromObject(saved,{isReplayInit:true})
         check(AdaptivePlayerTrolling.serialize().unreadScrollTurns===720,
           'continuous holding period restored from save/replay')
+        undergroundDiscovered.forEach(row=>row.fill(true))
+        AdaptivePlayerTrolling.onFloorChanged()
+        check(!AdaptivePlayerTrolling.completed('unread_scrolls'),'remembered floor cannot receive note')
+        for(let y=24;y<48;y++)for(let x=24;x<48;x++)undergroundDiscovered[y][x]=false
         check(AdaptivePlayerTrolling.onFloorChanged(),'qualifying ruins arrival creates the note')
         const notes=groundItems.filter(g=>g.adaptiveEventId==='unread_scrolls')
         check(notes.length===1 && notes[0].kind==='droppeditem' &&
-          notes[0].item.kind==='tauntingNote' && notes[0].item.inscription==='I wish I could read.',
+          !undergroundDiscovered[notes[0].y][notes[0].x] && notes[0].item.kind==='tauntingNote' && notes[0].item.inscription==='I wish I could read.',
           'one readable taunting note lies on the ground, not in a chest')
         check(AdaptivePlayerTrolling.completed('unread_scrolls') &&
           !AdaptivePlayerTrolling.onFloorChanged(),
@@ -1043,6 +1068,13 @@ describe('Dwarven Ruins encounter progression', () => {
             ? pool[gearIndex] : originalPick(pool)
           const spawnMessages=[]
           log=(msg)=>spawnMessages.push(msg)
+          undergroundDiscovered.forEach(row=>row.fill(true))
+          undergroundDiscovered[39][50]=false
+          AdaptivePlayerTrolling.onFloorChanged()
+          check(!AdaptivePlayerTrolling.completed('early_descent') && outcomeRolls===0 &&
+            !groundItems.some(g=>g.adaptiveEventId==='early_descent'),
+            'one undiscovered tile cannot hold the whole reward; no partial loot or roll')
+          for(let y=25;y<55;y++)for(let x=25;x<55;x++)undergroundDiscovered[y][x]=false
           check(AdaptivePlayerTrolling.onFloorChanged(),'early arrival produces an encounter')
           pick=originalPick;log=originalLog
           check(!spawnMessages.some(msg=>/fresh skeletal remains|early descent|ventured into these depths/i.test(msg)),
@@ -1051,6 +1083,8 @@ describe('Dwarven Ruins encounter progression', () => {
           const drops=groundItems.filter(g=>g.adaptiveEventId==='early_descent' && g.kind==='droppeditem')
           check(bodies.length===1 && drops.length===(scrollOutcome?2:1),
             'one corpse and the expected number of independent ground drops')
+          check([...bodies,...drops].every(g=>!undergroundDiscovered[g.y][g.x]),
+            'corpse and each adjacent item occupy undiscovered tiles')
           const body=bodies[0],scroll=drops.find(g=>g.item.kind==='homecomingscroll')
           const gear=drops.find(g=>['weapon','shield','armor'].includes(g.item.kind))
           check(outcomeRolls===1,'the 30/70 reward is rolled exactly once when placed')
@@ -1138,6 +1172,7 @@ describe('Dwarven Ruins encounter progression', () => {
         for(let y=25;y<55;y++)for(let x=25;x<55;x++)map[y][x]='marble'
         player.x=39;player.y=39;enemies=[];occupied=new Set()
         rebuildActiveLevelOccupancy()
+        undergroundDiscovered.forEach(row=>row.fill(false))
         check(AdaptivePlayerTrolling.onFloorChanged() && AdaptivePlayerTrolling.completed('early_descent'),
           'first entry to the fort at level five qualifies independently')
         AdaptivePlayerTrolling.reset();groundItems=[]
@@ -1256,7 +1291,7 @@ describe('Dwarven Ruins encounter progression', () => {
         AdaptivePlayerTrolling.reset()
         const ruins=deepLevels.find(f=>f.dungeonPackage==='dwarvenRuins')
         check(!!ruins,'ruins exist')
-        currentZ=chainZForDepth(deepLevels.indexOf(ruins)+2);currentCave=-1;map=ruins.map
+        currentZ=chainZForDepth(deepLevels.indexOf(ruins)+2);currentCave=-1;map=ruins.map;undergroundDiscovered=ruins.discovered
         for(let y=46;y<=61;y++)for(let x=48;x<=72;x++)map[y][x]='dwarvenwall'
         for(let x=50;x<=68;x++)map[52][x]='marble'
         for(let x=52;x<=63;x++)map[54][x]='marble'
@@ -1275,12 +1310,17 @@ describe('Dwarven Ruins encounter progression', () => {
         AdaptivePlayerTrolling.onPlayerMoved()
         check(!AdaptivePlayerTrolling.completed('trap_lure'),'four triggers are insufficient')
         AdaptivePlayerTrolling.onPlayerTriggeredTrap({id:'test-4'})
+        undergroundDiscovered.forEach(row=>row.fill(true))
         player.steps=1000
+        AdaptivePlayerTrolling.onPlayerMoved()
+        check(!AdaptivePlayerTrolling.completed('trap_lure'),'remembered spike detour cannot receive bait')
+        for(let x=60;x<=63;x++)undergroundDiscovered[52][x]=false
+        player.steps=1500
         AdaptivePlayerTrolling.onPlayerMoved()
         const drops=groundItems.filter(g=>g.adaptiveEventId==='trap_lure')
         check(drops.length===1 && drops[0].item?.kind==='potion' && drops[0].kind==='droppeditem',
           'one Life Potion lies on ground, not in a chest')
-        check(drops[0].x>59 && drops[0].y===52 && map[drops[0].y][drops[0].x]!=='dwarvenspikes',
+        check(!undergroundDiscovered[drops[0].y][drops[0].x] && drops[0].x>59 && drops[0].y===52 && map[drops[0].y][drops[0].x]!=='dwarvenspikes',
           'bait is beyond the existing spike plate')
         const save=JSON.parse(JSON.stringify(buildSaveObject()))
         loadGameFromObject(save,{isReplayInit:true})

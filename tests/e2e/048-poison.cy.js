@@ -16,20 +16,23 @@ describe('Monster poison', () => {
         check(AdaptivePlayerTrolling.serialize().poisonedEnemyIds.length===0,
           'ordinary worlds never track venom for cursed reactions')
         activeWorldTraits=[{name:'test curse',effects:[]}]
-        for(let i=0;i<15;i++) {
+        for(let i=0;i<10;i++) {
           const e=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Goblin,id:'adaptive-venom-'+i,
             x:40,y:40,level:0,hp:100,maxHp:100,alive:true,equipment:null})
           applyPlayerVenomToEnemy(e)
           applyPlayerVenomToEnemy(e)
           check(AdaptivePlayerTrolling.serialize().poisonedEnemyIds.length===i+1,
             'poison refresh never counts a target twice')
+          AdaptivePlayerTrolling.syncTriggerFlags()
+          check(AdaptivePlayerTrolling.serialize().triggerFlags.venom_eater===(i===9),
+            'only the tenth distinct target unlocks the event')
         }
-        check(AdaptivePlayerTrolling.serialize().poisonedEnemyIds.length===15,
-          '15 distinct targets qualify')
+        check(AdaptivePlayerTrolling.serialize().poisonedEnemyIds.length===10,
+          '10 distinct targets qualify')
         const saved=JSON.parse(JSON.stringify(buildSaveObject()))
         AdaptivePlayerTrolling.reset()
         AdaptivePlayerTrolling.restore(saved.adaptivePlayerTrolling)
-        check(AdaptivePlayerTrolling.serialize().poisonedEnemyIds.length===15,
+        check(AdaptivePlayerTrolling.serialize().poisonedEnemyIds.length===10,
           'the unique target history survives restoration')
         AdaptivePlayerTrolling.reset()
         const skeleton=addEnemy({...ENEMY_TEMPLATE_BY_NAME.Skeleton,id:'adaptive-undead',

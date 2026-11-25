@@ -12267,12 +12267,13 @@ more difficult:
   }
 
   function brownDeepCaveAt(x, y) {
-    // A boulder is an overlay, not a different geological floor. Use its
-    // recorded underlay so the brown grotto/mine artwork stays continuous.
-    const floor = map[y]?.[x] === 'boulder'
-      ? (ArtifactGeomancy.temporaryAt(x, y)?.underlay ||
+    // Boulders and rubble are overlays, not different geological floors.
+    // Select the floor artwork from their exact saved underlay.
+    const tile = map[y]?.[x]
+    const floor = tile === 'boulder' || tile === 'dwarvenrubble'
+      ? ((tile === 'boulder' ? ArtifactGeomancy.temporaryAt(x, y)?.underlay : null) ||
         tileUnderlays[tileUnderlayKey(x, y, currentZ)])
-      : map[y]?.[x]
+      : tile
     if (currentZ < 0 && deepLevels[chainDepthForZ(currentZ)-2]?.kind === 'dwarvenMines')
       return floor === 'cavefloor2' && !Mining.excavatedAt(Mining.activeLevel(), x, y)
     if (currentZ !== -2 || currentLevelKind() !== 'chain') return false

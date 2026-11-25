@@ -106,6 +106,48 @@ describe('Mine-only encounters and darkness', () => {
       currentZ=first.z;currentCave=-1;map=first.level.map
       undergroundDiscovered=first.level.discovered
       player.x=first.level.mineUpstairs.x;player.y=first.level.mineUpstairs.y
+      // The same floor texture must be drawn beneath rubble and boulders.
+      // Exercise the actual terrain visual stack, not just the underlay key.
+      const rubblePos=map.flatMap((row,y)=>row.map((tile,x)=>tile==='dwarvenrubble'?{x,y}:null)).find(Boolean)
+      const floorPos=rubblePos || map.flatMap((row,y)=>row.map((tile,x)=>
+        tile==='cavefloor2' && !Mining.excavatedAt(first.level,x,y)?{x,y}:null)).find(Boolean)
+      check(floorPos,'mine rendering fixture has a floor coordinate')
+      {
+        const {x,y}=floorPos
+        const savedMode=USE_TILE_IMAGES, savedDraw=drawSurfaceVisualLayer
+        const savedTile=map[y][x], savedExcavations=first.level.mineExcavations
+        const underlayKey=tileUnderlayKey(x,y,currentZ), savedUnderlay=tileUnderlays[underlayKey]
+        const layers=[]
+        try {
+          USE_TILE_IMAGES=true
+          if (!rubblePos) {map[y][x]='dwarvenrubble';tileUnderlays[underlayKey]='cavefloor2'}
+          const floor=overlayBaseTileKey('dwarvenrubble',x,y)
+          check(floor==='cavefloor2','mine rubble retains its geological floor')
+          const brown=RENDER_STYLE.terrainTiles.cavefloorBrown.image
+          drawSurfaceVisualLayer=(px,py,visual)=>{layers.push(visual);return true}
+          for (const tile of ['dwarvenrubble','boulder','cavefloor2']) {
+            map[y][x]=tile;layers.length=0
+            drawTerrainVisualStack(0,0,tile,x,y,terrainVisual(tile,x,y),tileBackground(x,y,tile))
+            check(layers[0]?.image===brown && layers[0].flipX===!!(x&1) &&
+              layers[0].flipY===!!(y&1),tile+' renders the same mirrored brown mine floor')
+            if(tile==='dwarvenrubble') check(layers.length===2 &&
+              RENDER_STYLE.terrainTiles.dwarvenrubble.variants.includes(layers[1].image),
+              'original rubble sprite is drawn over the mine floor')
+          }
+          map[y][x]='dwarvenrubble'
+          first.level.mineExcavations=[...savedExcavations,{x,y,kind:'wall',removed:true}]
+          check(terrainVisual('cavefloor2',x,y).image===RENDER_STYLE.terrainTiles.cavefloor2.image,
+            'excavated floor retains ordinary stone artwork under rubble')
+          USE_TILE_IMAGES=false
+          check(tileBackground(x,y,'dwarvenrubble')===TILE.dwarvenrubble.bg &&
+            overlayBaseTileKey('dwarvenrubble',x,y)===null,'ASCII rubble is unchanged')
+        } finally {
+          map[y][x]=savedTile; first.level.mineExcavations=savedExcavations
+          if(savedUnderlay===undefined) delete tileUnderlays[underlayKey]
+          else tileUnderlays[underlayKey]=savedUnderlay
+          drawSurfaceVisualLayer=savedDraw; USE_TILE_IMAGES=savedMode
+        }
+      }
       invalidateUndergroundFov()
       const shown=currentUndergroundFov()
       const expected=UndergroundFov.compute(map,player.x,player.y,5)
