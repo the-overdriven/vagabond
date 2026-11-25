@@ -4810,9 +4810,9 @@ This is separate from rare-beast sighting flight and does not alter its rules.
 
 ## Thief
 
-Some humanoid monsters have "thief" ability. On each adjacent enemy turn
+Some monsters have "thief" ability. On each adjacent enemy turn
 (including diagonal adjacency), a visible player with an eligible backpack item
-has a **10%** chance to lose one randomly selected backpack entry. Equipped
+has an **8%** chance to lose one randomly selected backpack entry. Equipped
 items are excluded; quest items are eligible. A selected stack loses exactly one
 unit. Entries have equal selection probability, regardless of stack size. A
 monster with no legal neighboring step that increases its Chebyshev distance
@@ -4829,10 +4829,9 @@ total** (including the guaranteed first step), regardless of HP and aggro range
 while the player is visible. Hesitation, opened doors without movement, being
 cornered, invisibility, and off-level turns do not advance the counter. Losing
 sight of an invisible player suspends directed retreat without losing the loot
-or resetting the one-time theft. A cornered thief usually fights until it can
-escape again; under bow fire it can instead attempt a short, committed lateral
-detour around nearby obstacles. Actual movement on that detour counts toward the
-same 40-step stolen-item escape budget; no extra free moves are granted.
+or resetting the one-time theft. A thief carrying loot can take a side route of up to
+four steps around an obstacle if the route ends farther from the player. Each
+step counts toward the escape limit. This works against any player weapon.
 
 On the 40th escape step, the thief anchors its home at the stopping tile and
 resumes normal wandering, aggro, and combat behavior from the following turn.
@@ -13338,7 +13337,7 @@ outside ordinary aggro range, but still respects invisibility, sanctuary, path
 blockers and normal defensive behavior. It occupies one optional lifetime threat
 slot; in the Dwarven Ruins it competes in the existing equal-weight,
 depth-weighted event lottery. The Gold Imp steals once using the normal adjacent
-thief opportunity: 10% per eligible adjacent turn, only if it has a legal escape
+thief opportunity: 8% per eligible adjacent turn, only if it has a legal escape
 step. Successful theft removes **10% of the player's current gold, capped at 300
 gold**, with the amount rounded down and preserved on the enemy. The original
 amount is recoverable from a regular thief bag after it dies; the bag lies on

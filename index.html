@@ -4935,7 +4935,7 @@ more difficult:
     enemy.theftEscapeSteps = Number.isInteger(enemy.theftEscapeSteps) ? enemy.theftEscapeSteps : 0
     enemy.stolenItemEquipped = enemy.stolenItemEquipped === true
     enemy.bowRetreatHold = enemy.bowRetreatHold === true
-    enemy.bowEvasion = enemy.bowEvasion && ['trapped', 'thief'].includes(enemy.bowEvasion.kind) &&
+    enemy.bowEvasion = enemy.bowEvasion && ['trapped', 'thief', 'loot'].includes(enemy.bowEvasion.kind) &&
       Array.isArray(enemy.bowEvasion.path) ? {
         kind: enemy.bowEvasion.kind,
         path: enemy.bowEvasion.path.filter(p => Number.isInteger(p.x) && Number.isInteger(p.y))
@@ -6216,11 +6216,15 @@ more difficult:
 
   function tryWoundedEnemyFlee(e, immediate = false) {
     if (!enemyIsFleeing(e)) return false
-    if (e.bowEvasion?.kind === 'thief' && equippedShortBow()) return advanceBowEvasion(e)
+    if (e.bowEvasion?.kind === 'loot' || (e.bowEvasion?.kind === 'thief' && equippedShortBow())) return advanceBowEvasion(e)
     const destination = enemyEscapeDestination(e)
     // A thief boxed against a wall may flank via a short, committed side
     // route. Without that route, the monster fights instead of pacing back.
-    if (!destination) return enemyHasAbility(e,'thief') && beginBowEvasion(e,'thief')
+    if (!destination) {
+      const escapingWithLoot = (e.stolenItem || e.stolenGold > 0) && e.theftEscapeSteps < THIEF_CONFIG.maxEscapeSteps
+      const kind = escapingWithLoot ? 'loot' : 'thief'
+      return enemyHasAbility(e,'thief') && beginBowEvasion(e,kind)
+    }
     e.aware = !playerHiddenFromEnemy(e)
     if (!immediate && chance(0.10)) return true // Hesitation consumes the whole action.
     if (enemyOpenDoorInsteadOfMove(e, destination.x, destination.y)) return true
@@ -6248,7 +6252,7 @@ more difficult:
         Math.max(Math.abs(e.x - player.x), Math.abs(e.y - player.y)) !== ATTACK_RANGE ||
         !enemyHasSight(e) || !enemyEscapeDestination(e)) return false
     // The Greedy Imp takes only coins, never a backpack item. Keep the normal
-    // thief's 10% adjacent-turn chance and escape requirement.
+    // thief's configured adjacent-turn chance and escape requirement.
     if (e.adaptiveEventId === 'gold_imp' && AdaptivePlayerTrolling.active()) {
       const amount=AdaptivePlayerTrolling.goldImpStealAmount()
       if (amount <= 0) return false
@@ -7924,7 +7928,7 @@ more difficult:
     const distance = (x, y) => Math.max(Math.abs(x-player.x), Math.abs(y-player.y))
     const startDist = distance(e.x,e.y)
     const bowRange = playerBowRange() || 6
-    const limit = kind === 'thief' ? 4 : 9
+    const limit = kind === 'trapped' ? 9 : 4
     const queue = [{x:e.x,y:e.y,path:[]}]
     const visited = new Set([keyXY(e.x,e.y)])
     let best = null, bestScore = -Infinity
@@ -7933,8 +7937,8 @@ more difficult:
       if (node.path.length) {
         const d=distance(node.x,node.y)
         if (d>startDist) {
-          const shelter = bowCoverBlocksPlayerShotAt(node.x,node.y)
-          const outOfRange = d>bowRange
+          const shelter = kind !== 'loot' && bowCoverBlocksPlayerShotAt(node.x,node.y)
+          const outOfRange = kind !== 'loot' && d>bowRange
           // Reaching safety is best; otherwise make real distance progress.
           // Penalize meandering so the route doesn't cross the whole room.
           const score=outOfRange ? 1000-node.path.length*15 :
@@ -7974,6 +7978,7 @@ more difficult:
       e.theftEscapeSteps++
       if (e.theftEscapeSteps === THIEF_CONFIG.maxEscapeSteps) {
         e.homeX=e.x;e.homeY=e.y
+        if (e.bowEvasion.kind === 'loot') e.bowEvasion=null
       }
     }
     leaveBeastTrack(e,fromX,fromY)
@@ -7987,7 +7992,7 @@ more difficult:
   }
 
   function beginBowEvasion(e, kind) {
-    if (e.bowEvasionSpent || !equippedShortBow() || enemyFearlessOfBow(e)) return false
+    if (kind !== 'loot' && (e.bowEvasionSpent || !equippedShortBow() || enemyFearlessOfBow(e))) return false
     const path=bowEvasionPath(e,kind)
     if (!path) return false
     e.bowEvasion={kind,path}
@@ -9074,7 +9079,7 @@ more difficult:
     // monsters on nearby but currently inactive floors.
     if (!equippedShortBow()) for (const e of enemies) {
       e.bowRetreatHold = false
-      e.bowEvasion = null
+      if (e.bowEvasion?.kind !== 'loot') e.bowEvasion = null
       e.bowEvasionSpent = false
     }
     // The surface stays alive under elevated floors, but its creatures never
@@ -9237,7 +9242,7 @@ more difficult:
           continue
         }
       }
-      if (e.bowEvasion && equippedShortBow() && dist > ATTACK_RANGE) {
+      if (e.bowEvasion && e.bowEvasion.kind !== 'loot' && equippedShortBow() && dist > ATTACK_RANGE) {
         if (advanceBowEvasion(e)) continue
       }
       // A shot target keeps seeking actual cover across ordinary turns, not

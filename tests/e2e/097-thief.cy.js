@@ -163,7 +163,7 @@ describe('One-time monster theft', () => {
     cy.window().then(win => win.eval(`(async () => {
       const e=makeThief();player.inventory=[{kind:'weapon',name:'Replay Blade',base:'Club',atk:7,grace:4,tier:1}]
       const baseAtk=e.atk;let seed=1
-      while(true) {rngState=seed;if(rng()<0.1) break;seed++}
+      while(true) {rngState=seed;if(rng()<THIEF_CONFIG.chance) break;seed++}
       rngState=seed;startReplayRecording();skipTurn()
       theftCheck(e.stolenItemEquipped && e.atk===baseAtk+7*e.gearScale,'recorded gear equipped')
       for(let i=0;i<4;i++) skipTurn()
@@ -184,8 +184,8 @@ describe('One-time monster theft', () => {
       const oldRng=rng,oldDamage=damageRoll;let calls=0
       try {
         const e=makeThief();player.inventory=[createItem('potion')]
-        rng=()=>{calls++;return 0.1}
-        theftCheck(!tryEnemyTheft(e) && calls===1 && !e.theftUsed,'10% boundary fails')
+        rng=()=>{calls++;return 0.08}
+        theftCheck(!tryEnemyTheft(e) && calls===1 && !e.theftUsed,'8% boundary fails')
         theftCheck(!tryEnemyTheft(e) && calls===2,'failed roll retries')
         e.x=42;calls=0;theftCheck(!tryEnemyTheft(e) && calls===0,'nonadjacent no roll');e.x=41
         player.invisibleTurns=10;theftCheck(!tryEnemyTheft(e) && calls===0,'invisible no roll');player.invisibleTurns=0
@@ -312,7 +312,7 @@ describe('One-time monster theft', () => {
       const e=makeThief();player.inventory=[createItem('potion',{count:4}),createItem('herb',{count:3})]
       // The first seeded eligibility roll succeeds, without replacing gameplay RNG.
       let seed=1
-      while(true) {rngState=seed;if(rng()<0.1) break;seed++}
+      while(true) {rngState=seed;if(rng()<THIEF_CONFIG.chance) break;seed++}
       // Keep a legal straight escape route until the 40-step limit is reached.
       for(let x=42;x<=95;x++) {
         map[40][x]='grass'

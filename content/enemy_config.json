@@ -1,6 +1,6 @@
 {
   "thief": {
-    "chance": 0.1,
+    "chance": 0.08,
     "maxEscapeSteps": 40
   },
   "blind": {

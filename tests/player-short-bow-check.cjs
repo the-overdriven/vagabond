@@ -561,6 +561,7 @@ async function main() {
         'limited thief evasion cannot restart indefinitely when shot again')
       // The same path applies to a thief actually carrying a stolen item.
       enemies=[];occupied=new Set()
+      player.equip.weapon=null
       thief=spawn('Imp','stolen-item-thief',44,40)
       thief.stolenItem={kind:'potion',name:'Life Potion',count:1}
       enemyTurn(null,null,thief)
