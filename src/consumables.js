@@ -4,6 +4,35 @@ const TACTICAL_CONSUMABLE_KINDS = Object.freeze([
   'scrollOfFear', 'scrollOfDeathShield', 'scrollOfChaos', 'scrollOfFireball', 'stoneSkinPotion', 'berserkPotion'
 ])
 
+// Poison has priority; otherwise choose one active temporary penalty. Terrain
+// hazards and intrinsic artifact curses are deliberately not candidates.
+function cureStrangePotionDebuff() {
+  if (player.poisonTurns > 0) {
+    curePlayerPoison()
+    return true
+  }
+  const candidates = []
+  for (const [key, label] of [
+    ['rootTurns', 'rooting'], ['gazeTurns', 'petrification'],
+    ['mummyCurseTurns', 'the curse'], ['confusionTurns', 'confusion'],
+    ['weakenTurns', 'weakness'], ['slowTurns', 'slowness']
+  ]) if (player[key] > 0) candidates.push({key, label})
+  for (const [index, debuff] of player.curseDebuffs.entries())
+    if (debuff.turnsLeft > 0) candidates.push({index, label:'a temporary penalty'})
+  if (!candidates.length) return false
+  const selected = candidates.length === 1 ? candidates[0] : pick(candidates)
+  if (selected.key) {
+    player[selected.key] = 0
+    if (selected.key === 'rootTurns') {
+      player.rootSourceId = null
+      player.rootFlavor = null
+    }
+    if (selected.key === 'confusionTurns') player.confusionSourceId = null
+  } else player.curseDebuffs.splice(selected.index, 1)
+  log(`The green potion clears ${selected.label}.`, 'good')
+  return true
+}
+
 function potionGracePenalty() {
   return (player.stoneSkinTurns > 0 ? itemDefinition('stoneSkinPotion').effect.gracePenalty : 0) +
     (player.berserkTurns > 0 ? itemDefinition('berserkPotion').effect.gracePenalty : 0)

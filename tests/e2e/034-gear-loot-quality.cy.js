@@ -66,15 +66,20 @@ describe('Exceptional prefixes and monster loot quality', () => {
         check(effects.length===1,'normal and offscreen drops do not queue effects')
         let artifactRolls=0
         makeArtifactItem=(tier,mf,options)=>{check(options.nonGearOnly,'only trinkets may roll independently');artifactRolls++;return {kind:'artifact',artifactSlot:'trinket',noun:'Amulet',name:'The Amulet',tier:3}}
-        chance=(p)=>p>0 && p<0.1
-        lootFromEnemy({...victim,equipment:gear(5)},false,true)
+        // Force only the independent artifact roll, not the Goblin's 1% scroll.
+        const deathContext={mf:0,strength:100}
+        chance=p=>p===enemyTrinketArtifactChance(deathContext.strength,deathContext.mf)
+        lootFromEnemy({...victim,equipment:gear(5)},false,true,0,deathContext)
         check(artifactRolls===1,'independent artifact actually dropped')
         check(effects.length===2,'artifact plus rare gear still queues only one effect')
         const rare={name:'Wyrdhag',baseName:'Wyrdhag',tier:4,humanoid:false,
           x:victim.x,y:victim.y,level:currentZ}
         chance=(p)=>Math.abs(p-0.198)<1e-8
-        rng=()=>0.5
+        let groupDraws=0
+        rng=()=>{groupDraws++;return 0.5}
         lootFromEnemy(rare,false,true)
+        check(groupDraws===1,'group loot selects its item without extra presentation RNG')
+        rng=()=>{throw Error('animation classifier consumed gameplay RNG')}
         check(effects.length===3,'6.6% group drop also receives a sparkle')
         check(JSON.stringify(sounds)==='[2,1,4,2]',
           'one cue per visible death; artifact wins and offscreen loot stays silent')

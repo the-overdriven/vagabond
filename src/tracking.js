@@ -7,6 +7,11 @@ let TRACK_CONFIG
 const TRACK_DIRECTIONS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
 const TRACK_ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']
 
+// God Mode grants temporary interpretation, not the learned skill.
+function canReadTracks() {
+  return !!(player.trackingLearned || player.godMode)
+}
+
 function trackSpecies(enemy) {
   return enemyTemplateForSavedEnemy(enemy)?.name || enemy.baseName || enemy.name
 }
@@ -56,7 +61,7 @@ function beastTrackAt(x, y) {
 }
 
 function inspectBeastTrack(track) {
-  if (!player.trackingLearned) return 'You notice something that looks like foot tracks, but cannot make sense of them.'
+  if (!canReadTracks()) return 'You notice something that looks like foot tracks, but cannot make sense of them.'
   const known = (player.killsBySpecies[track.species] || 0) > 0
   const freshness = track.age < TRACK_CONFIG.freshTurns ? 'Fresh' :
     track.age >= TRACK_CONFIG.fadingFromTurns ? 'Fading' : 'The'
@@ -100,7 +105,7 @@ function caveSpoorAt(x,y) {
   return caveSpoor.find(p=>p.x===x&&p.y===y&&caveSpoorEligibleSpecies(p.species)) || null
 }
 function inspectCaveSpoor(spoor) {
-  if(!player.trackingLearned)return 'You find old tracks in the stone dust, but cannot make sense of them.'
+  if(!canReadTracks())return 'You find old tracks in the stone dust, but cannot make sense of them.'
   const known=(player.killsBySpecies[spoor.species]||0)>0
   return `Old ${known ? spoor.species.toLowerCase()+' ' : ''}tracks point ${TRACK_DIRECTIONS[spoor.direction]}.`+
     (known?'':" You've never seen tracks like these before.")

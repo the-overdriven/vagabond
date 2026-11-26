@@ -447,6 +447,10 @@ const ArtifactWayfaring = (() => {
     const t=ENEMY_TEMPLATE_BY_NAME[e.baseName||e.name]||e
     return t.family==='living'&&!t.humanoid
   }
+  // The carried power prevents beast ambushes even while the truce is broken.
+  function preventsBeastAmbush(e) {
+    return has('one_with_the_wild') && beast(e)
+  }
   function truce(e) {
     const t=ENEMY_TEMPLATE_BY_NAME[e.baseName||e.name]||e
     return has('one_with_the_wild')&&!cooldownRemaining('one_with_the_wild')&&forestTile(player.x,player.y)&&beast(e)&&
@@ -722,7 +726,7 @@ const ArtifactWayfaring = (() => {
     state().phantomSurprise.splice(i,1);return true
   }
   function forgetEnemy(e) {state().stealth.observers=state().stealth.observers.filter(o=>o.id!==e.id);const i=state().phantomSurprise.indexOf(e.id);if(i>=0)state().phantomSurprise.splice(i,1)}
-  return {farsightSize,farsightTargets,farsightRegion,farsightEnemies,caveSurvey,describeCave,moved,reconcileTruce,stopTrucePursuit,exposedTo,beginStealthTurn,fighting,coverAvailable,forestGap,unseenActive,ignoresCover,cachedUnseen,rememberUnseen,forestBonus,ambushChance,forestSuccess,takeForestDodge,truce,playerAggression,peace,exhaustWaterWalking,ruleWaterDuration,waterRemaining,walkingOnWater,waterLand,lavaEntry,lavaWalk,lavaImmune,environmentalTurn,rechargeCastaway,rescueCastaway,baselinePosition,rememberPosition,activeItem,canActivate,activate,rushStep,finishRush,rushRemaining,phantomPosition,divert,distractPursuer,attackPhantomMelee,attackPhantomRanged,takeSurprise,forgetEnemy,blinkTargets,backtrackTarget,freshState, validate, templeCap, discover, visitDepth, effectiveMining, restEvery,
+  return {farsightSize,farsightTargets,farsightRegion,farsightEnemies,caveSurvey,describeCave,moved,reconcileTruce,stopTrucePursuit,exposedTo,beginStealthTurn,fighting,coverAvailable,forestGap,unseenActive,ignoresCover,cachedUnseen,rememberUnseen,forestBonus,ambushChance,preventsBeastAmbush,forestSuccess,takeForestDodge,truce,playerAggression,peace,exhaustWaterWalking,ruleWaterDuration,waterRemaining,walkingOnWater,waterLand,lavaEntry,lavaWalk,lavaImmune,environmentalTurn,rechargeCastaway,rescueCastaway,baselinePosition,rememberPosition,activeItem,canActivate,activate,rushStep,finishRush,rushRemaining,phantomPosition,divert,distractPursuer,attackPhantomMelee,attackPhantomRanged,takeSurprise,forgetEnemy,blinkTargets,backtrackTarget,freshState, validate, templeCap, discover, visitDepth, effectiveMining, restEvery,
     rootImmune, clearRoot, webPullDistance, countOrdinaryStep, enemyPhases, onDodge, clearFreeStep, clearCombat, stepContext, onStep, takeCritBonus,
     cooldownRemaining, startCooldown, reduceCooldowns, regenAmount, damage, ordinaryStep, finishTurn, resetEndurance, coldTerrain, positionStats, maxHpPct, adrenalineSpeed, homecomingBlocker, drifterMagicFind,
     terrainDefense, terrainSpeed, extraDownhillPush, syncHealth, clearFreezing, inventoryChanged}
