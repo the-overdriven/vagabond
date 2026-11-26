@@ -9113,6 +9113,28 @@ a shovel.
 
 Ordinary forest tiles can be foraged.
 
+**Auto-Forage:** Shift+F on a keyboard, or holding the mobile forage button
+for 500 ms, toggles automatic forest searches. Short taps and plain F retain
+the manual forage/loot action. The HUD shows only a leaf icon while active,
+with an explanatory hover tooltip. The touch button is also highlighted.
+Each successful ordinary or free walking step (including auto-pathing) onto
+an unsearched surface forest tile can trigger one normal forage action after
+the movement resolves. Teleports, forced movement, Rush, waiting, blocked
+steps, other terrain and already searched tiles do not trigger it. A visible
+non-passive hostile on the same level suppresses the search within its effective
+aggro range plus one tile (Chebyshev distance). For aware or alarmed enemies,
+the safety radius is at least eight tiles. Beasts under an active truce do not
+count. The check is independent of camera position, zoom and animation timing.
+Auto-Forage never
+invokes the manual loot, digging or camp interaction branches. It consumes the
+usual extra forage turn and ends forest concealment normally.
+
+The mode stays enabled outside forests, but resets on death, new world, and
+save/replay loading. It is an input preference, not persistent character state.
+Recorded movement actions carry the requested Auto-Forage intent so playback
+resolves the same movement and any additional forage turn in one RNG scope,
+without depending on the live toggle or adding a new save field.
+
 Each forest tile can only be foraged once. Each eligible search has an
 independent **75% chance to grant one Brushwood**, up to five carried. The
 ordinary herb, mushroom and berry roll still occurs even when the brushwood roll
@@ -11115,9 +11137,9 @@ retains its existing line break. The inspection prompt and touch controls are
 hidden while a modal overlay is open. The Bestiary keeps its own full-screen
 scrolling list and close control on touch layouts. The backpack opens the
 inventory, the magnifier runs the normal inspect action (including village
-huts), and the hand button uses the normal forage/loot action. Each button
-handles touch and click input while suppressing the duplicate click browsers
-emit after a touch.
+huts), and the hand button uses the normal forage/loot action on a short tap
+or toggles Auto-Forage (§48) on a long press. A long press does not also perform
+a manual search. Touch controls suppress duplicate clicks after a touch.
 
 Mobile supports:
 
@@ -11897,6 +11919,8 @@ not raw keyboard events. Current action types are:
 
 - `move` - one requested grid movement, including movement into an enemy
   (attack), an NPC (interaction), or an otherwise non-walkable destination;
+  movement with Auto-Forage enabled also carries the automatic search intent
+  (see §48);
 - `shoot` - a successful Short Bow firing action, recorded against one enemy ID
   and its tile at the time of firing;
 - `inspect` - inspect / surroundings action;

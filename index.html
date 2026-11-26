@@ -342,6 +342,7 @@ more difficult:
     <div class="stat" title="Magic Find - improves the chance and quality of magical loot.">🍀MF <b id="hMf"></b></div>
     <div class="stat">💰Gold <b id="hGold">0</b></div>
     <div class="stat">💀Deaths <b id="hDeaths">0</b></div>
+    <div class="stat" id="autoForageIndicator" title="Auto-Forage active: automatically searches unsearched forest tiles when safe." hidden>🌿</div>
     <div class="stat stat-actions">
       <button class="slbtn" id="btnSave" title="Save game to a .json file" style="display:none">💾 Save</button>
       <button class="slbtn" id="btnLoad" title="Load game from a .json file">📂 Load</button>
@@ -639,7 +640,7 @@ more difficult:
     </div>
     <div id="touchActions">
       <button id="touchSpace" aria-label="Inspect">🔍 &#x20;</button>
-      <button id="touchForage" aria-label="Forage">🤏</button>
+      <button id="touchForage" aria-label="Forage (hold to toggle Auto-Forage)" aria-pressed="false" title="Hold to toggle Auto-Forage">🤏</button>
     </div>
   </div>
   <div id="hint">
@@ -650,6 +651,7 @@ more difficult:
     <kbd>Q</kbd><kbd>E</kbd><kbd>Z</kbd><kbd>C</kbd> diagonal &nbsp;<br>
     <kbd>SPACE</kbd> inspect surroundings &nbsp;<br>
     <kbd>F</kbd> forage (or loot) &nbsp;<br>
+    <kbd>SHIFT</kbd>+<kbd>F</kbd> auto-forage &nbsp;<br>
     <kbd>R</kbd> aim bow (<kbd>ENTER</kbd> shoot) &nbsp;<br>
     <kbd>1</kbd> best melee (+shield) &nbsp;<br>
     <kbd>2</kbd> best ranged weapon &nbsp;<br>
@@ -7401,6 +7403,7 @@ more difficult:
 
   function die(killer = null, cause = 'environment', impactDelay = 0) {
     if (deathTransition) return
+    setAutoForage(false)
     cancelAllPreparedEnemyAbilities()
     toggleInv(false)
     const shore = cause === 'drowning' ? drowningShore() : null
@@ -9888,6 +9891,43 @@ more difficult:
   // chance to scrounge up something to eat. Each tile can only be
   // searched once - repeating it just confirms it's already been picked
   // over, so players can't farm the same spot for infinite herbs.
+  // Input preference, like auto-pathing: only executed gameplay is replayed.
+  let autoForageEnabled = false
+  const AUTO_FORAGE_HOLD_MS = 500
+  const AUTO_FORAGE_SAFETY_RADIUS = 8
+
+  function setAutoForage(enabled) {
+    autoForageEnabled = !!enabled
+    document.getElementById('autoForageIndicator').hidden = !autoForageEnabled
+    document.getElementById('touchForage').setAttribute('aria-pressed', String(autoForageEnabled))
+  }
+
+  function forageInputAllowed() {
+    return !raceOpen && !worldGenerating && !replayPlaying && !replaySimulationMode &&
+      !deathTransition && !surfaceCatchupBusy && !campOpen && !mapOpen && !invOpen &&
+      !tradeOpen && !npcMenuOpen && !treasureMapOpen && !bestiaryOpen && !holeJumpOpen &&
+      !fireballAim && !player.wayfaring.rush && !onlineRecordsBlockActions() &&
+      !AdaptivePlayerTrolling.pendingDebtCollector()
+  }
+
+  function autoForageAfterStep(nx, ny, fromZ) {
+    if (fromZ !== 0 || currentZ !== 0 || player.x !== nx || player.y !== ny ||
+        player.hp <= 0 || deathTransition || map[ny]?.[nx] !== 'forest' ||
+        foragedTiles.has(keyXY(nx, ny)) || AdaptivePlayerTrolling.pendingDebtCollector()) return false
+    // Reserve the wider safety radius for enemies that have noticed the player.
+    // Otherwise allow for one step of approach during the extra forage turn.
+    // Use world-space distances, not viewport or animation state.
+    if (enemies.some(e => e.alive && onCurrentLevel(e) && !enemyIsPassive(e) &&
+        !ArtifactWayfaring.truce(e) && enemyCanBeSeen(e) && undergroundTileVisible(e.x, e.y) &&
+        Math.max(Math.abs(e.x - nx), Math.abs(e.y - ny)) <= Math.max(
+          effectiveAggroRange(e) + 1, e.aware || e.alarmed ? AUTO_FORAGE_SAFETY_RADIUS : 0))) return false
+    // Only search vegetation: manual F's loot, digging and camp interactions
+    // are intentionally not part of this automation. The move's replay scope
+    // contains both the movement and this additional ordinary forage turn.
+    tryForage()
+    return true
+  }
+
   let foragedTiles = new Set()
   let dugSandTiles = new Set()
   let suppressLootLog = false
@@ -11386,7 +11426,7 @@ more difficult:
     return moved
   }
 
-  async function tryMove(dx, dy, autoTravel = false) {
+  async function tryMove(dx, dy, autoTravel = false, autoForage = autoForageEnabled && !replayPlaying && !replaySimulationMode) {
     if (player.wayfaring.rush) return ArtifactWayfaring.rushStep(dx,dy)
     if (fireballAim || holeJumpOpen) return false
     if (campOpen || mapOpen || invOpen || tradeOpen || npcMenuOpen || raceOpen || onlineRecordsBlockActions() || deathTransition) return
@@ -11401,7 +11441,8 @@ more difficult:
       const adjacentNpc = currentZ === 0 && npcs.find(n => n.x === player.x + dx && n.y === player.y + dy)
       if (adjacentNpc && openNpcMenu(adjacentNpc)) return
     }
-    const replayScope = recordReplayAction({type: 'move', dx: dx, dy: dy})
+    const replayScope = recordReplayAction({type: 'move', dx: dx, dy: dy, ...(autoForage ? {autoForage: true} : {})})
+    const fromZ = currentZ
     try {
     const frenzy = tryBerserkFrenzy()
     if (frenzy) { await frenzy; return }
@@ -11679,7 +11720,9 @@ more difficult:
       const moved = finishPlayerStep(nx,ny)
       if (moved) {
         artifactAbilityMessage(freeStep,`${ARTIFACT_ABILITIES.abilities[freeStep].name} grants a free step!`, 'You slip through the opening!')
-        animateCameraToPlayer(fromPos, {walking: player.x === nx && player.y === ny, duration: autoTravel ? AUTO_MOVE_ANIM_MS : MOVE_ANIM_MS})
+        const foraged = autoForage && autoForageAfterStep(nx, ny, fromZ)
+        if (!foraged || (!deathTransition && !['pull','charge-knockback','wrestle'].includes(moveAnim?.kind)))
+          animateCameraToPlayer(fromPos, {walking: player.x === nx && player.y === ny, duration: autoTravel ? AUTO_MOVE_ANIM_MS : MOVE_ANIM_MS})
       } else render()
       updateHud(); updateTooltip(); flushPendingMove()
       return
@@ -11704,12 +11747,13 @@ more difficult:
     }
     enemyTurn(null, {fromTile}, null, true)
     npcTurn()
+    const foraged = autoForage && (nx !== fromPos.x || ny !== fromPos.y) && autoForageAfterStep(nx, ny, fromZ)
     updateHud()
     // A successful Pull has its own web-then-drag camera animation. Do not
     // replace it with the ordinary 140 ms walking pan when the spider reacts
     // to this movement in the same turn (the normal pan would snap the player
     // to the pulled destination before the web arrives).
-    if (moved && !['pull', 'charge-knockback', 'wrestle'].includes(moveAnim?.kind))
+    if (moved && (!foraged || !deathTransition) && !['pull', 'charge-knockback', 'wrestle'].includes(moveAnim?.kind))
       animateCameraToPlayer(fromPos, {walking: player.x === nx && player.y === ny, duration: autoTravel ? AUTO_MOVE_ANIM_MS : MOVE_ANIM_MS})
     else {
       render()
@@ -19434,10 +19478,14 @@ more difficult:
       inspect()
       return
     }
-    if (k === 'f' || k === 'F') {
+    if (key === 'f') {
+      // Leave browser Find (Ctrl/Cmd+F) and other modified shortcuts alone.
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return
       ev.preventDefault()
-      if (enemyAttackPresentationPending()) return
-      lootSkeletonOrForage()
+      if (!forageInputAllowed()) return
+      if (ev.shiftKey) {
+        if (!ev.repeat) setAutoForage(!autoForageEnabled)
+      } else if (!enemyAttackPresentationPending()) lootSkeletonOrForage()
       return
     }
     if (k === 't' || k === 'T') {
@@ -19527,17 +19575,41 @@ more difficult:
     touchSpaceBtn.addEventListener('click', fn)
   }
   if (touchForageBtn) {
-    const fn = (ev) => {
-      ev.preventDefault()
-      if (ev.type === 'touchstart') touchForageBtn.dataset.touchHandled = '1'
-      else if (touchForageBtn.dataset.touchHandled) {
-        delete touchForageBtn.dataset.touchHandled
-        return
-      }
-      if (!mapOpen && !invOpen && !tradeOpen && !raceOpen && !replayPlaying) lootSkeletonOrForage()
+    let pointerId = null, holdTimer = null, held = false
+    const cancel = () => {
+      clearTimeout(holdTimer)
+      holdTimer = null
+      pointerId = null
+      held = false
     }
-    touchForageBtn.addEventListener('touchstart', fn)
-    touchForageBtn.addEventListener('click', fn)
+    touchForageBtn.addEventListener('pointerdown', ev => {
+      if (!ev.isPrimary || ev.button !== 0 || pointerId !== null || !forageInputAllowed()) return
+      ev.preventDefault()
+      pointerId = ev.pointerId
+      held = false
+      holdTimer = setTimeout(() => {
+        held = true
+        if (forageInputAllowed()) setAutoForage(!autoForageEnabled)
+      }, AUTO_FORAGE_HOLD_MS)
+    })
+    touchForageBtn.addEventListener('pointerup', ev => {
+      if (ev.pointerId !== pointerId) return
+      ev.preventDefault()
+      const tap = !held && forageInputAllowed()
+      cancel()
+      if (tap) lootSkeletonOrForage()
+    })
+    touchForageBtn.addEventListener('pointercancel', cancel)
+    touchForageBtn.addEventListener('pointerleave', cancel)
+    touchForageBtn.addEventListener('lostpointercapture', cancel)
+    window.addEventListener('blur', cancel)
+    touchForageBtn.addEventListener('contextmenu', ev => ev.preventDefault())
+    // Keyboard/assistive technology clicks have no pointer sequence. Pointer
+    // clicks are ignored here, even if a browser emits one after pointerup.
+    touchForageBtn.addEventListener('click', ev => {
+      ev.preventDefault()
+      if (ev.detail === 0 && !ev.pointerType && forageInputAllowed()) lootSkeletonOrForage()
+    })
   }
   if (touchInventoryBtn) {
     const fn = (ev) => {
@@ -19779,6 +19851,7 @@ more difficult:
 
   /* ============================== INIT ============================== */
   async function generateNewWorld() {
+    setAutoForage(false)
     player.wayfaring = ArtifactWayfaring.freshState()
     ArtifactGeomancy.resetWorld()
     AdaptivePlayerTrolling.reset()

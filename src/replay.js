@@ -337,7 +337,7 @@ async function runReplayAction(action) {
       if(!ArtifactWayfaring.finishRush())return replayDesync('Replay desynchronized: no active Rush.')
       break
     case 'move':
-      await tryMove(action.dx, action.dy)
+      await tryMove(action.dx, action.dy, false, action.autoForage === true)
       break
     case 'castFireball': {
       const idx = player.inventory.findIndex(item => item.replayId === action.replayId && item.kind === 'scrollOfFireball')

@@ -2709,3 +2709,14 @@ body:has(#raceOverlay.show) #hud .stat:not(.stat-actions) {
 #mapOverlay.farsight-view .map-toolbar,
 #mapOverlay.farsight-view #mapTravelHint,
 #mapOverlay.farsight-view #btnMapToInv { display: none; }
+
+/* Auto-Forage is an input mode, not a timed player status. */
+#autoForageIndicator {
+  color: #a7d19a;
+}
+
+#touchActions #touchForage[aria-pressed="true"] {
+  border-color: #a7d19a;
+  box-shadow: inset 0 0 0 2px #a7d19a;
+  background: #29422a;
+}

@@ -558,6 +558,7 @@ function saveGame() {
 }
 
 function loadGameFromObject(data, opts = {}) {
+  setAutoForage(false)
   clearLevelUpPopup()
   closeNpcMenu()
   Campfires.close()
