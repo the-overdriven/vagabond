@@ -65,7 +65,7 @@ test('live loot classifier and replay guard', async () => {
   assert.equal(run('JSON.stringify(cues)'),'[1,2,3,4]')
 })
 
-test('soundtrack waits for interaction, observes the two-minute gap and shares mute', async () => {
+test('soundtrack waits for interaction, advances immediately and shares mute', async () => {
   const listeners = {}, attrs = {}, buttonEvents = {}, timers = new Map()
   const button = {setAttribute(k,v){attrs[k]=v},addEventListener(k,v){buttonEvents[k]=v}}
   const document = {hidden:false,getElementById:()=>button,addEventListener(k,v){listeners[k]=v}}
@@ -98,19 +98,97 @@ test('soundtrack waits for interaction, observes the two-minute gap and shares m
   assert.equal(audio.volume,0.25)
   audio.currentTime=55; buttonEvents.click(); assert.equal(audio.paused,true)
   buttonEvents.click(); await settle(); assert.equal(audio.currentTime,55); assert.equal(audio.plays,3)
-  audio.finish(); assert.equal(timers.size,1)
-  await advance(119999); assert.equal(audio.plays,3)
-  listeners.click(); assert.equal(audio.plays,3,'input cannot skip the gap')
-  await advance(1); assert.equal(audio.plays,4); assert.equal(audio.loads,2)
+  audio.finish(); await settle(); assert.equal(timers.size,0)
+  assert.equal(audio.plays,4,'next track starts immediately'); assert.equal(audio.loads,2)
+  listeners.click(); assert.equal(audio.plays,4,'input does not restart the next track')
   document.hidden=true; listeners.visibilitychange(); assert.equal(audio.paused,true)
   document.hidden=false; listeners.visibilitychange(); await settle(); assert.equal(audio.plays,5)
   run('replayPlaying=true; MusicAudio.suspend()'); assert.equal(audio.paused,true)
   listeners.click(); assert.equal(audio.plays,5)
   run('replayPlaying=false; LootAudio.syncMusic()'); await settle(); assert.equal(audio.plays,6)
-  audio.finish(); buttonEvents.click(); assert.equal(timers.size,0)
-  await advance(120000); assert.equal(audio.plays,6)
-  buttonEvents.click(); await settle(); assert.equal(audio.plays,7)
-  audio.fail(); await advance(120000); assert.equal(audio.plays,8,'failed media retries after gap')
+  audio.finish(); await settle(); assert.equal(audio.plays,7)
+  buttonEvents.click(); assert.equal(timers.size,0); assert.equal(audio.paused,true)
+  await advance(120000); assert.equal(audio.plays,7)
+  buttonEvents.click(); await settle(); assert.equal(audio.plays,8)
+  const beforeFailure = audio.file
+  audio.fail(); await settle(); assert.equal(audio.plays,9,'unavailable media skips immediately')
+  assert.notEqual(audio.file,beforeFailure)
+  // An offline session with no cached audio must not loop over failed assets
+  // indefinitely. Wait after a playlist-length streak, even across a shuffle.
+  for(let i=1;i<17;i++){ audio.fail(); await settle() }
+  assert.equal(audio.plays,24)
+  assert.equal(timers.size,1)
+  await advance(119999); assert.equal(audio.plays,24)
+  await advance(1); assert.equal(audio.plays,25)
+})
+
+test('soundtrack shuffles on startup and each round without repeating a boundary track', async () => {
+  const code = fs.readFileSync(path.join(root,'src','musicAudio.js'),'utf8')
+  // The downloaded assets retain their published filenames, including spaces,
+  // apostrophes, and literal percent escapes in one MP3 filename.
+  const filenames = [
+    "dark-fantasy-gothic-dungeon.mp3",
+    "RPG - Misty Mountains.mp3",
+    "RPG_Lost_In_Time.mp3",
+    "Temple%20of%20the%20Manes.mp3",
+    "rpg_ambience_-_exploration.mp3",
+    "RPG - The Enchanted Forest of Min.mp3",
+    "Kokopelli's Labyrinth Theme ~ Full.mp3",
+    "012_Sirens_in_Darkness.mp3",
+    "lonely_mournful_tune.mp3",
+    "RPG - The Cave (Ambient).mp3",
+    "RPG - Dungeon Exploration Music (The Black Temple).mp3",
+    "devilish-design.mp3",
+    "A Darkness Opus.mp3",
+    "sunset_plains.mp3",
+    "GameMusic_ForestTheme_24.mp3",
+    "RPG The Lost Town.mp3",
+    "RPG - The Great Collapse.mp3"
+  ]
+  assert.equal(filenames.length,17)
+  assert.ok(filenames.every(file => file.endsWith('.mp3')))
+  const expected = filenames.map(file => 'audio/music/'+encodeURIComponent(file))
+  assert.equal(new Set(expected).size,expected.length)
+  const credits = fs.readFileSync(path.join(root,'CREDITS.md'),'utf8')
+  for(const file of filenames) assert.ok(credits.includes('`'+file+'`') ||
+    credits.includes('`audio/music/'+file+'`'),`missing music credit: ${file}`)
+  assert.ok(expected.includes('audio/music/Temple%2520of%2520the%2520Manes.mp3'))
+  const ctx = vm.createContext({document:{hidden:false},window:{},
+    replayPlaying:false,replaySimulationMode:false,replayAnimationsDisabled:false})
+  vm.runInContext(`
+    let now=0, timer, audio, rngCalls=0, randomQueue=[];
+    function rng(){rngCalls++; throw Error('game RNG used for music')}
+    Math.random=()=>randomQueue.length ? randomQueue.shift() : 0;
+    Date.now=()=>now;
+    function setTimeout(fn){timer=fn;return 1}
+    function clearTimeout(){timer=null}
+    window.Audio=class {
+      constructor(){audio=this;this.paused=true;this.events={};this.files=[]}
+      set src(value){this.files.push(value);this.paused=true}
+      addEventListener(name,fn){this.events[name]=fn}
+      play(){this.paused=false;return Promise.resolve()}
+      pause(){this.paused=true}
+    };
+  `,ctx)
+  vm.runInContext(code,ctx)
+  vm.runInContext('MusicAudio.sync(true,true)',ctx)
+  const settle=()=>new Promise(resolve=>setImmediate(resolve))
+  for(let i=1;i<expected.length*2;i++){
+    await settle()
+    // Force the previous round's last track into the first slot, then
+    // force the boundary guard to swap it with a different track.
+    if(i===expected.length) vm.runInContext('randomQueue=[0,...Array(15).fill(0.999),0.5]',ctx)
+    vm.runInContext('audio.paused=true; audio.events.ended()',ctx)
+  }
+  const files=JSON.parse(vm.runInContext('JSON.stringify(audio.files)',ctx))
+  assert.equal(files.length,expected.length*2)
+  assert.notDeepEqual(files.slice(0,expected.length),expected,'first round is shuffled')
+  assert.deepEqual(files.slice(0,expected.length).sort(),[...expected].sort())
+  assert.deepEqual(files.slice(expected.length).sort(),[...expected].sort())
+  assert.notEqual(files[expected.length-1],files[expected.length])
+  assert.notDeepEqual(files.slice(0,expected.length),files.slice(expected.length))
+  assert.equal(vm.runInContext('rngCalls',ctx),0)
+  assert.equal(vm.runInContext('randomQueue.length',ctx),0,'boundary guard drew an extra random value')
 })
 
 test('offline audio serves full files and valid byte ranges', async () => {

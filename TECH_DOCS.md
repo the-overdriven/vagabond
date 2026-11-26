@@ -10942,14 +10942,19 @@ retains the preference locally across sessions, independently of character
 saves and replays. Muting immediately stops the current cue, pauses music and
 costs no turn.
 
-Background music begins after the first user interaction, plays a complete
-track at low volume and then leaves a two-minute silent interval before the
-next track in the playlist. A single-track playlist repeats that track after
-the interval. Music pauses when muted, in a hidden tab or during replay and
-resumes when permitted; an elapsed silent interval is not restarted. Audio
-files (both loot cues and soundtrack tracks) are precached by the service
-worker, including support for partial media requests while offline. Music is
-presentation only and never affects the turn counter, game RNG or save data.
+Background music begins after the first user interaction and plays complete
+tracks at low volume, starting the next track immediately when one ends. The
+playlist is shuffled on page load and again after each round; every track is
+attempted once per round, with no immediate repeat between rounds. Music
+pauses when muted, in a hidden tab or during replay and resumes when permitted.
+The original soundtrack track and loot cues are precached. Additional MP3
+tracks are fetched and cached on demand by the existing service worker,
+including support for partial media requests. The explicit playlist uses actual
+asset filenames; directory contents are not discovered automatically.
+Unavailable tracks are skipped immediately; after a playlist-length streak of
+failures, playback waits two minutes before retrying to avoid repeated failed
+requests. Music is presentation only and never affects the turn counter, game
+RNG or save data.
 A discreet link in the bottom-left corner of the character creation panel
 opens the music attribution in `CREDITS.md`. The journey and local recovery
 buttons are aligned to the right of the footer, wrapping on narrow screens.
