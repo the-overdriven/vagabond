@@ -8476,6 +8476,34 @@ function worldDecorationRoll(x, y, level) {
   return ((n ^ (n >>> 16)) >>> 0) / 4294967296
 }
 
+// Headwater outlets are scenery only. Prefer the actual recorded downhill
+// direction; for a crater without one, select an adjacent channel endpoint.
+// A diagonal outlet must not paint over a landmark, water or forest corner.
+function mountainSpringOutlet(grid, spring) {
+  const {x,y} = spring
+  if (!['mountain','snowmountain'].includes(grid[y]?.[x])) return null
+  const river = (x,y) => ['river','frozenriver'].includes(grid[y]?.[x])
+  const valid = ({x:tx,y:ty}) => {
+    const dx = tx-x, dy = ty-y
+    return Math.max(Math.abs(dx),Math.abs(dy)) === 1 && river(tx,ty) &&
+      (!dx || !dy || [grid[y]?.[tx],grid[ty]?.[x]].every(t =>
+        ['grass','sand','snow','hill','mountain','snowmountain'].includes(t)))
+  }
+  if (spring.outlet) return valid(spring.outlet) ? spring.outlet : null
+  const candidates = []
+  for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
+    const outlet = {x:x+dx,y:y+dy}
+    if (!valid(outlet)) continue
+    let neighbors = 0
+    for (let oy=-1;oy<=1;oy++) for (let ox=-1;ox<=1;ox++)
+      if ((ox || oy) && river(outlet.x+ox,outlet.y+oy)) neighbors++
+    candidates.push({outlet,neighbors,distance:Math.abs(dx)+Math.abs(dy)})
+  }
+  candidates.sort((a,b) => a.neighbors-b.neighbors || a.distance-b.distance ||
+    a.outlet.y-b.outlet.y || a.outlet.x-b.outlet.x)
+  return candidates[0]?.outlet ?? null
+}
+
 // Keep natural and abandoned-world props on the existing saved decoration layer.
 function spawnNaturalDecorations(roll) {
   const cfg = WORLD_GEN_CONFIG.worldDecorations
@@ -8575,22 +8603,19 @@ function spawnNaturalDecorations(roll) {
   }
   const connected = []
   for (const site of generatedHeadwaters) {
-    if (connected.length >= 8) break
-    const {x,y,outlet} = site
-    if (!['mountain','snowmountain'].includes(surfaceMap[y]?.[x]) ||
-        !['river','frozenriver'].includes(surfaceMap[outlet.y]?.[outlet.x])) continue
-    if (x !== outlet.x && y !== outlet.y &&
-        ![surfaceMap[y][outlet.x],surfaceMap[outlet.y][x]].every(t =>
-          ['grass','sand','snow','hill','mountain','snowmountain'].includes(t))) continue
-    if (connected.some(p => Math.max(Math.abs(x-p.x),Math.abs(y-p.y)) < 3)) continue
+    const outlet = mountainSpringOutlet(surfaceMap,site)
+    if (!outlet) continue
     if (add(0,'mountain-water',site)) {
       caveDecorations[caveDecorations.length-1].outlet = {...outlet}
       connected.push(site)
     }
   }
-  const enclosed = springs.filter(s => connected.every(p =>
-    Math.max(Math.abs(s.x-p.x),Math.abs(s.y-p.y)) >= 3))
-  scatter(0,'mountain-water',enclosed,12-connected.length,27,3)
+  const extra = springs.filter(s => mountainSpringOutlet(surfaceMap,s) &&
+    connected.every(p => Math.max(Math.abs(s.x-p.x),Math.abs(s.y-p.y)) >= 3))
+  const firstExtra = caveDecorations.length
+  scatter(0,'mountain-water',extra,Math.max(0,12-connected.length),27,3)
+  for (const spring of caveDecorations.slice(firstExtra))
+    spring.outlet = mountainSpringOutlet(surfaceMap,spring)
 
   // Flood-fill water only; large oceans and river channels are not lily ponds.
   const visited = new Set(), pondSites=[]

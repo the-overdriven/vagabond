@@ -14609,10 +14609,16 @@ more difficult:
         .map(prop=>keyXY(prop.x,prop.y))) : null
     const springChannels = new Map()
     if (mountainSpringTiles?.size) for (const spring of caveDecorations) {
-      if (spring.kind !== 'mountain-water' || !spring.outlet) continue
-      const {x,y,outlet} = spring
-      for (const tx of new Set([x,outlet.x])) for (const ty of new Set([y,outlet.y]))
-        springChannels.set(keyXY(tx,ty),spring)
+      if (spring.level !== 0 || spring.kind !== 'mountain-water') continue
+      const outlet = mountainSpringOutlet(surfaceMap,spring)
+      if (!outlet) continue
+      const {x,y} = spring
+      const channel = {...spring,outlet}
+      for (const tx of new Set([x,outlet.x])) for (const ty of new Set([y,outlet.y])) {
+        const key = keyXY(tx,ty)
+        if (!springChannels.has(key)) springChannels.set(key,[])
+        springChannels.get(key).push(channel)
+      }
     }
     // ASCII fills light per cell; resolve sources once per frame instead of
     // rescanning cave exits and ground crystals for every visible tile.
@@ -14748,8 +14754,8 @@ more difficult:
           } else {
             drawTile(px, py, treeStyle ? treeStyle.glyph : glyph, color, bg)
           }
-          const spring = terrainSource === surfaceMap && springChannels.get(keyXY(mx,my))
-          if (spring) drawSpringOutlet(px,py,mx,my,spring)
+          const springs = terrainSource === surfaceMap && springChannels.get(keyXY(mx,my))
+          if (springs) for (const spring of springs) drawSpringOutlet(px,py,mx,my,spring)
           if (tileKey === 'sand' && dugSandTiles.has(keyXY(mx, my))) {
             // Keep the original sand/grass connector and the entire outer edge
             // untouched; the dug hole is only a transparent central overlay.
